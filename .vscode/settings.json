@@ -1,4 +1,21 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+  // Pin the exact Conda Python (adjust path if different)
+  "python.defaultInterpreterPath": "C:\\Users\\Phillip\\anaconda3\\envs\\denguard-py311\\python.exe",
+
+  // Auto-activate the env in the integrated terminal
+  "python.terminal.activateEnvironment": true,
+
+  // Make Pylance analyze code against this interpreter
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.typeCheckingMode": "off",
+
+  // (Optional) help Pylance avoid other envs
+  "python.analysis.venvPath": "C:\\Users\\Phillip\\anaconda3\\envs",
+"python.analysis.exclude": [
+    "**/.venv/**",
+    "**/__pycache__/**"
+],
+"python-envs.defaultEnvManager": "ms-python.python:conda",
+"python-envs.defaultPackageManager": "ms-python.python:conda",
+"python-envs.pythonProjects": []
 }
