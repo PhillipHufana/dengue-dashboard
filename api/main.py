@@ -4,25 +4,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .geo import router as geo_router
 from .forecast import router as forecast_router
+from api import geo
+
 
 app = FastAPI(
     title="Denguard API",
-    description="Provides barangay boundaries, dengue forecasts, and city-level data.",
+    description="Provides dengue forecasts, barangay boundaries, geospatial overlays.",
     version="1.0.0",
 )
 
-# CORS (allow requests from your Next.js frontend)
+# CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # You can restrict later
+    allow_origins=["*"],  # later restrict to your Next.js domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routers
-app.include_router(geo_router, prefix="/geo", tags=["Geospatial"])
-app.include_router(forecast_router, prefix="/forecast", tags=["Forecasts"])
+# Route groups
+app.include_router(geo.router)  # NO prefix here
+app.include_router(forecast_router, prefix="/forecast")
 
 
 @app.get("/health")
