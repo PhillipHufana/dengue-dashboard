@@ -88,7 +88,8 @@ export default function MapView({ onSelect }: { onSelect: (name: string) => void
 
     layer.bindTooltip(tooltip, { sticky: true });
 
-    layer.on("click", () => onSelect(name));
+    layer.on("click", () => onSelect(feature.properties.name));
+
   };
 
   return (

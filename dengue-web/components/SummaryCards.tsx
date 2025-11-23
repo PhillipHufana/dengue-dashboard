@@ -23,7 +23,7 @@ export default function SummaryCards() {
     <div className="grid grid-cols-3 gap-4 p-4 bg-white shadow">
       <div className="rounded border p-4">
         <div className="text-sm text-zinc-500">City forecast</div>
-        <div className="text-2xl font-bold">{city?.city_cases}</div>
+        <div className="text-2xl font-bold text-zinc-600">{city?.city_cases}</div>
         <div className="text-xs text-zinc-600">{city?.week_start}</div>
       </div>
 
@@ -31,15 +31,15 @@ export default function SummaryCards() {
         <div className="text-sm text-zinc-500">
           Total forecasted (all barangays)
         </div>
-        <div className="text-2xl font-bold">{total}</div>
+        <div className="text-2xl font-bold text-zinc-600">{total}</div>
         <div className="text-xs text-zinc-600">Latest forecast week</div>
       </div>
 
       <div className="rounded border p-4">
         <div className="text-sm text-zinc-500">Top 3 hotspots</div>
         {top3.map((b: any) => (
-          <div key={b.name} className="text-sm">
-            {b.name} — <span className="font-semibold">{b.forecast}</span>
+          <div key={b.name} className="text-sm text-gray-600">
+            {b.name} — <span className="font-semibold text-gray-600">{b.forecast}</span>
           </div>
         ))}
       </div>

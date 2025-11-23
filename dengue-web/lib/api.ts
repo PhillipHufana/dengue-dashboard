@@ -14,8 +14,14 @@ export async function getChoropleth() {
 }
 
 export async function getBarangaySeries(name: string) {
-  const res = await fetch(`${API_BASE}/forecast/barangay/${name}`);
-  if (!res.ok) throw new Error("Failed to load barangay series");
+  const safe = encodeURIComponent(name.trim().toLowerCase());
+  const res = await fetch(`${API_BASE}/forecast/barangay/${safe}`);
+
+  if (!res.ok) {
+    console.error("Barangay fetch failed", safe, res.status);
+    throw new Error("Failed to load barangay series");
+  }
+
   return res.json();
 }
 
