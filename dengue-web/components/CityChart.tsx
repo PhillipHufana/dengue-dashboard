@@ -1,5 +1,3 @@
-// components/CityChart.tsx
-"use client";
 "use client";
 
 import {

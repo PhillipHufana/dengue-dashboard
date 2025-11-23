@@ -6,6 +6,9 @@ import SummaryCards from "@/components/SummaryCards";
 import MapView from "@/components/MapView";
 import BarangayChart from "@/components/BarangayChart";
 import CityChart from "@/components/CityChart";
+// import HotspotCards from "@/components/HotspotCards";
+
+
 
 export default function Dashboard() {
   const [selectedBarangay, setSelectedBarangay] = useState<string>("");
@@ -26,7 +29,13 @@ export default function Dashboard() {
           <BarangayChart name={selectedBarangay} />
           <CityChart />
         </div>
+        {/* <div className="w-1/2 overflow-y-auto bg-zinc-50">
+          <HotspotCards />
+          <BarangayChart name={selectedBarangay} />
+          <CityChart />
+        </div> */}
       </div>
     </div>
   );
 }
+

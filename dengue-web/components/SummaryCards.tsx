@@ -1,4 +1,3 @@
-// components/SummaryCards.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,6 +14,7 @@ export default function SummaryCards() {
 
   const city = data.city_latest;
   const total = data.total_forecasted_cases;
+
   const top3 = [...data.barangay_latest]
     .sort((a, b) => (b.forecast ?? 0) - (a.forecast ?? 0))
     .slice(0, 3);
@@ -28,7 +28,9 @@ export default function SummaryCards() {
       </div>
 
       <div className="rounded border p-4">
-        <div className="text-sm text-zinc-500">Total forecasted (all barangays)</div>
+        <div className="text-sm text-zinc-500">
+          Total forecasted (all barangays)
+        </div>
         <div className="text-2xl font-bold">{total}</div>
         <div className="text-xs text-zinc-600">Latest forecast week</div>
       </div>
