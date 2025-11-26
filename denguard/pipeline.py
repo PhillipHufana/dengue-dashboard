@@ -129,7 +129,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg,
     )
 
-    # ============================================
+   # ============================================
     # Step 20 — Export to Supabase
     # ============================================
     try:
@@ -140,9 +140,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
             upsert_barangay_forecasts,
         )
 
-        # -----------------------------
-        # Export barangay table (names)
-        # -----------------------------
+        # Export barangay list
         barangay_list = (
             weekly_full["Barangay_standardized"]
             .drop_duplicates()
@@ -150,17 +148,17 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         )
         upsert_barangays(barangay_list)
 
-        # -----------------------------
-        # Export city weekly series
-        # -----------------------------
+        # Export city weekly
         city_weekly_out = city_weekly.rename(
             columns={"WeekStart": "week_start", "CityCases": "city_cases"}
         )
+        city_weekly_out["week_start"] = pd.to_datetime(
+            city_weekly_out["week_start"]
+        ).dt.strftime("%Y-%m-%d")
+
         upsert_city_weekly(city_weekly_out)
 
-        # -----------------------------
-        # Export barangay weekly history
-        # -----------------------------
+        # Export barangay weekly
         barangay_weekly_out = weekly_full.rename(
             columns={
                 "Barangay_standardized": "name",
@@ -168,11 +166,13 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
                 "Cases": "cases",
             }
         )
+        barangay_weekly_out["week_start"] = pd.to_datetime(
+            barangay_weekly_out["week_start"]
+        ).dt.strftime("%Y-%m-%d")
+
         upsert_barangay_weekly(barangay_weekly_out)
 
-        # -----------------------------
         # Export forecasts
-        # -----------------------------
         last_observed = weekly_full["WeekStart"].max()
 
         df_fore = final_forecast.rename(
@@ -184,7 +184,13 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
                 "local_forecast": "local_forecast",
             }
         )
-        df_fore["is_future"] = df_fore["week_start"] > last_observed
+        df_fore["week_start"] = pd.to_datetime(
+            df_fore["week_start"]
+        ).dt.strftime("%Y-%m-%d")
+
+        df_fore["is_future"] = (
+            pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
+        )
 
         upsert_barangay_forecasts(df_fore)
 
@@ -192,6 +198,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
     except Exception as e:
         print(f"ℹ️ Supabase export skipped: {e}")
+
 
 
 if __name__ == "__main__":
