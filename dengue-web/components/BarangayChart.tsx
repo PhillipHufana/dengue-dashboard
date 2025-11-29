@@ -1,75 +1,53 @@
-// components/BarangayChart.tsx
 "use client";
 
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Legend
-);
-
 import { useEffect, useState } from "react";
-import { getBarangaySeries } from "@/lib/api";
 import { Line } from "react-chartjs-2";
+import { getTimeseries } from "@/lib/api";
 
-function normalizeName(x: string): string {
-  return x
-    .toLowerCase()
-    .replace(/\(.+?\)/g, "") // remove "(Pob.)"
-    .replace(/-/g, " ")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-export default function BarangayChart({ name }: { name: string }) {
+export default function BarangayChart({
+  name,
+  freq,
+  model,
+}: {
+  name: string;
+  freq: string;
+  model: string;
+}) {
   const [series, setSeries] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (name) {
-      const nm = normalizeName(name);
-      setError(null);
+    if (!name) return;
+    getTimeseries("barangay", { name, freq: freq as any, model: model as any })
+      .then((data) => setSeries(data.series || []))
+      .catch(console.error);
+  }, [name, freq, model]);
 
-      getBarangaySeries(nm)
-        .then((res) => setSeries(res.series || []))
-        .catch((err) => {
-          console.error(err);
-          setError("No data for this barangay");
-        });
-    }
-  }, [name]);
+  if (!name)
+    return <div className="p-4">Select a barangay on the map</div>;
 
-  if (!name) return <div className="p-4 text-gray-600">Click a barangay on the map</div>;
-  if (error) return <div className="p-4 text-red-600">{error}</div>;
-
-  const labels = series.map((d) => d.week_start);
-  const values = series.map((d) => d.final_forecast);
+  const labels = series.map((x) => x.date);
+  const cases = series.map((x) => x.cases);
+  const forecast = series.map((x) => x.forecast);
 
   return (
     <div className="p-4">
-      <h2 className="text-lg font-semibold mb-2 text-gray-600">{name.toUpperCase()}</h2>
+      <h2 className="font-semibold text-lg mb-2">
+        {name.toUpperCase()} — {model} ({freq})
+      </h2>
+
       <Line
         data={{
           labels,
           datasets: [
             {
+              label: "Actual Cases",
+              data: cases,
+              borderColor: "#22c55e",
+            },
+            {
               label: "Forecast",
-              data: values,
+              data: forecast,
               borderColor: "#2563eb",
-              backgroundColor: "rgba(37,99,235,0.3)",
             },
           ],
         }}

@@ -1,5 +1,4 @@
 "use client";
-
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,32 +18,39 @@ ChartJS.register(
   Legend
 );
 
-import { useEffect, useState } from "react";
-import { getCitySeries } from "@/lib/api";
 import { Line } from "react-chartjs-2";
 
-export default function CityChart() {
-  const [rows, setRows] = useState<any[]>([]);
+export default function CityChart({
+  series,
+  timeIndex,
+}: {
+  series: any[];
+  timeIndex: number;
+}) {
+  if (!series || series.length === 0)
+    return <div className="p-4">Loading city trends…</div>;
 
-  useEffect(() => {
-    getCitySeries().then((data) => setRows(data || []));
-  }, []);
-
-  const labels = rows.map((d) => d.week_start);
-  const values = rows.map((d) => d.city_cases);
+  const labels = series.map((x) => x.date);
+  const cases = series.map((x) => x.cases);
+  const forecast = series.map((x) => x.forecast);
 
   return (
     <div className="p-4">
-      <h2 className="text-lg font-semibold mb-2 text-gray-600">City Weekly Cases</h2>
+      <h2 className="font-semibold text-lg mb-2">Citywide Cases + Forecast</h2>
+
       <Line
         data={{
           labels,
           datasets: [
             {
-              label: "City Cases",
-              data: values,
+              label: "Actual Cases",
+              data: cases,
               borderColor: "#16a34a",
-              backgroundColor: "rgba(22,163,74,0.4)",
+            },
+            {
+              label: "Forecast",
+              data: forecast,
+              borderColor: "#ef4444",
             },
           ],
         }}

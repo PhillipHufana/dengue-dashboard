@@ -30,3 +30,23 @@ export async function getCitySeries() {
   if (!res.ok) throw new Error("Failed to load city series");
   return res.json();
 }
+
+export async function getTimeseries(
+  level: "barangay" | "city",
+  options: {
+    name?: string;
+    freq?: "weekly" | "monthly" | "yearly";
+    model?: "preferred" | "final" | "hybrid" | "local";
+  }
+) {
+  const params = new URLSearchParams();
+  params.set("level", level);
+  if (options.name) params.set("name", options.name);
+  params.set("freq", options.freq ?? "weekly");
+  params.set("model", options.model ?? "preferred");
+
+  const res = await fetch(`${API_BASE}/timeseries?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to load timeseries");
+
+  return res.json();
+}

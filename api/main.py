@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .geo import router as geo_router
 from .forecast import router as forecast_router
+from .timeseries import router as timeseries_router  # NEW
 from api import geo
 
 
@@ -13,18 +14,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later restrict to your Next.js domain
+    allow_origins=["*"],  # tighten later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Route groups
-app.include_router(geo.router)  # NO prefix here
+app.include_router(geo.router)
 app.include_router(forecast_router, prefix="/forecast")
+app.include_router(timeseries_router, prefix="/timeseries")  # NEW
 
 
 @app.get("/health")
