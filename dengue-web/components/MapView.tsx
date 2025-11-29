@@ -1,3 +1,4 @@
+// components/MapView.tsx
 "use client";
 
 import dynamic from "next/dynamic";
@@ -25,13 +26,15 @@ export default function MapView({
   onSelect,
   freq,
   model,
-  timeIndex,
+  rangeStart,
+  rangeEnd,
   citySeries,
 }: {
   onSelect: (name: string) => void;
   freq: "weekly" | "monthly" | "yearly";
   model: "preferred" | "final" | "hybrid" | "local";
-  timeIndex: number;
+  rangeStart: number;
+  rangeEnd: number;
   citySeries: any[];
 }) {
   const [polygons, setPolygons] = useState<FeatureCollection | null>(null);
@@ -39,9 +42,21 @@ export default function MapView({
     Record<string, any[]>
   >({});
 
-  // Safe date
-  const safeIndex = Math.min(timeIndex, citySeries.length - 1);
-  const selectedDate = citySeries?.[safeIndex]?.date ?? null;
+  // Clamp range
+  const safeStart =
+    citySeries.length === 0 ? 0 : Math.max(0, Math.min(rangeStart, citySeries.length - 1));
+  const safeEnd =
+    citySeries.length === 0
+      ? 0
+      : Math.max(safeStart, Math.min(rangeEnd, citySeries.length - 1));
+
+  const selectedSlice =
+    citySeries.length > 0 && safeEnd >= safeStart
+      ? citySeries.slice(safeStart, safeEnd + 1)
+      : [];
+
+  const selectedDates = new Set(selectedSlice.map((d) => d.date));
+  const anyFuture = selectedSlice.some((d) => d.is_future === true);
 
   // -------------------------------
   // LOAD CHOROPLETH GEOJSON
@@ -76,19 +91,12 @@ export default function MapView({
         })
         .catch(() => {});
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polygons, freq, model]);
 
   // -------------------------------
   // HELPERS
   // -------------------------------
-  function getForecastForBarangay(nm: string) {
-    const series = barangayForecasts[nm];
-    if (!series || !selectedDate) return 0;
-
-    const match = series.find((x) => x.date === selectedDate);
-    return match?.forecast ?? 0;
-  }
-
   function getRiskColor(risk?: string): string {
     switch (risk) {
       case "high":
@@ -102,6 +110,22 @@ export default function MapView({
     }
   }
 
+  // Sum forecast over the selected date range
+  function getRangeForecastForBarangay(nm: string) {
+    const series = barangayForecasts[nm];
+    if (!series || selectedSlice.length === 0) return 0;
+
+    let sum = 0;
+    for (const pt of series) {
+      if (selectedDates.has(pt.date)) {
+        // choose the same field that /timeseries uses for "value"
+        const v = pt.forecast ?? pt.value ?? 0;
+        sum += typeof v === "number" ? v : Number(v) || 0;
+      }
+    }
+    return sum;
+  }
+
   // -------------------------------
   // STYLING
   // -------------------------------
@@ -110,12 +134,10 @@ export default function MapView({
     const riskColor = getRiskColor(p?.risk_level);
 
     const nm = p?.name;
-    const forecastValue = getForecastForBarangay(nm);
+    const forecastSum = getRangeForecastForBarangay(nm);
 
-    const isFuture = citySeries?.[safeIndex]?.is_future ?? false;
-
-    // If it's not future → show risk map
-    if (!isFuture) {
+    // If range is entirely past → use risk choropleth
+    if (!anyFuture) {
       return {
         fillColor: riskColor,
         weight: 1,
@@ -125,11 +147,13 @@ export default function MapView({
       };
     }
 
-    // Future → use forecast overlay
+    // If range includes future → use forecast sum
     const overlayColor =
-      forecastValue > 15 ? "#ef4444" :
-      forecastValue > 5  ? "#f59e0b" :
-                          "#22c55e";
+      forecastSum > 60 ? "#b91c1c" : // very high
+      forecastSum > 30 ? "#ef4444" :
+      forecastSum > 10 ? "#f59e0b" :
+      forecastSum > 0  ? "#84cc16" :
+                         "#e5e7eb"; // zero
 
     return {
       fillColor: overlayColor,
@@ -140,13 +164,13 @@ export default function MapView({
     };
   }
 
-
-
   // -------------------------------
   // POPUP + TOOLTIP
   // -------------------------------
   function onEachFeature(feature: any, layer: any) {
     const p = feature.properties || {};
+    const nm = p.name;
+    const forecastSum = getRangeForecastForBarangay(nm);
 
     const tooltip = `
       <div style="font-size:12px;">
@@ -154,8 +178,7 @@ export default function MapView({
         Risk: <b>${p.risk_level ?? "unknown"}</b><br/>
         Latest week: ${p.latest_week ?? "N/A"}<br/>
         Cases: ${p.latest_cases ?? "N/A"}<br/>
-        Forecast week: ${p.latest_future_week ?? "N/A"}<br/>
-        Forecast: ${p.latest_forecast ?? "N/A"}
+        Forecast range total: ${forecastSum.toFixed(2)}
       </div>
     `;
 
@@ -173,7 +196,11 @@ export default function MapView({
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      <GeoJSON data={polygons as any} style={style} onEachFeature={onEachFeature} />
+      <GeoJSON
+        data={polygons as any}
+        style={style as any}
+        onEachFeature={onEachFeature as any}
+      />
     </MapContainer>
   );
 }

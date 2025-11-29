@@ -1,3 +1,4 @@
+// app/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,39 +11,55 @@ import { getTimeseries } from "@/lib/api";
 export default function Dashboard() {
   const [selectedBarangay, setSelectedBarangay] = useState<string>("");
 
-  // Global control state
+  // global controls
   const [freq, setFreq] = useState<"weekly" | "monthly" | "yearly">("weekly");
   const [model, setModel] = useState<"preferred" | "final" | "hybrid" | "local">(
     "preferred"
   );
 
-  // Global city-level timeseries (for both map coloring & city chart)
   const [citySeries, setCitySeries] = useState<any[]>([]);
-  const [timeIndex, setTimeIndex] = useState(0);
 
-  // Load city timeseries whenever freq/model changes
+  // range = [startIndex, endIndex]
+  const [rangeStart, setRangeStart] = useState(0);
+  const [rangeEnd, setRangeEnd] = useState(0);
+
+  // load city time series whenever freq/model changes
   useEffect(() => {
     getTimeseries("city", { freq, model })
       .then((data) => {
-        setCitySeries(data.series || []);
-        setTimeIndex((i) =>
-          i < data.series.length ? i : data.series.length - 1
-        );
+        const series = data.series || [];
+        setCitySeries(series);
+
+        if (series.length === 0) {
+          setRangeStart(0);
+          setRangeEnd(0);
+        } else {
+          setRangeStart(0);
+          setRangeEnd(series.length - 1);
+        }
       })
       .catch(console.error);
   }, [freq, model]);
 
-  const currentDate =
-    citySeries.length > 0 ? citySeries[timeIndex]?.date : null;
+  const safeStart =
+    citySeries.length === 0 ? 0 : Math.max(0, Math.min(rangeStart, citySeries.length - 1));
+  const safeEnd =
+    citySeries.length === 0
+      ? 0
+      : Math.max(safeStart, Math.min(rangeEnd, citySeries.length - 1));
+
+  const startDate =
+    citySeries.length > 0 ? citySeries[safeStart]?.date : null;
+  const endDate =
+    citySeries.length > 0 ? citySeries[safeEnd]?.date : null;
 
   return (
     <div className="h-screen w-screen flex flex-col">
-
       {/* TOP SUMMARY */}
       <SummaryCards />
 
-      {/* Controls */}
-      <div className="flex items-center gap-4 p-3 border-b bg-white">
+      {/* CONTROLS */}
+      <div className="flex flex-wrap items-center gap-4 p-3 border-b bg-white">
         {/* Frequency */}
         <select
           className="border p-2 rounded"
@@ -54,7 +71,7 @@ export default function Dashboard() {
           <option value="yearly">Yearly</option>
         </select>
 
-        {/* Forecast Model */}
+        {/* Model */}
         <select
           className="border p-2 rounded"
           value={model}
@@ -66,23 +83,55 @@ export default function Dashboard() {
           <option value="local">Local</option>
         </select>
 
-        {/* Time slider */}
+        {/* RANGE SLIDER (two thumbs) */}
         {citySeries.length > 0 && (
-          <input
-            type="range"
-            min={0}
-            max={citySeries.length - 1}
-            value={timeIndex}
-            onChange={(e) => setTimeIndex(Number(e.target.value))}
-            className="w-64"
-          />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={citySeries.length - 1}
+                value={safeStart}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  // start cannot go beyond end
+                  setRangeStart(Math.min(v, safeEnd));
+                }}
+                className="w-64"
+              />
+              <span className="text-xs text-zinc-600">
+                From: {startDate ?? "N/A"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={citySeries.length - 1}
+                value={safeEnd}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  // end cannot go before start
+                  setRangeEnd(Math.max(v, safeStart));
+                }}
+                className="w-64"
+              />
+              <span className="text-xs text-zinc-600">
+                To: {endDate ?? "N/A"}
+              </span>
+            </div>
+          </div>
         )}
 
         <div className="text-sm text-zinc-600">
-          {currentDate ? `Selected: ${currentDate}` : ""}
+          {startDate && endDate
+            ? `Selected range: ${startDate} → ${endDate}`
+            : ""}
         </div>
       </div>
 
+      {/* MAIN LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT MAP */}
         <div className="w-1/2 border-r overflow-hidden">
@@ -90,22 +139,26 @@ export default function Dashboard() {
             onSelect={setSelectedBarangay}
             freq={freq}
             model={model}
-            timeIndex={timeIndex}
+            rangeStart={safeStart}
+            rangeEnd={safeEnd}
             citySeries={citySeries}
           />
-
         </div>
 
-        {/* RIGHT CHART PANEL */}
+        {/* RIGHT CHARTS */}
         <div className="w-1/2 overflow-y-auto bg-zinc-50">
           <BarangayChart
             name={selectedBarangay}
             freq={freq}
             model={model}
+            rangeStart={safeStart}
+            rangeEnd={safeEnd}
           />
+
           <CityChart
             series={citySeries}
-            timeIndex={timeIndex}
+            rangeStart={safeStart}
+            rangeEnd={safeEnd}
           />
         </div>
       </div>
