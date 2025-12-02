@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import List, Tuple
 import numpy as np
 import pandas as pd
-
+import warnings
 from denguard.config import Config
 
 def local_models_tierA(
@@ -116,15 +116,21 @@ def local_models_tierA(
         try:
             y_train = df_train.set_index("ds")["y"]
             y_train.index = pd.DatetimeIndex(y_train.index, freq="W-MON")
-
-            ma = pm.auto_arima(
-                y_train,
-                seasonal=True,
-                m=52,
-                stepwise=True,
-                suppress_warnings=True,
-                error_action="ignore",
-            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    # message="'force_all_finite' was renamed to 'ensure_all_finite'",
+                    message=".*force_all_finite.*",  # regex, matches the full sklearn message
+                    category=FutureWarning,
+                )
+                ma = pm.auto_arima(
+                    y_train,
+                    seasonal=True,
+                    m=52,
+                    stepwise=True,
+                    suppress_warnings=True,
+                    error_action="ignore",
+                )
 
             pred_test = ma.predict(n_periods=len(test_ds))
             pred_future = ma.predict(n_periods=len(test_ds) + horizon)[-horizon:]
@@ -160,8 +166,14 @@ def local_models_tierA(
         if test_vals is None or fut_vals is None:
             raise RuntimeError(f"{bgy}: No valid forecast from either model.")
 
-        if abs(test_vals[-1] - fut_vals[0]) > 50:
-            print(f"Warning: {bgy} discontinuity detected >50 cases.")
+        # Discontinuity check: always treat as arrays (Series or ndarray)
+        test_vals_arr = np.asarray(test_vals, dtype=float)
+        fut_vals_arr = np.asarray(fut_vals, dtype=float)
+
+        if test_vals_arr.size > 0 and fut_vals_arr.size > 0:
+            if abs(test_vals_arr[-1] - fut_vals_arr[0]) > 50:
+                print(f"Warning: {bgy} discontinuity detected >50 cases.")
+
 
         out_test = pd.DataFrame({
             "Barangay_standardized": bgy,

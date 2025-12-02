@@ -29,18 +29,22 @@ def _resample_series(
     freq: Literal["weekly", "monthly", "yearly"],
 ) -> List[Dict[str, Any]]:
     """
-    rows: list of {"date": "YYYY-MM-DD", "cases": ..., "forecast": ...}
+    rows: list of {"date": "YYYY-MM-DD", "cases": ..., "forecast": ..., "is_future"?: bool}
     freq: "weekly" | "monthly" | "yearly"
-    Aggregates by sum.
+    Aggregates by sum. If 'is_future' exists, any future in the bucket → is_future=True.
     """
     if freq == "weekly":
-        # Already weekly, just sort and return
+        # Keep weekly as-is, preserving extra keys like is_future
         return sorted(rows, key=lambda r: r["date"])
 
     if not rows:
         return []
 
     df = pd.DataFrame(rows)
+
+    if "date" not in df.columns:
+        return []
+
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"])
 
@@ -52,27 +56,35 @@ def _resample_series(
     elif freq == "yearly":
         rule = "YS"  # year start
     else:
-        # Should not happen, as we validate freq earlier
         return rows
 
-    agg = (
-        df.groupby(pd.Grouper(key="date", freq=rule))
-        .agg(
-            cases=("cases", "sum"),
-            forecast=("forecast", "sum"),
-        )
-        .reset_index()
-    )
+    agg_dict: Dict[str, Any] = {
+        "cases": ("cases", "sum"),
+        "forecast": ("forecast", "sum"),
+    }
+
+    # If city-level series has is_future, keep that info
+    has_is_future = "is_future" in df.columns
+    if has_is_future:
+        agg_dict["is_future"] = ("is_future", "max")
+
+    agg = df.groupby(pd.Grouper(key="date", freq=rule)).agg(**agg_dict).reset_index()
 
     result: List[Dict[str, Any]] = []
     for _, row in agg.iterrows():
-        result.append(
-            {
-                "date": row["date"].strftime("%Y-%m-%d"),
-                "cases": float(row["cases"]) if pd.notna(row["cases"]) else None,
-                "forecast": float(row["forecast"]) if pd.notna(row["forecast"]) else None,
-            }
-        )
+        item: Dict[str, Any] = {
+            "date": row["date"].strftime("%Y-%m-%d"),
+            "cases": float(row["cases"]) if pd.notna(row["cases"]) else None,
+            "forecast": float(row["forecast"]) if pd.notna(row["forecast"]) else None,
+        }
+        if has_is_future and "is_future" in row:
+            val = row["is_future"]
+            if pd.isna(val):
+                item["is_future"] = False
+            else:
+                item["is_future"] = bool(val)
+        result.append(item)
+
     return result
 
 
@@ -96,24 +108,9 @@ def get_timeseries(
 
     - level=barangay, name="buhangin"
     - level=city
-
-    Returns:
-    {
-      "level": "barangay",
-      "name": "buhangin",
-      "freq": "weekly",
-      "model": "preferred",
-      "n_points": 52,
-      "series": [
-        {"date": "2024-01-01", "cases": 2, "forecast": null},
-        {"date": "2024-01-08", "cases": 0, "forecast": 0.3},
-        ...
-      ]
-    }
     """
     sb = get_supabase()
 
-    # Which forecast column to read
     forecast_col = MODEL_COLUMN_MAP.get(model)
     if forecast_col is None:
         raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
@@ -123,11 +120,13 @@ def get_timeseries(
     # --------------------------------------------------------
     if level == "barangay":
         if not name:
-            raise HTTPException(status_code=400, detail="name is required when level=barangay")
+            raise HTTPException(
+                status_code=400,
+                detail="name is required when level=barangay",
+            )
 
         nm = normalize_name(name)
 
-        # 1) Historical weekly cases for this barangay
         weekly_resp = (
             sb.table("barangay_weekly")
             .select("week_start, cases")
@@ -137,7 +136,6 @@ def get_timeseries(
         )
         weekly_rows = weekly_resp.data or []
 
-        # 2) Forecasts for this barangay (all weeks)
         fore_resp = (
             sb.table("barangay_forecasts")
             .select(f"week_start, {forecast_col}, is_future")
@@ -153,7 +151,6 @@ def get_timeseries(
                 detail=f"No timeseries found for barangay '{name}' (normalized='{nm}')",
             )
 
-        # 3) Merge into single dictionary keyed by date
         series_map: Dict[str, Dict[str, Any]] = {}
 
         # Historical cases
@@ -176,11 +173,9 @@ def get_timeseries(
                 {"date": d, "cases": None, "forecast": None},
             )
             series_map[d]["forecast"] = float(val)
+            # Note: we don't propagate is_future for barangays in current UI.
 
-        # Convert to sorted list
         series = sorted(series_map.values(), key=lambda r: r["date"])
-
-        # Resample if needed
         series = _resample_series(series, freq=freq)
 
         return {
@@ -195,7 +190,6 @@ def get_timeseries(
     # --------------------------------------------------------
     # CITY LEVEL
     # --------------------------------------------------------
-    # 1) Historical city cases
     city_resp = (
         sb.table("city_weekly")
         .select("week_start, city_cases")
@@ -207,7 +201,6 @@ def get_timeseries(
     if not city_rows:
         raise HTTPException(status_code=404, detail="No city_weekly data found")
 
-    # 2) Aggregate barangay forecasts → city forecast per week
     fore_resp = (
         sb.table("barangay_forecasts")
         .select(f"week_start, {forecast_col}")
@@ -216,7 +209,6 @@ def get_timeseries(
     )
     fore_rows = fore_resp.data or []
 
-    # Sum forecast per week_start
     city_fore_map: Dict[str, float] = {}
     for row in fore_rows:
         d = row["week_start"]
@@ -225,22 +217,40 @@ def get_timeseries(
             continue
         city_fore_map[d] = city_fore_map.get(d, 0.0) + float(val)
 
-    # Merge into series_map
     series_map: Dict[str, Dict[str, Any]] = {}
     for row in city_rows:
         d = row["week_start"]
         series_map.setdefault(
             d,
-            {"date": d, "cases": None, "forecast": None},
+            {"date": d, "cases": None, "forecast": None, "is_future": False},
         )
         series_map[d]["cases"] = row.get("city_cases")
+        series_map[d]["is_future"] = False  # historical week
 
     for d, total_fore in city_fore_map.items():
         series_map.setdefault(
             d,
-            {"date": d, "cases": None, "forecast": None},
+            {"date": d, "cases": None, "forecast": None, "is_future": True},
         )
         series_map[d]["forecast"] = total_fore
+        if series_map[d]["cases"] is not None:
+            series_map[d]["is_future"] = False
+
+    series = sorted(series_map.values(), key=lambda r: r["date"])
+
+    # Extend up to latest forecast date
+    if fore_rows:
+        max_fore_date = max(row["week_start"] for row in fore_rows)
+        cur = pd.to_datetime(series[-1]["date"])
+        target = pd.to_datetime(max_fore_date)
+
+        while cur < target:
+            cur += pd.Timedelta(days=7)
+            d = cur.strftime("%Y-%m-%d")
+            series_map.setdefault(
+                d,
+                {"date": d, "cases": None, "forecast": None, "is_future": True},
+            )
 
     series = sorted(series_map.values(), key=lambda r: r["date"])
     series = _resample_series(series, freq=freq)

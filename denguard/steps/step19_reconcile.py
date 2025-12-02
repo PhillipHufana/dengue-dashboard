@@ -1,3 +1,4 @@
+# file: denguard/steps/step19_reconcile.py
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -12,7 +13,8 @@ def reconcile_forecasts(
 ) -> pd.DataFrame:
     """
     STEP 19 — Final reconciliation so that:
-    sum(Final barangay forecasts per week) == chosen city-level forecast.
+    sum(Final barangay forecasts per week) == chosen city-level forecast
+    for all weeks where a city forecast is provided.
     """
     print("\n== STEP 19: Forecast Reconciliation (Corrected) ==")
 
@@ -37,7 +39,9 @@ def reconcile_forecasts(
     hyb = hybrid_bg_forecast.copy()
     hyb["ds"] = pd.to_datetime(hyb["ds"])
     hyb["Forecast"] = (
-        pd.to_numeric(hyb["Forecast"], errors="coerce").fillna(0).clip(lower=0)
+        pd.to_numeric(hyb["Forecast"], errors="coerce")
+        .fillna(0)
+        .clip(lower=0)
     )
 
     # -------------------------
@@ -46,7 +50,9 @@ def reconcile_forecasts(
     loc = local_forecasts_all.copy()
     loc["ds"] = pd.to_datetime(loc["ds"])
     loc["local_forecast"] = (
-        pd.to_numeric(loc["local_forecast"], errors="coerce").fillna(0).clip(lower=0)
+        pd.to_numeric(loc["local_forecast"], errors="coerce")
+        .fillna(0)
+        .clip(lower=0)
     )
 
     merged = hyb.merge(
@@ -55,12 +61,21 @@ def reconcile_forecasts(
 
     # Choose local first, fallback to hybrid
     merged["Final"] = merged["local_forecast"].combine_first(merged["Forecast"])
-    merged["Final"] = merged["Final"].fillna(0).clip(lower=0)
+    merged["Final"] = (
+        pd.to_numeric(merged["Final"], errors="coerce")
+        .fillna(0)
+        .clip(lower=0)
+    )
 
     # -------------------------
     # Compute scaling factor
     # -------------------------
-    sum_bg = merged.groupby("ds")["Final"].sum().rename("SumBarangay").reset_index()
+    sum_bg = (
+        merged.groupby("ds")["Final"]
+        .sum()
+        .rename("SumBarangay")
+        .reset_index()
+    )
     chk = sum_bg.merge(city, on="ds", how="inner")
 
     if len(chk) != len(city):
@@ -71,15 +86,21 @@ def reconcile_forecasts(
 
     scale_map = chk.set_index("ds")["scale"]
 
-    # Apply scaling
-    merged["Final"] = merged["Final"] * merged["ds"].map(scale_map)
-    merged["Final"] = merged["Final"].clip(lower=0)
+    # Apply scaling:
+    # - where city has a forecast -> use scale factor
+    # - where city has no forecast -> scale=1 (keep Final as-is)
+    scale_series = merged["ds"].map(scale_map).fillna(1)
+    merged["Final"] = (merged["Final"] * scale_series).clip(lower=0)
 
     # -------------------------
     # Optional diagnostic
     # -------------------------
-    rec_sum = merged.groupby("ds")["Final"].sum().reset_index()
-    rec_sum = rec_sum.merge(city, on="ds", how="left")
+    rec_sum = (
+        merged.groupby("ds")["Final"]
+        .sum()
+        .reset_index()
+        .merge(city, on="ds", how="left")
+    )
 
     diff = (rec_sum["Final"] - rec_sum["CityForecast"]).abs().mean()
     print(f"✅ Reconciliation complete. Avg weekly diff = {diff:.12f}")
@@ -90,7 +111,6 @@ def reconcile_forecasts(
         ["Barangay_standardized", "ds", "Final", "Forecast", "local_forecast"]
     ].sort_values(["Barangay_standardized", "ds"])
 
-    # Save CSV
     out.to_csv(cfg.out / "barangay_forecasts_final.csv", index=False)
     print("✅ barangay_forecasts_final.csv written.")
 

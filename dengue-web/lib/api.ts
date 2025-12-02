@@ -45,8 +45,27 @@ export async function getTimeseries(
   params.set("freq", options.freq ?? "weekly");
   params.set("model", options.model ?? "preferred");
 
-  const res = await fetch(`${API_BASE}/timeseries?${params.toString()}`);
-  if (!res.ok) throw new Error("Failed to load timeseries");
+  const url = `${API_BASE}/timeseries?${params.toString()}`;
 
-  return res.json();
+  try {
+    console.log("[getTimeseries] Fetching:", url);
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        "[getTimeseries] HTTP error",
+        res.status,
+        res.statusText,
+        text
+      );
+      throw new Error(`Failed to load timeseries: ${res.status}`);
+    }
+
+    const json = await res.json();
+    return json;
+  } catch (err) {
+    console.error("[getTimeseries] Network/Fetch error for URL:", url, err);
+    throw err;
+  }
 }

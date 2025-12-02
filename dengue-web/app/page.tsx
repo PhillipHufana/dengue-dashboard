@@ -10,6 +10,7 @@ import { getTimeseries } from "@/lib/api";
 
 export default function Dashboard() {
   const [selectedBarangay, setSelectedBarangay] = useState<string>("");
+  const [barangayLength, setBarangayLength] = useState(0);
 
   // global controls
   const [freq, setFreq] = useState<"weekly" | "monthly" | "yearly">("weekly");
@@ -90,7 +91,10 @@ export default function Dashboard() {
               <input
                 type="range"
                 min={0}
-                max={citySeries.length - 1}
+                max={selectedBarangay
+                  ? barangayLength - 1
+                  : citySeries.length - 1}
+
                 value={safeStart}
                 onChange={(e) => {
                   const v = Number(e.target.value);
@@ -108,7 +112,10 @@ export default function Dashboard() {
               <input
                 type="range"
                 min={0}
-                max={citySeries.length - 1}
+                max={selectedBarangay
+                  ? barangayLength - 1
+                  : citySeries.length - 1}
+
                 value={safeEnd}
                 onChange={(e) => {
                   const v = Number(e.target.value);
@@ -148,17 +155,20 @@ export default function Dashboard() {
         {/* RIGHT CHARTS */}
         <div className="w-1/2 overflow-y-auto bg-zinc-50">
           <BarangayChart
-            name={selectedBarangay}
-            freq={freq}
-            model={model}
-            rangeStart={safeStart}
-            rangeEnd={safeEnd}
+              name={selectedBarangay}
+              freq={freq}
+              model={model}
+              rangeStart={safeStart}
+              rangeEnd={safeEnd}
+              onSeriesLength={setBarangayLength}
           />
+
 
           <CityChart
             series={citySeries}
             rangeStart={safeStart}
             rangeEnd={safeEnd}
+            freq={freq}          // ← ADD THIS
           />
         </div>
       </div>

@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { getTimeseries } from "@/lib/api";
 import type { FeatureCollection } from "geojson";
 
-// Dynamic imports (Leaflet)
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
   { ssr: false }
@@ -38,11 +37,10 @@ export default function MapView({
   citySeries: any[];
 }) {
   const [polygons, setPolygons] = useState<FeatureCollection | null>(null);
-  const [barangayForecasts, setBarangayForecasts] = useState<
-    Record<string, any[]>
-  >({});
+  const [barangayForecasts, setBarangayForecasts] = useState<Record<string, any[]>>(
+    {}
+  );
 
-  // Clamp range
   const safeStart =
     citySeries.length === 0 ? 0 : Math.max(0, Math.min(rangeStart, citySeries.length - 1));
   const safeEnd =
@@ -58,9 +56,7 @@ export default function MapView({
   const selectedDates = new Set(selectedSlice.map((d) => d.date));
   const anyFuture = selectedSlice.some((d) => d.is_future === true);
 
-  // -------------------------------
-  // LOAD CHOROPLETH GEOJSON
-  // -------------------------------
+  // Load choropleth polygons once
   useEffect(() => {
     fetch("http://127.0.0.1:8000/geo/choropleth")
       .then((res) => res.json())
@@ -71,32 +67,67 @@ export default function MapView({
       .catch((err) => console.error("Failed to load polygons", err));
   }, []);
 
-  // -------------------------------
-  // LOAD BARANGAY FORECAST SERIES
-  // -------------------------------
+  // Reset barangay series on freq/model change
   useEffect(() => {
-    if (!polygons) return;
+    setBarangayForecasts({});
+  }, [freq, model]);
 
-    polygons.features.forEach((f: any) => {
+// -------------------------------
+// LOAD BARANGAY FORECAST SERIES (throttled)
+// -------------------------------
+useEffect(() => {
+  if (!polygons) return;
+
+  // If the selected range is entirely in the past,
+  // we *only* use risk_level from choropleth and don't need per-barangay series.
+  if (!anyFuture) return;
+
+  // ✅ TS now knows this is non-null inside the effect body
+  const feats = (polygons.features as any[]) || [];
+
+  let cancelled = false;
+
+  async function loadBarangaySeriesSequentially() {
+    for (const f of feats) {
+      if (cancelled) break;
+
       const nm = f.properties?.name;
-      if (!nm) return;
-      if (barangayForecasts[nm]) return;
+      if (!nm) continue;
 
-      getTimeseries("barangay", { name: nm, freq, model })
-        .then((data) => {
-          setBarangayForecasts((prev) => ({
+      // Skip if we already fetched this barangay
+      if (barangayForecasts[nm]) continue;
+
+      try {
+        const data = await getTimeseries("barangay", { name: nm, freq, model });
+
+        if (cancelled) break;
+
+        setBarangayForecasts((prev) => {
+          // Another iteration might have filled this while we awaited
+          if (prev[nm]) return prev;
+          return {
             ...prev,
             [nm]: data.series ?? [],
-          }));
-        })
-        .catch(() => {});
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [polygons, freq, model]);
+          };
+        });
+      } catch (err) {
+        console.error("Failed to load barangay series", nm, err);
+        // swallow error; map still works with risk_level-only fallback
+      }
+    }
+  }
 
-  // -------------------------------
-  // HELPERS
-  // -------------------------------
+  loadBarangaySeriesSequentially();
+
+  return () => {
+    cancelled = true;
+  };
+  // IMPORTANT: don't depend on barangayForecasts to avoid infinite re-runs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [polygons, freq, model, anyFuture]);
+
+
+
   function getRiskColor(risk?: string): string {
     switch (risk) {
       case "high":
@@ -110,7 +141,6 @@ export default function MapView({
     }
   }
 
-  // Sum forecast over the selected date range
   function getRangeForecastForBarangay(nm: string) {
     const series = barangayForecasts[nm];
     if (!series || selectedSlice.length === 0) return 0;
@@ -118,7 +148,6 @@ export default function MapView({
     let sum = 0;
     for (const pt of series) {
       if (selectedDates.has(pt.date)) {
-        // choose the same field that /timeseries uses for "value"
         const v = pt.forecast ?? pt.value ?? 0;
         sum += typeof v === "number" ? v : Number(v) || 0;
       }
@@ -126,9 +155,6 @@ export default function MapView({
     return sum;
   }
 
-  // -------------------------------
-  // STYLING
-  // -------------------------------
   function style(feature: any) {
     const p = feature.properties;
     const riskColor = getRiskColor(p?.risk_level);
@@ -136,7 +162,7 @@ export default function MapView({
     const nm = p?.name;
     const forecastSum = getRangeForecastForBarangay(nm);
 
-    // If range is entirely past → use risk choropleth
+    // Past-only range → classic risk choropleth
     if (!anyFuture) {
       return {
         fillColor: riskColor,
@@ -147,13 +173,17 @@ export default function MapView({
       };
     }
 
-    // If range includes future → use forecast sum
+    // Range includes future → overlay by forecast sum
     const overlayColor =
-      forecastSum > 60 ? "#b91c1c" : // very high
-      forecastSum > 30 ? "#ef4444" :
-      forecastSum > 10 ? "#f59e0b" :
-      forecastSum > 0  ? "#84cc16" :
-                         "#e5e7eb"; // zero
+      forecastSum > 60
+        ? "#b91c1c"
+        : forecastSum > 30
+        ? "#ef4444"
+        : forecastSum > 10
+        ? "#f59e0b"
+        : forecastSum > 0
+        ? "#84cc16"
+        : "#e5e7eb";
 
     return {
       fillColor: overlayColor,
@@ -164,9 +194,6 @@ export default function MapView({
     };
   }
 
-  // -------------------------------
-  // POPUP + TOOLTIP
-  // -------------------------------
   function onEachFeature(feature: any, layer: any) {
     const p = feature.properties || {};
     const nm = p.name;
@@ -189,18 +216,9 @@ export default function MapView({
   if (!polygons) return <div>Loading map…</div>;
 
   return (
-    <MapContainer
-      center={[7.07, 125.6]}
-      zoom={11}
-      style={{ height: "100%", width: "100%" }}
-    >
+    <MapContainer center={[7.07, 125.6]} zoom={11} style={{ height: "100%", width: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
-      <GeoJSON
-        data={polygons as any}
-        style={style as any}
-        onEachFeature={onEachFeature as any}
-      />
+      <GeoJSON data={polygons as any} style={style as any} onEachFeature={onEachFeature as any} />
     </MapContainer>
   );
 }

@@ -1,3 +1,4 @@
+# file: denguard/export_supabase.py
 from __future__ import annotations
 
 import os
@@ -6,8 +7,7 @@ import pandas as pd
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Correct normalization import
-from denguard.normalize import normalize_barangay_name  
+from denguard.normalize import normalize_barangay_name
 
 load_dotenv()
 
@@ -30,7 +30,6 @@ def _load_supabase() -> Client:
 # ============================================================
 
 def _upsert_df(table: str, df: pd.DataFrame, conflict: str, chunk_size: int = 500) -> None:
-
     if df.empty:
         print(f"ℹ️ Skipped {table}: empty dataframe.")
         return
@@ -56,25 +55,25 @@ def _upsert_df(table: str, df: pd.DataFrame, conflict: str, chunk_size: int = 50
 # PUBLIC UPSERT FUNCTIONS
 # ============================================================
 
-def upsert_barangays(df: pd.DataFrame):
+def upsert_barangays(df: pd.DataFrame) -> None:
     if not {"name"}.issubset(df.columns):
         raise ValueError("barangays requires column: name")
     _upsert_df("barangays", df, conflict="name")
 
 
-def upsert_city_weekly(df: pd.DataFrame):
+def upsert_city_weekly(df: pd.DataFrame) -> None:
     if not {"week_start", "city_cases"}.issubset(df.columns):
         raise ValueError("city_weekly requires week_start, city_cases")
     _upsert_df("city_weekly", df, conflict="week_start")
 
 
-def upsert_barangay_weekly(df: pd.DataFrame):
+def upsert_barangay_weekly(df: pd.DataFrame) -> None:
     if not {"name", "week_start", "cases"}.issubset(df.columns):
         raise ValueError("barangay_weekly requires name, week_start, cases")
     _upsert_df("barangay_weekly", df, conflict="name,week_start")
 
 
-def upsert_barangay_forecasts(df: pd.DataFrame):
+def upsert_barangay_forecasts(df: pd.DataFrame) -> None:
     required = {
         "name",
         "week_start",
@@ -92,41 +91,46 @@ def upsert_barangay_forecasts(df: pd.DataFrame):
 # MASTER EXPORT FUNCTION
 # ============================================================
 
-def upload_to_supabase(cfg):
-
+def upload_to_supabase(cfg) -> None:
     outdir = cfg.out
 
     # ---------------------------------------------------------
     # Barangays (master list)
     # ---------------------------------------------------------
-    df_barangays = (
-        pd.read_csv(outdir / "weekly_cases_all_barangays.csv")["Barangay_standardized"]
-        .drop_duplicates()
-        .to_frame(name="name")
-    )
+    src_bg = pd.read_csv(outdir / "weekly_cases_all_barangays.csv")[
+        "Barangay_standardized"
+    ].drop_duplicates()
 
-    df_barangays["name"] = df_barangays["name"].apply(normalize_barangay_name)
+    # Normalized name + display_name for UI
+    df_barangays = pd.DataFrame(
+        {
+            "name": src_bg.apply(normalize_barangay_name),
+            "display_name": src_bg,
+        }
+    )
 
     upsert_barangays(df_barangays)
 
     # ---------------------------------------------------------
-    # City Weekly  (FIXED ORDER)
+    # City Weekly
     # ---------------------------------------------------------
     df_city_weekly = pd.read_csv(outdir / "city_weekly.csv")
 
-    # Fix numeric BEFORE rename
-    df_city_weekly["CityCases"] = (
-        pd.to_numeric(df_city_weekly["CityCases"], errors="coerce")
-        .fillna(0)
-        .astype(int)
-    )
-
+    # Rename first, then enforce integer city_cases
     df_city_weekly = df_city_weekly.rename(
         columns={"WeekStart": "week_start", "CityCases": "city_cases"}
     )
 
-    df_city_weekly["week_start"] = pd.to_datetime(df_city_weekly["week_start"])\
+    df_city_weekly["city_cases"] = (
+        pd.to_numeric(df_city_weekly["city_cases"], errors="coerce")
+        .fillna(0)
+        .astype(int)
+    )
+
+    df_city_weekly["week_start"] = (
+        pd.to_datetime(df_city_weekly["week_start"])
         .dt.strftime("%Y-%m-%d")
+    )
 
     upsert_city_weekly(df_city_weekly)
 
@@ -149,8 +153,10 @@ def upload_to_supabase(cfg):
         .astype(int)
     )
 
-    df_bg_weekly["week_start"] = pd.to_datetime(df_bg_weekly["week_start"])\
+    df_bg_weekly["week_start"] = (
+        pd.to_datetime(df_bg_weekly["week_start"])
         .dt.strftime("%Y-%m-%d")
+    )
 
     upsert_barangay_weekly(df_bg_weekly)
 
@@ -169,22 +175,34 @@ def upload_to_supabase(cfg):
 
     df_fore["name"] = df_fore["name"].apply(normalize_barangay_name)
 
-    df_fore["week_start"] = pd.to_datetime(df_fore["week_start"])\
+    df_fore["week_start"] = (
+        pd.to_datetime(df_fore["week_start"])
         .dt.strftime("%Y-%m-%d")
+    )
 
+    # Mark future weeks relative to last observed barangay weekly date
     last_observed = df_bg_weekly["week_start"].max()
-    df_fore["is_future"] = pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
+    df_fore["is_future"] = (
+        pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
+    )
 
+    # ORIGINAL, WORKING BEHAVIOR:
+    # Crush inf/NaN/None to 0.0 so JSON is always finite numeric
     df_fore = df_fore.replace([float("inf"), float("-inf")], None).fillna(0)
 
     df_fore["final_forecast"] = df_fore["final_forecast"].astype(float)
     df_fore["hybrid_forecast"] = df_fore["hybrid_forecast"].astype(float)
     df_fore["local_forecast"] = df_fore["local_forecast"].astype(float)
 
+    # is_future already bool from comparison; optional explicit cast if you want:
+    # df_fore["is_future"] = df_fore["is_future"].astype(bool)
+
     upsert_barangay_forecasts(df_fore)
 
     print("✅ Supabase export: COMPLETE")
 
+
 if __name__ == "__main__":
     from denguard.config import DEFAULT_CFG
+
     upload_to_supabase(DEFAULT_CFG)

@@ -1,8 +1,21 @@
+// components/BarangayChart.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { getTimeseries } from "@/lib/api";
+import {
+  Chart as ChartJS,
+  TimeScale,
+  LineElement,
+  PointElement,
+  LinearScale,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import "chartjs-adapter-date-fns";
+
+ChartJS.register(TimeScale, LineElement, PointElement, LinearScale, Tooltip, Legend);
 
 export default function BarangayChart({
   name,
@@ -10,28 +23,41 @@ export default function BarangayChart({
   model,
   rangeStart,
   rangeEnd,
+  onSeriesLength,
 }: {
   name: string;
   freq: "weekly" | "monthly" | "yearly";
   model: "preferred" | "final" | "hybrid" | "local";
   rangeStart: number;
   rangeEnd: number;
+  onSeriesLength?: (len: number) => void;
 }) {
   const [series, setSeries] = useState<any[]>([]);
 
   const rangeHighlightPlugin = {
     id: "rangeHighlight",
-    beforeDraw(chart: any, args: any, pluginOptions: any) {
+    beforeDraw(chart: any, _args: any, pluginOptions: any) {
       const { rangeStart, rangeEnd } = pluginOptions || {};
       if (rangeStart == null || rangeEnd == null) return;
 
       const { ctx, chartArea, scales } = chart;
       const xScale = scales.x;
-
       if (!chartArea || !xScale) return;
 
-      const left = xScale.getPixelForValue(rangeStart);
-      const right = xScale.getPixelForValue(rangeEnd);
+      const labels = chart.data?.labels || [];
+      if (!labels.length) return;
+
+      if (
+        rangeStart < 0 ||
+        rangeEnd < 0 ||
+        rangeStart >= labels.length ||
+        rangeEnd >= labels.length
+      ) {
+        return;
+      }
+
+      const left = xScale.getPixelForValue(labels[rangeStart]);
+      const right = xScale.getPixelForValue(labels[rangeEnd]);
 
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.08)";
@@ -40,13 +66,6 @@ export default function BarangayChart({
     },
   };
 
-
-
-
-
-  // -----------------------------------------------------
-  // Load FULL barangay series
-  // -----------------------------------------------------
   useEffect(() => {
     if (!name) return;
 
@@ -55,37 +74,30 @@ export default function BarangayChart({
       .catch(console.error);
   }, [name, freq, model]);
 
-  if (!name)
-    return <div className="p-4">Select a barangay on the map</div>;
+  useEffect(() => {
+    if (series.length > 0) {
+      onSeriesLength?.(series.length);
+    }
+  }, [series, onSeriesLength]);
 
-  if (!series.length)
-    return <div className="p-4">Loading data…</div>;
+  if (!name) return <div className="p-4">Select a barangay on the map</div>;
+  if (!series.length) return <div className="p-4">Loading data…</div>;
 
-  // -----------------------------------------------------
-  // Slice range
-  // -----------------------------------------------------
-  const sliced = series.slice(rangeStart, rangeEnd + 1);
+  const safeStart =
+    series.length === 0 ? 0 : Math.max(0, Math.min(rangeStart, series.length - 1));
+  const safeEnd =
+    series.length === 0
+      ? 0
+      : Math.max(safeStart, Math.min(rangeEnd, series.length - 1));
 
-  const totalCases = sliced.reduce(
-    (sum, x) => sum + (x.cases ?? 0), 
-    0
-  );
-  const totalForecast = sliced.reduce(
-    (sum, x) => sum + (x.forecast ?? 0), 
-    0
-  );
+  const sliced = series.slice(safeStart, safeEnd + 1);
 
-  const labels = series.map((x) => x.date);
+  const totalCases = sliced.reduce((sum, x) => sum + (x.cases ?? 0), 0);
+  const totalForecast = sliced.reduce((sum, x) => sum + (x.forecast ?? 0), 0);
+
+  const labels = series.map((x) => new Date(x.date));
   const cases = series.map((x) => x.cases);
   const forecast = series.map((x) => x.forecast);
-
-  // -----------------------------------------------------
-  // Range shading FIX — use a "baseline difference" line
-  // This avoids bar datasets completely
-  // -----------------------------------------------------
-  const highlightValues = series.map((_, idx) =>
-    idx >= rangeStart && idx <= rangeEnd ? 1 : null
-  );
 
   return (
     <div className="p-4">
@@ -94,7 +106,7 @@ export default function BarangayChart({
       </h2>
 
       <div className="text-sm text-gray-600 mb-3">
-        Range: {series[rangeStart]?.date} → {series[rangeEnd]?.date}
+        Range: {series[safeStart]?.date} → {series[safeEnd]?.date}
         <br />
         <b>Total cases:</b> {totalCases.toFixed(1)} &nbsp; | &nbsp;
         <b>Total forecast:</b> {totalForecast.toFixed(1)}
@@ -129,22 +141,27 @@ export default function BarangayChart({
           plugins: {
             legend: { display: true },
             rangeHighlight: {
-              rangeStart,
-              rangeEnd,
+              rangeStart: safeStart,
+              rangeEnd: safeEnd,
             },
           } as any,
-
-
           scales: {
-            x: { beginAtZero: false },
+            x: {
+              type: "time",
+              time: {
+                unit:
+                  freq === "weekly"
+                    ? "week"
+                    : freq === "monthly"
+                    ? "month"
+                    : "year",
+              },
+            },
             y: { beginAtZero: true },
           },
         }}
         plugins={[rangeHighlightPlugin]}
       />
-
-
-
     </div>
   );
 }

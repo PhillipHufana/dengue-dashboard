@@ -1,3 +1,4 @@
+# file: denguard/run_pipeline.py  (or wherever your run_pipeline currently lives)
 from __future__ import annotations
 
 import pandas as pd
@@ -24,6 +25,11 @@ from denguard.steps.step16_health import model_health_report
 from denguard.steps.step17_tiers import tier_classification
 from denguard.steps.step18_local_models import local_models_tierA
 from denguard.steps.step19_reconcile import reconcile_forecasts
+from denguard.export_supabase import upload_to_supabase
+
+
+# NEW: horizon resolver
+from denguard.horizon import resolve_horizon
 
 
 def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
@@ -40,34 +46,56 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     city_weekly = build_city_series(weekly_full, cfg)
     city_prophet, train_city, test_city, forecast_weeks = train_test_split_city(city_weekly, cfg)
 
-    horizon = (
-        forecast_weeks
-        if cfg.forecast_weeks_override is None
-        else cfg.forecast_weeks_override
-    )
+    # RESOLVED HORIZON (replaces old inline horizon logic)
+    # Testing/thesis mode:
+    #   cfg.forecast_weeks_override = None  -> horizon = forecast_weeks (len(test))
+    # Production/dashboard mode:
+    #   cfg.forecast_weeks_override = N     -> horizon = N
+    horizon = resolve_horizon(cfg, test_len=forecast_weeks)
 
+    # Step 7–8
     # Step 7–8
     PROPHET_OK, model_prophet, forecast_prophet, metrics_prophet = fit_prophet(
         train_city, test_city, cfg
     )
-    model_arima, forecast_arima, metrics_arima, y_train, y_test = fit_arima(
+
+    ARIMA_OK, model_arima, forecast_arima, metrics_arima = fit_arima(
         train_city, test_city, cfg
     )
+
+    # Build y_train / y_test for ARIMA-style series (weekly W-MON)
+    y_train = (
+        train_city.set_index("ds")["y"]
+        .sort_index()
+    )
+    y_train.index = pd.DatetimeIndex(y_train.index)
+    y_train = y_train.asfreq("W-MON")
+
+    y_test = (
+        test_city.set_index("ds")["y"]
+        .sort_index()
+    )
+    y_test.index = pd.DatetimeIndex(y_test.index)
+    y_test = y_test.asfreq("W-MON")
+
 
     # Step 9
     comparison_plot(y_test, forecast_arima, forecast_prophet, cfg)
 
-    # Select best city model
+    # Select best city model (Prophet vs ARIMA) + build future horizon
     chosen_city_model, chosen_city_forecast = select_city_model(
         metrics_prophet,
         metrics_arima,
         forecast_prophet,
-        forecast_arima,
+        forecast_arima,  # ARIMA test series (still passed for API compatibility)
         city_prophet,
         y_train,
+        model_prophet,   # <-- NEW
+        model_arima,
         cfg,
         horizon,
     )
+
 
     # Step 10 — Hybrid disaggregation
     barangay_forecasts, diff, chosen = hybrid_disaggregation(
@@ -116,7 +144,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         weekly_full,
         test_city,
         train_end,
-        forecast_weeks,
+        horizon,      # use the resolved horizon here too
         PROPHET_OK,
         cfg,
     )
@@ -129,76 +157,14 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg,
     )
 
-   # ============================================
-    # Step 20 — Export to Supabase
+    # ============================================
+    # Step 20 — Export to Supabase (single source)
     # ============================================
     try:
-        from denguard.export_supabase import (
-            upsert_barangays,
-            upsert_city_weekly,
-            upsert_barangay_weekly,
-            upsert_barangay_forecasts,
-        )
-
-        # Export barangay list
-        barangay_list = (
-            weekly_full["Barangay_standardized"]
-            .drop_duplicates()
-            .to_frame(name="name")
-        )
-        upsert_barangays(barangay_list)
-
-        # Export city weekly
-        city_weekly_out = city_weekly.rename(
-            columns={"WeekStart": "week_start", "CityCases": "city_cases"}
-        )
-        city_weekly_out["week_start"] = pd.to_datetime(
-            city_weekly_out["week_start"]
-        ).dt.strftime("%Y-%m-%d")
-
-        upsert_city_weekly(city_weekly_out)
-
-        # Export barangay weekly
-        barangay_weekly_out = weekly_full.rename(
-            columns={
-                "Barangay_standardized": "name",
-                "WeekStart": "week_start",
-                "Cases": "cases",
-            }
-        )
-        barangay_weekly_out["week_start"] = pd.to_datetime(
-            barangay_weekly_out["week_start"]
-        ).dt.strftime("%Y-%m-%d")
-
-        upsert_barangay_weekly(barangay_weekly_out)
-
-        # Export forecasts
-        last_observed = weekly_full["WeekStart"].max()
-
-        df_fore = final_forecast.rename(
-            columns={
-                "Barangay_standardized": "name",
-                "ds": "week_start",
-                "Final": "final_forecast",
-                "Forecast": "hybrid_forecast",
-                "local_forecast": "local_forecast",
-            }
-        )
-        df_fore["week_start"] = pd.to_datetime(
-            df_fore["week_start"]
-        ).dt.strftime("%Y-%m-%d")
-
-        df_fore["is_future"] = (
-            pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
-        )
-
-        upsert_barangay_forecasts(df_fore)
-
+        upload_to_supabase(cfg)
         print("✅ Supabase export completed.")
-
     except Exception as e:
         print(f"ℹ️ Supabase export skipped: {e}")
-
 
 
 if __name__ == "__main__":

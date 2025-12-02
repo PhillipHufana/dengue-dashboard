@@ -1,3 +1,4 @@
+// components/SummaryCards.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,7 +23,7 @@ export default function SummaryCards() {
   return (
     <div className="grid grid-cols-3 gap-4 p-4 bg-white shadow">
       <div className="rounded border p-4">
-        <div className="text-sm text-zinc-500">City forecast</div>
+        <div className="text-sm text-zinc-500">City cases</div>
         <div className="text-2xl font-bold text-zinc-600">{city?.city_cases}</div>
         <div className="text-xs text-zinc-600">{city?.week_start}</div>
       </div>
