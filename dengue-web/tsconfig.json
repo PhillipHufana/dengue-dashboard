@@ -14,13 +14,17 @@
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
-      {
-        "name": "next"
-      }
+      { "name": "next" }
     ],
+
+    "baseUrl": ".",           // dengue-web is the root
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": ["./*"],
+      "@/lib/*": ["./lib/*"],
+      "@/components/*": ["./components/*"]
+    },
+
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "next-env.d.ts",
