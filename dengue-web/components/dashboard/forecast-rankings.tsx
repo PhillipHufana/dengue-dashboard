@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, Search, MapPin, AlertTriangle, ChevronUp, ChevronDown, Brain, Activity } from "lucide-react"
-import { barangays } from "./leaflet-map-client"
+import { barangays } from "../../legacy/leaflet-map-client"
 
 type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y"
 type ForecastModel = "arima" | "prophet" | "average"

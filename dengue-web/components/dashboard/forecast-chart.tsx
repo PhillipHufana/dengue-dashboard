@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, Brain, Activity, MapPin } from "lucide-react"
-import { barangays } from "./leaflet-map-client"
+import { barangays } from "../../legacy/leaflet-map-client"
 
 const generateCityForecastData = () => {
   const data = []

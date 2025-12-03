@@ -2,14 +2,9 @@
 
 import { useState } from "react"
 import { KpiCards } from "./dashboard/kpi-cards"
-import { OutbreakMap } from "./dashboard/outbreak-map"
 import { ChoroplethMap } from "./dashboard/choropleth-map"
 import { ForecastChart } from "./dashboard/forecast-chart"
 import { ForecastRankings } from "./dashboard/forecast-rankings"
-import { RegionalDistribution } from "./dashboard/regional-distribution"
-import { AgeDistributionChart } from "./dashboard/age-distribution-chart"
-import { SeverityBreakdown } from "./dashboard/severity-breakdown"
-import { RecentAlerts } from "./dashboard/recent-alerts"
 import { LoginModal } from "./dashboard/login-modal"
 import { ThemeToggle } from "./dashboard/theme-toggle"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -105,18 +100,6 @@ export function DengueDashboard() {
 
           <ChoroplethMap selectedBarangayId={selectedBarangayId} onBarangaySelect={setSelectedBarangayId} />
 
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-            <OutbreakMap />
-            <div className="space-y-4 md:space-y-6">
-              <RegionalDistribution />
-              <SeverityBreakdown />
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:gap-6 md:grid-cols-2">
-            <AgeDistributionChart />
-            <RecentAlerts />
-          </div>
         </div>
       </main>
     </div>
