@@ -2,19 +2,33 @@
 
 import { useState } from "react"
 import { KpiCards } from "./dashboard/kpi-cards"
-import { ChoroplethMap } from "./dashboard/choropleth-map"
+// import { ChoroplethMap } from "./dashboard/choropleth-map"
 import { ForecastChart } from "./dashboard/forecast-chart"
-import { ForecastRankings } from "./dashboard/forecast-rankings"
+// import { ForecastRankings } from "./dashboard/forecast-rankings"
 import { LoginModal } from "./dashboard/login-modal"
 import { ThemeToggle } from "./dashboard/theme-toggle"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Bug, Calendar, Menu } from "lucide-react"
+import dynamic from "next/dynamic";
+
+const ChoroplethMap = dynamic(
+  () =>
+    import("./dashboard/choropleth-map").then((mod) => mod.ChoroplethMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[300px] flex items-center justify-center">
+        Loading map…
+      </div>
+    ),
+  }
+);
 
 export function DengueDashboard() {
   const [timeRange, setTimeRange] = useState("7d")
-  const [selectedBarangayId, setSelectedBarangayId] = useState<number | null>(null)
+  const [selectedBarangayName, setSelectedBarangayName] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,11 +108,14 @@ export function DengueDashboard() {
           <KpiCards />
 
           <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-            <ForecastChart selectedBarangayId={selectedBarangayId} />
-            <ForecastRankings selectedBarangayId={selectedBarangayId} onBarangaySelect={setSelectedBarangayId} />
+            <ForecastChart selectedBarangayName={selectedBarangayName} />
+            {/* <ForecastRankings selectedBarangayName={selectedBarangayName} onBarangaySelect={setSelectedBarangayName} /> */}
           </div>
 
-          <ChoroplethMap selectedBarangayId={selectedBarangayId} onBarangaySelect={setSelectedBarangayId} />
+          <ChoroplethMap
+            selectedBarangayName={selectedBarangayName}
+            onBarangaySelect={setSelectedBarangayName}
+          />
 
         </div>
       </main>

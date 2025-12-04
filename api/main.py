@@ -4,9 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .geo import router as geo_router
 from .forecast import router as forecast_router
-from .timeseries import router as timeseries_router  # NEW
-from api import geo
-
+from .timeseries import router as timeseries_router
 
 app = FastAPI(
     title="Denguard API",
@@ -16,16 +14,16 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(geo.router)
+# Routers
+app.include_router(geo_router)
 app.include_router(forecast_router, prefix="/forecast")
-app.include_router(timeseries_router, prefix="/timeseries")  # NEW
-
+app.include_router(timeseries_router, prefix="/timeseries")
 
 @app.get("/health")
 def health():

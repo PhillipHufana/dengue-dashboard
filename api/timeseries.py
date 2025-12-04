@@ -115,9 +115,9 @@ def get_timeseries(
     if forecast_col is None:
         raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
 
-    # --------------------------------------------------------
-    # BARANGAY LEVEL
-    # --------------------------------------------------------
+# --------------------------------------------------------
+# BARANGAY LEVEL
+# --------------------------------------------------------
     if level == "barangay":
         if not name:
             raise HTTPException(
@@ -158,23 +158,31 @@ def get_timeseries(
             d = row["week_start"]
             series_map.setdefault(
                 d,
-                {"date": d, "cases": None, "forecast": None},
+                {"date": d, "cases": None, "forecast": None, "is_future": False},
             )
             series_map[d]["cases"] = row.get("cases")
 
-        # Forecasts (selected model)
+        # Forecast rows
         for row in fore_rows:
             d = row["week_start"]
             val = row.get(forecast_col)
-            if val is None:
-                continue
+            is_future = row.get("is_future", False)
+
             series_map.setdefault(
                 d,
-                {"date": d, "cases": None, "forecast": None},
+                {"date": d, "cases": None, "forecast": None, "is_future": is_future},
             )
-            series_map[d]["forecast"] = float(val)
-            # Note: we don't propagate is_future for barangays in current UI.
 
+            if val is not None:
+                series_map[d]["forecast"] = float(val)
+
+            # If cases exist, it's historical regardless of model flag
+            if series_map[d].get("cases") is not None:
+                series_map[d]["is_future"] = False
+            else:
+                series_map[d]["is_future"] = is_future
+
+        # Sort + resample
         series = sorted(series_map.values(), key=lambda r: r["date"])
         series = _resample_series(series, freq=freq)
 
@@ -186,6 +194,7 @@ def get_timeseries(
             "n_points": len(series),
             "series": series,
         }
+
 
     # --------------------------------------------------------
     # CITY LEVEL
