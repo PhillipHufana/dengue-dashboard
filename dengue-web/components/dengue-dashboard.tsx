@@ -4,7 +4,7 @@ import { useState } from "react"
 import { KpiCards } from "./dashboard/kpi-cards"
 // import { ChoroplethMap } from "./dashboard/choropleth-map"
 import { ForecastChart } from "./dashboard/forecast-chart"
-// import { ForecastRankings } from "./dashboard/forecast-rankings"
+import { ForecastRankings } from "./dashboard/forecast-rankings"
 import { LoginModal } from "./dashboard/login-modal"
 import { ThemeToggle } from "./dashboard/theme-toggle"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -113,7 +113,10 @@ export function DengueDashboard() {
 
           <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
             <ForecastChart selectedBarangay={selectedBarangay} />
-            {/* <ForecastRankings selectedBarangayName={selectedBarangayName} onBarangaySelect={setSelectedBarangayName} /> */}
+            <ForecastRankings
+              selectedBarangay={selectedBarangay}
+              onBarangaySelect={setSelectedBarangay}
+            />
           </div>
 
           <ChoroplethMap

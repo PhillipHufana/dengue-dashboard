@@ -1,320 +1,267 @@
-// "use client"
+"use client";
 
-// import { useState, useMemo } from "react"
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-// import { Badge } from "@/components/ui/badge"
-// import { Button } from "@/components/ui/button"
-// import { Input } from "@/components/ui/input"
-// import { ScrollArea } from "@/components/ui/scroll-area"
-// import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-// import { TrendingUp, Search, MapPin, AlertTriangle, ChevronUp, ChevronDown, Brain, Activity } from "lucide-react"
-// import { barangays } from "./leaflet-map-client"
+import { useState, useMemo } from "react";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y"
-// type ForecastModel = "arima" | "prophet" | "average"
+import {
+  TrendingUp,
+  Search,
+  MapPin,
+  AlertTriangle,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 
-// interface ForecastRankingsProps {
-//   selectedBarangayId: number | null
-//   onBarangaySelect: (barangayId: number | null) => void
-// }
+import { useSummary } from "@/lib/query/hooks";
+import { cleanName } from "./choropleth-map";
 
-// const timePeriodDays: Record<TimePeriod, number> = {
-//   "1w": 7,
-//   "2w": 14,
-//   "1m": 30,
-//   "3m": 90,
-//   "6m": 180,
-//   "1y": 365,
-// }
+interface ForecastRankingsProps {
+  selectedBarangay: { pretty: string; clean: string } | null;
+  onBarangaySelect: (value: { pretty: string; clean: string } | null) => void;
+}
 
-// const timePeriodLabels: Record<TimePeriod, string> = {
-//   "1w": "1 Week",
-//   "2w": "2 Weeks",
-//   "1m": "1 Month",
-//   "3m": "3 Months",
-//   "6m": "6 Months",
-//   "1y": "1 Year",
-// }
+interface BarangayLatest {
+  name: string;
+  forecast: number | null;
+  week_start: string;
+  risk_level: "low" | "medium" | "high" | "critical" | "unknown";
+}
 
-// export function ForecastRankings({ selectedBarangayId, onBarangaySelect }: ForecastRankingsProps) {
-//   const [timePeriod, setTimePeriod] = useState<TimePeriod>("1m")
-//   const [forecastModel, setForecastModel] = useState<ForecastModel>("average")
-//   const [searchQuery, setSearchQuery] = useState("")
-//   const [showAll, setShowAll] = useState(false)
+interface RankedBarangay {
+  pretty: string;
+  clean: string;
+  riskLevel: string;
+  totalCases: number;
+  dailyAverage: number;
+  trendPercent: number;
+}
 
-//   const rankedBarangays = useMemo(() => {
-//     const days = timePeriodDays[timePeriod]
+type TimePeriod = "1w" | "2w" | "1m" | "3m";
 
-//     return barangays
-//       .map((barangay) => {
-//         // Get forecast data (non-historical entries)
-//         const forecastEntries = barangay.forecastData.filter((d) => !d.isHistorical)
+const timePeriodLabels: Record<TimePeriod, string> = {
+  "1w": "1 Week",
+  "2w": "2 Weeks",
+  "1m": "1 Month",
+  "3m": "3 Months",
+};
 
-//         // Limit to the time period we're looking at (up to available data)
-//         const periodEntries = forecastEntries.slice(0, Math.min(days, forecastEntries.length))
+const periodMultiplier: Record<TimePeriod, number> = {
+  "1w": 1,
+  "2w": 2,
+  "1m": 4,
+  "3m": 12,
+};
 
-//         // Calculate totals based on selected model
-//         let totalCases = 0
-//         let arimaTotal = 0
-//         let prophetTotal = 0
+export function ForecastRankings({
+  selectedBarangay,
+  onBarangaySelect,
+}: ForecastRankingsProps) {
+  const { data, isLoading } = useSummary();
 
-//         periodEntries.forEach((entry) => {
-//           arimaTotal += entry.arima || 0
-//           prophetTotal += entry.prophet || 0
-//         })
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("1m");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
-//         if (forecastModel === "arima") {
-//           totalCases = arimaTotal
-//         } else if (forecastModel === "prophet") {
-//           totalCases = prophetTotal
-//         } else {
-//           totalCases = Math.round((arimaTotal + prophetTotal) / 2)
-//         }
+  const barangays: BarangayLatest[] = data?.barangay_latest ?? [];
 
-//         // Calculate daily average
-//         const dailyAverage = periodEntries.length > 0 ? Math.round(totalCases / periodEntries.length) : 0
+  // -----------------------------------------------------------
+  // 🔍 FILTER + RANKING (TYPED)
+  // -----------------------------------------------------------
 
-//         // Calculate trend (compare first half to second half)
-//         const halfPoint = Math.floor(periodEntries.length / 2)
-//         const firstHalf = periodEntries.slice(0, halfPoint)
-//         const secondHalf = periodEntries.slice(halfPoint)
+  const ranked: RankedBarangay[] = useMemo(() => {
+    if (!barangays.length) return [];
 
-//         const getModelValue = (entry: (typeof periodEntries)[0]) => {
-//           if (forecastModel === "arima") return entry.arima || 0
-//           if (forecastModel === "prophet") return entry.prophet || 0
-//           return ((entry.arima || 0) + (entry.prophet || 0)) / 2
-//         }
+    const multiplier = periodMultiplier[timePeriod];
 
-//         const firstHalfAvg = firstHalf.reduce((sum, e) => sum + getModelValue(e), 0) / (firstHalf.length || 1)
-//         const secondHalfAvg = secondHalf.reduce((sum, e) => sum + getModelValue(e), 0) / (secondHalf.length || 1)
+    return barangays
+      .map((b: BarangayLatest): RankedBarangay => {
+        const forecast = b.forecast ?? 0;
 
-//         const trendPercent = firstHalfAvg > 0 ? Math.round(((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100) : 0
+        const totalCases = forecast * multiplier;
+        const dailyAverage = Number((forecast / 7).toFixed(1));
 
-//         // Determine risk level
-//         let riskLevel: "critical" | "high" | "medium" | "low"
-//         if (dailyAverage > 40) riskLevel = "critical"
-//         else if (dailyAverage > 25) riskLevel = "high"
-//         else if (dailyAverage > 10) riskLevel = "medium"
-//         else riskLevel = "low"
+        const trendPercent =
+          forecast > 0 ? Math.round(((forecast - forecast * 0.8) / (forecast * 0.8)) * 100) : 0;
 
-//         return {
-//           ...barangay,
-//           totalCases,
-//           dailyAverage,
-//           trendPercent,
-//           riskLevel,
-//           arimaTotal,
-//           prophetTotal,
-//         }
-//       })
-//       .sort((a, b) => b.totalCases - a.totalCases)
-//   }, [timePeriod, forecastModel])
+        return {
+          pretty: b.name.replace(/\b\w/g, (c) => c.toUpperCase()),
+          clean: cleanName(b.name),
+          riskLevel: b.risk_level,
+          totalCases,
+          dailyAverage,
+          trendPercent,
+        };
+      })
+      .sort((a: RankedBarangay, b: RankedBarangay) => b.totalCases - a.totalCases);
+  }, [barangays, timePeriod]);
 
-//   const filteredBarangays = useMemo(() => {
-//     if (!searchQuery) return rankedBarangays
-//     return rankedBarangays.filter((b) => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
-//   }, [rankedBarangays, searchQuery])
+  const filtered = useMemo(() => {
+    return ranked.filter((b: RankedBarangay) =>
+      b.pretty.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [ranked, searchQuery]);
 
-//   const displayedBarangays = showAll ? filteredBarangays : filteredBarangays.slice(0, 10)
+  const displayed = showAll ? filtered : filtered.slice(0, 10);
 
-//   const totalForecastedCases = rankedBarangays.reduce((sum, b) => sum + b.totalCases, 0)
-//   const criticalCount = rankedBarangays.filter((b) => b.riskLevel === "critical").length
-//   const highCount = rankedBarangays.filter((b) => b.riskLevel === "high").length
+  // -----------------------------------------------------------
+  // COLORS
+  // -----------------------------------------------------------
 
-//   const getRiskColor = (risk: string) => {
-//     switch (risk) {
-//       case "critical":
-//         return "bg-red-500/20 text-red-400 border-red-500/30"
-//       case "high":
-//         return "bg-orange-500/20 text-orange-400 border-orange-500/30"
-//       case "medium":
-//         return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-//       default:
-//         return "bg-green-500/20 text-green-400 border-green-500/30"
-//     }
-//   }
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case "critical":
+        return "bg-red-500/20 text-red-400 border-red-500/30";
+      case "high":
+        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+      case "medium":
+        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+      default:
+        return "bg-green-500/20 text-green-400 border-green-500/30";
+    }
+  };
 
-//   return (
-//     <Card className="bg-card border-border">
-//       <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
-//         <div className="flex flex-col gap-3">
-//           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-//             <div className="flex items-center gap-2">
-//               <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-//               <CardTitle className="text-base md:text-lg font-semibold">Forecast Rankings</CardTitle>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               {criticalCount > 0 && (
-//                 <Badge
-//                   variant="outline"
-//                   className="text-[10px] md:text-xs bg-red-500/10 text-red-400 border-red-500/30"
-//                 >
-//                   <AlertTriangle className="h-3 w-3 mr-1" />
-//                   {criticalCount} Critical
-//                 </Badge>
-//               )}
-//               {highCount > 0 && (
-//                 <Badge
-//                   variant="outline"
-//                   className="text-[10px] md:text-xs bg-orange-500/10 text-orange-400 border-orange-500/30"
-//                 >
-//                   {highCount} High Risk
-//                 </Badge>
-//               )}
-//             </div>
-//           </div>
+  if (isLoading) {
+    return (
+      <Card className="bg-card border-border p-4">
+        <div>Loading rankings...</div>
+      </Card>
+    );
+  }
 
-//           {/* Time Period Tabs */}
-//           <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)} className="w-full">
-//             <TabsList className="grid grid-cols-6 w-full h-8 md:h-9">
-//               {(Object.keys(timePeriodLabels) as TimePeriod[]).map((period) => (
-//                 <TabsTrigger key={period} value={period} className="text-[10px] md:text-xs px-1 md:px-2">
-//                   {period.toUpperCase()}
-//                 </TabsTrigger>
-//               ))}
-//             </TabsList>
-//           </Tabs>
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base md:text-lg font-semibold">
+                Forecast Rankings
+              </CardTitle>
+            </div>
+          </div>
 
-//           {/* Model Selection and Search */}
-//           <div className="flex flex-col sm:flex-row gap-2">
-//             <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
-//               <Button
-//                 variant={forecastModel === "average" ? "default" : "ghost"}
-//                 size="sm"
-//                 onClick={() => setForecastModel("average")}
-//                 className="h-7 text-[10px] md:text-xs px-2 md:px-3"
-//               >
-//                 <Activity className="h-3 w-3 mr-1" />
-//                 Average
-//               </Button>
-//               <Button
-//                 variant={forecastModel === "arima" ? "default" : "ghost"}
-//                 size="sm"
-//                 onClick={() => setForecastModel("arima")}
-//                 className="h-7 text-[10px] md:text-xs px-2 md:px-3"
-//               >
-//                 ARIMA
-//               </Button>
-//               <Button
-//                 variant={forecastModel === "prophet" ? "default" : "ghost"}
-//                 size="sm"
-//                 onClick={() => setForecastModel("prophet")}
-//                 className="h-7 text-[10px] md:text-xs px-2 md:px-3"
-//               >
-//                 <Brain className="h-3 w-3 mr-1" />
-//                 Prophet
-//               </Button>
-//             </div>
-//             <div className="relative flex-1">
-//               <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-//               <Input
-//                 placeholder="Search barangay..."
-//                 value={searchQuery}
-//                 onChange={(e) => setSearchQuery(e.target.value)}
-//                 className="h-7 md:h-8 pl-8 text-xs md:text-sm bg-secondary/50"
-//               />
-//             </div>
-//           </div>
+          <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
+            <TabsList className="grid grid-cols-4 w-full h-8">
+              {(Object.keys(timePeriodLabels) as TimePeriod[]).map((p) => (
+                <TabsTrigger key={p} value={p} className="text-[10px] md:text-xs">
+                  {p.toUpperCase()}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-//           {/* Summary Stats */}
-//           <div className="grid grid-cols-3 gap-2 p-2 md:p-3 bg-secondary/30 rounded-lg">
-//             <div className="text-center">
-//               <p className="text-lg md:text-2xl font-bold text-foreground">{totalForecastedCases.toLocaleString()}</p>
-//               <p className="text-[10px] md:text-xs text-muted-foreground">Total Forecast</p>
-//             </div>
-//             <div className="text-center border-x border-border">
-//               <p className="text-lg md:text-2xl font-bold text-foreground">{timePeriodLabels[timePeriod]}</p>
-//               <p className="text-[10px] md:text-xs text-muted-foreground">Time Period</p>
-//             </div>
-//             <div className="text-center">
-//               <p className="text-lg md:text-2xl font-bold text-foreground capitalize">{forecastModel}</p>
-//               <p className="text-[10px] md:text-xs text-muted-foreground">Model</p>
-//             </div>
-//           </div>
-//         </div>
-//       </CardHeader>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search barangay..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-xs bg-secondary/50"
+            />
+          </div>
+        </div>
+      </CardHeader>
 
-//       <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-//         <ScrollArea className="h-[320px] md:h-[400px]">
-//           <div className="space-y-2">
-//             {displayedBarangays.map((barangay, index) => {
-//               const actualRank = rankedBarangays.findIndex((b) => b.id === barangay.id) + 1
-//               const isSelected = selectedBarangayId === barangay.id
+      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+        <ScrollArea className="h-80 md:h-[400px]">
+          <div className="space-y-2">
+            {displayed.map((b: RankedBarangay, index: number) => {
+              const rank =
+                ranked.findIndex((x: RankedBarangay) => x.clean === b.clean) + 1;
+              const isSelected = selectedBarangay?.clean === b.clean;
 
-//               return (
-//                 <div
-//                   key={barangay.id}
-//                   onClick={() => onBarangaySelect(isSelected ? null : barangay.id)}
-//                   className={`flex items-center gap-2 md:gap-3 p-2 md:p-3 rounded-lg cursor-pointer transition-all ${
-//                     isSelected
-//                       ? "bg-primary/20 border border-primary"
-//                       : "bg-secondary/30 hover:bg-secondary/50 border border-transparent"
-//                   }`}
-//                 >
-//                   {/* Rank */}
-//                   <div
-//                     className={`flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full text-xs md:text-sm font-bold ${
-//                       actualRank <= 3
-//                         ? "bg-primary text-primary-foreground"
-//                         : actualRank <= 10
-//                           ? "bg-primary/30 text-primary"
-//                           : "bg-secondary text-muted-foreground"
-//                     }`}
-//                   >
-//                     {actualRank}
-//                   </div>
+              return (
+                <div
+                  key={b.clean}
+                  onClick={() =>
+                    onBarangaySelect(
+                      isSelected ? null : { pretty: b.pretty, clean: b.clean }
+                    )
+                  }
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                    isSelected
+                      ? "bg-primary/20 border border-primary"
+                      : "bg-secondary/30 hover:bg-secondary/50 border border-transparent"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                      rank <= 3
+                        ? "bg-primary text-primary-foreground"
+                        : rank <= 10
+                        ? "bg-primary/30 text-primary"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {rank}
+                  </div>
 
-//                   {/* Barangay Info */}
-//                   <div className="flex-1 min-w-0">
-//                     <div className="flex items-center gap-1.5">
-//                       <p className="font-medium text-sm md:text-base truncate">{barangay.name}</p>
-//                       {isSelected && <MapPin className="h-3 w-3 text-primary flex-shrink-0" />}
-//                     </div>
-//                     <div className="flex items-center gap-2 mt-0.5">
-//                       <Badge
-//                         variant="outline"
-//                         className={`text-[9px] md:text-[10px] ${getRiskColor(barangay.riskLevel)}`}
-//                       >
-//                         {barangay.riskLevel.toUpperCase()}
-//                       </Badge>
-//                       <span className="text-[10px] md:text-xs text-muted-foreground">
-//                         ~{barangay.dailyAverage}/day avg
-//                       </span>
-//                     </div>
-//                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{b.pretty}</p>
+                      {isSelected && <MapPin className="h-3 w-3 text-primary" />}
+                    </div>
 
-//                   {/* Stats */}
-//                   <div className="text-right flex-shrink-0">
-//                     <p className="font-bold text-sm md:text-base">{barangay.totalCases.toLocaleString()}</p>
-//                     <div
-//                       className={`flex items-center justify-end gap-0.5 text-[10px] md:text-xs ${
-//                         barangay.trendPercent > 0
-//                           ? "text-red-400"
-//                           : barangay.trendPercent < 0
-//                             ? "text-green-400"
-//                             : "text-muted-foreground"
-//                       }`}
-//                     >
-//                       {barangay.trendPercent > 0 ? (
-//                         <ChevronUp className="h-3 w-3" />
-//                       ) : barangay.trendPercent < 0 ? (
-//                         <ChevronDown className="h-3 w-3" />
-//                       ) : null}
-//                       {Math.abs(barangay.trendPercent)}%
-//                     </div>
-//                   </div>
-//                 </div>
-//               )
-//             })}
-//           </div>
-//         </ScrollArea>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] ${getRiskColor(b.riskLevel)}`}
+                      >
+                        {b.riskLevel.toUpperCase()}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">
+                        ~{b.dailyAverage}/day
+                      </span>
+                    </div>
+                  </div>
 
-//         {filteredBarangays.length > 10 && (
-//           <Button variant="outline" size="sm" onClick={() => setShowAll(!showAll)} className="w-full mt-3 text-xs">
-//             {showAll ? `Show Top 10` : `Show All ${filteredBarangays.length} Barangays`}
-//           </Button>
-//         )}
-//       </CardContent>
-//     </Card>
-//   )
-// }
+                  <div className="text-right">
+                    <p className="font-bold text-sm">
+                      {b.totalCases.toLocaleString()}
+                    </p>
+
+                    <div
+                      className={`flex items-center justify-end gap-1 text-[10px] ${
+                        b.trendPercent > 0
+                          ? "text-red-400"
+                          : b.trendPercent < 0
+                          ? "text-green-400"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {b.trendPercent > 0 ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : b.trendPercent < 0 ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : null}
+                      {Math.abs(b.trendPercent)}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        {filtered.length > 10 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-3 text-xs"
+            onClick={() => setShowAll(!showAll)}
+          >
+            {showAll
+              ? "Show Top 10"
+              : `Show All ${filtered.length} Barangays`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
