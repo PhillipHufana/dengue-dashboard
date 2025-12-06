@@ -28,7 +28,11 @@ const ChoroplethMap = dynamic(
 
 export function DengueDashboard() {
   const [timeRange, setTimeRange] = useState("7d")
-  const [selectedBarangayName, setSelectedBarangayName] = useState<string | null>(null);
+  const [selectedBarangay, setSelectedBarangay] = useState<{
+    pretty: string;
+    clean: string;
+  } | null>(null);
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,14 +112,15 @@ export function DengueDashboard() {
           <KpiCards />
 
           <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-            <ForecastChart selectedBarangayName={selectedBarangayName} />
+            <ForecastChart selectedBarangay={selectedBarangay} />
             {/* <ForecastRankings selectedBarangayName={selectedBarangayName} onBarangaySelect={setSelectedBarangayName} /> */}
           </div>
 
           <ChoroplethMap
-            selectedBarangayName={selectedBarangayName}
-            onBarangaySelect={setSelectedBarangayName}
+            selectedBarangay={selectedBarangay}
+            onBarangaySelect={setSelectedBarangay}
           />
+
 
         </div>
       </main>

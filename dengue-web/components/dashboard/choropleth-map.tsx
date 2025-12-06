@@ -19,6 +19,29 @@ import { useChoropleth, useSummary } from "@/lib/query/hooks";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export function cleanName(name: string): string {
+  if (!name) return "";
+
+  let x = name.toLowerCase().trim();
+
+  // remove accents
+  x = x.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // remove (pob.) or any parentheses
+  x = x.replace(/\(.*?\)/g, "");
+
+  // convert hyphens to spaces
+  x = x.replace(/-/g, " ");
+
+  // remove punctuation
+  x = x.replace(/[^a-z0-9 ]/g, "");
+
+  // collapse multiple spaces
+  x = x.replace(/\s+/g, " ").trim();
+
+  return x;
+}
+
 
 interface BarangayForecast {
   name: string;
@@ -67,13 +90,16 @@ const weeks = [
 // ---------------------------------------------------------------------------
 
 interface ChoroplethMapProps {
-  selectedBarangayName: string | null;
-  onBarangaySelect: (name: string | null) => void;
+  selectedBarangay: { pretty: string; clean: string } | null;
+  onBarangaySelect: (
+    value: { pretty: string; clean: string } | null
+  ) => void;
 }
 
 
+
 export function ChoroplethMap({
-  selectedBarangayName,
+  selectedBarangay,
   onBarangaySelect,
 }: ChoroplethMapProps) {
   // Animation
@@ -139,7 +165,7 @@ export function ChoroplethMap({
 
   const style = (feature: any) => {
     const name = feature.properties.ADM4_EN;
-    const selected = name === selectedBarangayName;
+    const selected = selectedBarangay?.pretty === name;
 
     return {
       fillColor: getColor(feature.properties.risk_level),
@@ -154,7 +180,7 @@ export function ChoroplethMap({
     const name = feature.properties.ADM4_EN;
 
     const match = barangayForecast.find(
-      (bg) => bg.name.toLowerCase().trim() === name.toLowerCase().trim()
+      (bg) => cleanName(bg.name) === cleanName(name)
     );
 
     const risk = match?.risk_level ?? "unknown";
@@ -171,9 +197,17 @@ export function ChoroplethMap({
     );
 
     layer.on("click", () => {
-      const name = feature.properties.ADM4_EN;
-      onBarangaySelect(name === selectedBarangayName ? null : name);
+      const pretty = feature.properties.ADM4_EN;
+      const clean = cleanName(pretty);
+
+      if (selectedBarangay?.clean === clean) {
+        onBarangaySelect(null);
+      } else {
+        onBarangaySelect({ pretty, clean });
+      }
     });
+
+
 
   };
 
@@ -214,10 +248,10 @@ export function ChoroplethMap({
             </div>
           </div>
 
-          {selectedBarangayName && (
+          {selectedBarangay && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
               <span className="text-primary text-sm">Selected:</span>
-              <Badge>{selectedBarangayName}</Badge>
+              <Badge>{selectedBarangay.pretty}</Badge>
               <Button
                 size="sm"
                 variant="ghost"

@@ -1,6 +1,30 @@
 // lib/api.ts
 const API_BASE = "http://127.0.0.1:8000";
 
+export function cleanName(name: string): string {
+  if (!name) return "";
+
+  let x = name.toLowerCase().trim();
+
+  // remove accents
+  x = x.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // remove (pob.) or any parentheses
+  x = x.replace(/\(.*?\)/g, "");
+
+  // convert hyphens to spaces
+  x = x.replace(/-/g, " ");
+
+  // remove punctuation
+  x = x.replace(/[^a-z0-9 ]/g, "");
+
+  // collapse multiple spaces
+  x = x.replace(/\s+/g, " ").trim();
+
+  return x;
+}
+
+
 export async function getSummary() {
   const res = await fetch(`${API_BASE}/forecast/summary`);
   if (!res.ok) throw new Error("Failed to load summary");
@@ -14,7 +38,7 @@ export async function getChoropleth() {
 }
 
 export async function getBarangaySeries(name: string) {
-  const safe = encodeURIComponent(name.trim().toLowerCase());
+  const safe = encodeURIComponent(cleanName(name));
   const res = await fetch(`${API_BASE}/forecast/barangay/${safe}`);
 
   if (!res.ok) {
@@ -41,7 +65,7 @@ export async function getTimeseries(
 ) {
   const params = new URLSearchParams();
   params.set("level", level);
-  if (options.name) params.set("name", options.name);
+  if (options.name) params.set("name", cleanName(options.name));
   params.set("freq", options.freq ?? "weekly");
   params.set("model", options.model ?? "preferred");
 

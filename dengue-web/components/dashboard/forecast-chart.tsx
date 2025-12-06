@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Activity, TrendingUp } from "lucide-react";
 
+
 import {
   LineChart,
   Line,
@@ -19,7 +20,7 @@ import {
 import { useTimeseries } from "@/lib/query/useTimeseries";
 
 interface ForecastChartProps {
-  selectedBarangayName: string | null;
+  selectedBarangay: { pretty: string; clean: string } | null;
 }
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -56,20 +57,25 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function ForecastChart({ selectedBarangayName }: ForecastChartProps) {
-  const { data, isError, isLoading } = useTimeseries(selectedBarangayName);
+export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
+  const { data, isLoading, isError } = useTimeseries(selectedBarangay?.clean ?? null);
 
   const series = data?.series ?? [];
   const locationName =
-    selectedBarangayName ?? "City-Wide (All 182 Barangays)";
-  const isBarangay = selectedBarangayName !== null;
+    selectedBarangay?.pretty ?? "City-Wide (All 182 Barangays)";
 
-  const forecastStartIndex = series.findIndex((d) => d.is_future);
+  const isBarangay = selectedBarangay !== null;
+
+  const forecastStartIndex = series.findIndex(
+    (d: { is_future: boolean }) => d.is_future
+  );
+
   const forecastStartDate =
     forecastStartIndex > -1 ? series[forecastStartIndex].date : null;
 
   if (isLoading) return <div className="p-4">Loading chart...</div>;
   if (isError) return <div className="p-4 text-red-500">Failed to load timeseries.</div>;
+
 
   return (
     <Card className="bg-card border-border">
