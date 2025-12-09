@@ -63,7 +63,6 @@ def _resample_series(
         "forecast": ("forecast", "sum"),
     }
 
-    # If city-level series has is_future, keep that info
     has_is_future = "is_future" in df.columns
     if has_is_future:
         agg_dict["is_future"] = ("is_future", "max")
@@ -115,9 +114,9 @@ def get_timeseries(
     if forecast_col is None:
         raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
 
-# --------------------------------------------------------
-# BARANGAY LEVEL
-# --------------------------------------------------------
+    # --------------------------------------------------------
+    # BARANGAY LEVEL
+    # --------------------------------------------------------
     if level == "barangay":
         if not name:
             raise HTTPException(
@@ -182,7 +181,6 @@ def get_timeseries(
             else:
                 series_map[d]["is_future"] = is_future
 
-        # Sort + resample
         series = sorted(series_map.values(), key=lambda r: r["date"])
         series = _resample_series(series, freq=freq)
 
@@ -194,7 +192,6 @@ def get_timeseries(
             "n_points": len(series),
             "series": series,
         }
-
 
     # --------------------------------------------------------
     # CITY LEVEL

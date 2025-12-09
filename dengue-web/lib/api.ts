@@ -55,6 +55,12 @@ export async function getCitySeries() {
   return res.json();
 }
 
+export async function getForecastRankings(period: string) {
+  const res = await fetch(`${API_BASE}/forecast/rankings?period=${period}`);
+  if (!res.ok) throw new Error("Failed to load rankings");
+  return res.json();
+}
+
 export async function getTimeseries(
   level: "barangay" | "city",
   options: {

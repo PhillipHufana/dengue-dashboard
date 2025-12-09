@@ -1,5 +1,5 @@
 "use client";
-
+import { getForecastRankings } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import {
   getSummary,
@@ -21,6 +21,16 @@ export function useChoropleth() {
     queryFn: getChoropleth,
   });
 }
+
+
+
+export function useRankings(period: string) {
+  return useQuery({
+    queryKey: ["rankings", period],
+    queryFn: () => getForecastRankings(period),
+  });
+}
+
 
 export function useBarangaySeries(
   name: string | null,

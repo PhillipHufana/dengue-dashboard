@@ -14,6 +14,7 @@ router = APIRouter()
 # 🔧 HELPERS — LOAD WEEKLY HISTORY + COMPUTE THRESHOLDS
 # ================================================================
 
+
 def _load_weekly_history(sb) -> Dict[str, List[int]]:
     """
     Loads full historical dengue cases per barangay.
@@ -101,7 +102,7 @@ def _classify_risk(forecast: Optional[float], th: Dict[str, float]) -> str:
 
 
 # ================================================================
-# 🟦 1. Barangay-level FORECAST TIMESERIES (unchanged logic)
+# 🟦 1. Barangay-level FORECAST TIMESERIES (unchanged)
 # ================================================================
 @router.get("/barangay/{name}")
 def get_barangay_forecast(name: str):
@@ -167,7 +168,7 @@ def get_recent_weeks(n: int):
 
 
 # ================================================================
-# 🟩 4. LATEST forecast per barangay — NOW WITH RISK LEVEL
+# 🟩 4. LATEST forecast per barangay — WITH RISK
 # ================================================================
 @router.get("/latest/barangay")
 def get_latest_forecast_for_all_barangays():
@@ -199,14 +200,16 @@ def get_latest_forecast_for_all_barangays():
         forecast = row.get("final_forecast")
         risk = _classify_risk(forecast, thresholds.get(nm, {}))
 
-        out.append({
-            "name": nm,
-            "latest_forecast": forecast,
-            "week_start": row["week_start"],
-            "is_future": row["is_future"],
-            "risk_level": risk,
-            "thresholds": thresholds.get(nm),
-        })
+        out.append(
+            {
+                "name": nm,
+                "latest_forecast": forecast,
+                "week_start": row["week_start"],
+                "is_future": row["is_future"],
+                "risk_level": risk,
+                "thresholds": thresholds.get(nm),
+            }
+        )
 
     return out
 
@@ -229,14 +232,11 @@ def get_latest_city_forecast():
     return resp.data[0] if resp.data else None
 
 
-# ================================================================
-# 🟦 6. Summary widget — NOW WITH RISK LEVEL
-# ================================================================
 @router.get("/summary")
 def get_forecast_summary():
     sb = get_supabase()
 
-    # Latest city
+    # Latest city (used for data_last_updated)
     city = (
         sb.table("city_weekly")
         .select("*")
@@ -245,7 +245,9 @@ def get_forecast_summary():
         .execute()
     ).data
 
-    # Load thresholds
+    data_last_updated = city[0]["week_start"] if city else None
+
+    # Load thresholds + full historical weekly data
     history = _load_weekly_history(sb)
     thresholds = _compute_thresholds(history)
 
@@ -259,7 +261,7 @@ def get_forecast_summary():
 
     seen = set()
     barangay_latest = []
-    total_forecast = 0
+    total_forecast = 0.0
 
     for row in resp:
         nm = normalize_name(row["name"])
@@ -268,20 +270,42 @@ def get_forecast_summary():
 
         seen.add(nm)
 
-        fc = row.get("final_forecast") or 0
+        fc = float(row.get("final_forecast") or 0.0)
         total_forecast += fc
 
         risk = _classify_risk(fc, thresholds.get(nm, {}))
 
-        barangay_latest.append({
-            "name": nm,
-            "forecast": fc,
-            "week_start": row["week_start"],
-            "risk_level": risk,
-        })
+        # Trend using historical cases (last 2 points)
+        hist_series = history.get(nm, [])
+
+        trend = 0.0
+        last_week = None
+        this_week = None
+
+        if len(hist_series) >= 2:
+            last_week = hist_series[-2]
+            this_week = hist_series[-1]
+
+            if last_week > 0:
+                trend = ((this_week - last_week) / last_week) * 100
+            else:
+                trend = 0.0
+
+        barangay_latest.append(
+            {
+                "name": nm,
+                "forecast": fc,
+                "week_start": row["week_start"],
+                "risk_level": risk,
+                "trend": trend,
+                "last_week": last_week,
+                "this_week": this_week,
+            }
+        )
 
     return {
         "city_latest": city[0] if city else None,
         "barangay_latest": barangay_latest,
         "total_forecasted_cases": round(total_forecast, 2),
+        "data_last_updated": data_last_updated,
     }
