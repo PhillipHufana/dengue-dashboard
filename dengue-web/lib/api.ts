@@ -55,10 +55,30 @@ export async function getCitySeries() {
   return res.json();
 }
 
-export async function getForecastRankings(period: string) {
+export async function getForecastRankings(period: string): Promise<RankingResponse> {
   const res = await fetch(`${API_BASE}/forecast/rankings?period=${period}`);
-  if (!res.ok) throw new Error("Failed to load rankings");
+  if (!res.ok) throw new Error("Failed to load rankings");232
   return res.json();
+}
+
+export interface RankingRow {
+  name: string;
+  pretty_name: string;
+  total_forecast: number;
+  risk_level: string;
+  trend: number;
+  this_week: number | null;
+  last_week: number | null;
+  trend_source: string;
+  trend_message: string;
+}
+
+export interface RankingResponse {
+  period: string;
+  model_current_date: string | null;
+  user_current_date: string;
+  data_last_updated: string | null;
+  rankings: RankingRow[];
 }
 
 export async function getTimeseries(

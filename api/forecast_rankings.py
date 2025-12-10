@@ -1,6 +1,6 @@
 # api/forecast_rankings.py
 from fastapi import APIRouter, Query
-from datetime import datetime
+from datetime import datetime, date
 from .supabase_client import get_supabase
 from .utils import normalize_name
 from .forecast import (
@@ -208,6 +208,9 @@ def get_forecast_rankings(period: str = Query("1m")):
 
     return {
         "period": period,
-        "data_last_updated": latest_week_date,  # for your disclaimer in UI
+        "model_current_date": latest_week_date,        # <-- NEW
+        "user_current_date": str(date.today()),        # <-- NEW
+        "data_last_updated": latest_week_date,
         "rankings": results,
     }
+

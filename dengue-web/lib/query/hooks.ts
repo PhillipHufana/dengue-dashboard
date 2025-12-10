@@ -7,6 +7,7 @@ import {
   getTimeseries,
 } from "@/lib/api";
 import { Frequency, ForecastModel } from "@/lib/store/dashboard-store";
+import type { RankingResponse } from "@/lib/api";
 
 export function useSummary() {
   return useQuery({
@@ -25,7 +26,7 @@ export function useChoropleth() {
 
 
 export function useRankings(period: string) {
-  return useQuery({
+  return useQuery<RankingResponse>({
     queryKey: ["rankings", period],
     queryFn: () => getForecastRankings(period),
   });

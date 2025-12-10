@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { RankingRow, RankingResponse } from "@/lib/api";
 
 import {
   TrendingUp,
@@ -25,17 +26,17 @@ interface ForecastRankingsProps {
   onBarangaySelect: (value: { pretty: string; clean: string } | null) => void;
 }
 
-interface RankingRow {
-  name: string;
-  pretty_name: string;
-  total_forecast: number;
-  risk_level: string;
-  trend: number;
-  this_week: number | null;
-  last_week: number | null;
-  trend_source: string;       // NEW
-  trend_message: string;      // NEW
-}
+// interface RankingRow {
+//   name: string;
+//   pretty_name: string;
+//   total_forecast: number;
+//   risk_level: string;
+//   trend: number;
+//   this_week: number | null;
+//   last_week: number | null;
+//   trend_source: string;       // NEW
+//   trend_message: string;      // NEW
+// }
 
 type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
 
@@ -63,7 +64,8 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const { data, isLoading } = useRankings(timePeriod);
   const barangays: RankingRow[] = data?.rankings ?? [];
 
-  const lastUpdated = data?.data_last_updated;
+  const lastUpdated = data?.model_current_date;
+
 
 
   // -------------------------------------------------------------
@@ -100,42 +102,44 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   };
 
   if (isLoading) {
-    return (
-      <Card className="bg-card border-border">
-        <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-4 rounded-full" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4 rounded-full" />
+            <Skeleton className="h-4 w-32" />
           </div>
-        </CardHeader>
 
-        <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-2 rounded-lg border border-transparent"
-              >
-                <Skeleton className="h-7 w-7 rounded-full" />
-                <div className="flex-1 space-y-1">
-                  <Skeleton className="h-3 w-3/5" />
-                  <Skeleton className="h-3 w-2/5" />
-                </div>
-                <div className="space-y-1">
-                  <Skeleton className="h-3 w-10" />
-                  <Skeleton className="h-3 w-12" />
-                </div>
+          <p className="text-[10px] text-muted-foreground">
+            Loading model date…
+          </p>
+
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-2 rounded-lg">
+              <Skeleton className="h-7 w-7 rounded-full" />
+              <div className="flex-1 space-y-1">
+                <Skeleton className="h-3 w-3/5" />
+                <Skeleton className="h-3 w-2/5" />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+              <div className="space-y-1">
+                <Skeleton className="h-3 w-10" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 
   return (
@@ -162,10 +166,15 @@ export const ForecastRankings = React.memo(function ForecastRankings({
             </TabsList>
           </Tabs>
           {lastUpdated && (
-            <p className="text-[10px] text-muted-foreground -mt-1">
-              Data last updated: {lastUpdated}
+          <div className="text-[10px] text-muted-foreground leading-tight">
+            <p>Model date (latest real data): {data.model_current_date}</p>
+            <p>Your current date: {data.user_current_date}</p>
+            <p className="italic opacity-80">
+              Forecast horizons (1w, 1m, 1y) are relative to the model date.
             </p>
-          )}
+          </div>
+        )}
+
 
           {/* Search */}
           <div className="relative">
