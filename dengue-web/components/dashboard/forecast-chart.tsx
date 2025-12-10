@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Activity, TrendingUp } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 import {
@@ -73,7 +74,52 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const forecastStartDate =
     forecastStartIndex > -1 ? series[forecastStartIndex].date : null;
 
-  if (isLoading) return <div className="p-4">Loading chart...</div>;
+  if (isLoading) {
+    return (
+      <Card className="bg-card border-border">
+        <CardHeader className="p-4 pb-2">
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              {/* Title + badge skeleton */}
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-12 rounded-full" />
+              </div>
+
+              {/* Location pill skeleton */}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">
+                <Skeleton className="h-3 w-3 rounded-full" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+
+            {/* Subtitle skeleton */}
+            <Skeleton className="h-3 w-40" />
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 pt-0">
+          {/* Chart area skeleton */}
+          <div className="h-[240px] w-full ">
+            <Skeleton className="w-full h-full" />
+          </div>
+
+          {/* Legend skeleton */}
+          <div className="mt-3 flex justify-center gap-4 text-[10px]">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-0.5 w-5" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-0.5 w-5" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isError) return <div className="p-4 text-red-500">Failed to load timeseries.</div>;
 
 
