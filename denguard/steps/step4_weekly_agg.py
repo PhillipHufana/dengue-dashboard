@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pandas as pd
 from denguard.config import Config
-
+from denguard.keys import make_barangay_db_key
 
 def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     """
@@ -17,31 +17,41 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     # Compute week start
     df["WeekStart"] = df["date_onset"] - pd.to_timedelta(df["date_onset"].dt.weekday, unit="d")
     df["WeekStart"] = df["WeekStart"].dt.floor("D")
+    df = df.dropna(subset=["Barangay_key"])
 
     weekly = (
-        df.groupby(["Barangay_standardized", "WeekStart"])
+        df.groupby(["Barangay_key", "WeekStart"])
         .size()
         .reset_index(name="Cases")
     )
 
-    start_date = df["WeekStart"].min().floor("D")
+    start_date = df["WeekStart"].min()
     end_date = weekly["WeekStart"].max()
 
     weeks = pd.date_range(start_date, end_date, freq="W-MON")
-    barangays = weekly["Barangay_standardized"].unique()
+    canonical = pd.read_csv(cfg.canon_csv)
+    # build keys in the same style as your DB name keys
+    canonical_keys = canonical["canonical_name"].map(make_barangay_db_key).dropna().unique()
+    barangays = canonical_keys
+
+    extra = set(weekly["Barangay_key"]) - set(barangays)
+    if extra:
+        raise ValueError(f"Barangay keys not in canonical list: {sorted(extra)}")
+
 
     template = pd.MultiIndex.from_product(
-        [barangays, weeks], names=["Barangay_standardized", "WeekStart"]
+        [barangays, weeks], names=["Barangay_key", "WeekStart"]
     ).to_frame(index=False)
 
+
     weekly_full = (
-        template.merge(weekly, on=["Barangay_standardized", "WeekStart"], how="left")
+        template.merge(weekly, on=["Barangay_key", "WeekStart"], how="left")
         .fillna({"Cases": 0})
-        .sort_values(["Barangay_standardized", "WeekStart"])
+        .sort_values(["Barangay_key", "WeekStart"])
     )
 
     # Ensure all barangays have same week count
-    week_counts = weekly_full.groupby("Barangay_standardized")["WeekStart"].count()
+    week_counts = weekly_full.groupby("Barangay_key")["WeekStart"].count()
     assert week_counts.nunique() == 1, "❌ Inconsistent week counts per barangay!"
 
     print(f"✅ All barangays have {week_counts.iloc[0]} weeks of data.")

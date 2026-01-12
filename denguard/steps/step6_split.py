@@ -8,7 +8,7 @@ def train_test_split_city(
     cfg: Config
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
     print("\n== STEP 6: Train/Test split ==")
-    train_end = pd.to_datetime(cfg.train_end_date)
+    train_end = pd.to_datetime(cfg.train_end_date) if cfg.train_end_date else city_weekly["WeekStart"].max()
 
     city_prophet = (
         city_weekly.rename(columns={"WeekStart": "ds", "CityCases": "y"})

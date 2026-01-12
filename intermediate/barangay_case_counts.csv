@@ -1,183 +1,183 @@
-Barangay_standardized,CaseCount
-talomo,2021
-bucana,1665
-buhangin,1644
-matina crossing,1272
-ma-a,1199
-sasa,1133
-catalunan grande,1080
-cabantian,1035
-panacan,948
-barangay 19-b,903
-tibungco,834
-calinan,794
-matina aplaya,715
-catalunan pequeño,675
-toril,658
-mintal,627
-tigatto,595
-daliao,584
-bago gallera,554
-indangan,547
-alfonso angliongto sr.,541
-tacunan,533
-bunawan,524
-baliok,471
-bago aplaya,429
-lizada,427
-santo niño,427
-ilang,405
-dumoy,397
-lubogan,388
-marilog,384
-agdao,366
-pampanga,346
-communal,346
-mandug,345
-barangay 5-a,330
-tugbok,328
-matina pangi,321
-malagos,271
-los amigos,267
-rafael castillo,260
-crossing bayabas,256
-baguio,254
-barangay 8-a,246
-barangay 31-d,235
-binugao,231
-barangay 23-c,231
-centro (san juan),221
-sirawan,221
-san antonio,220
-leon garcia sr.,217
-wilfredo aquino,217
-bato,217
-dacudao,214
-barangay 9-a,203
-tamugan,194
-gumalang,194
-lapu-lapu,189
-barangay 21-c,184
-talomo river,177
-bangkas heights,170
-alejandra navarro (lasang),169
-barangay 37-d,161
-barangay 22-c,160
-barangay 10-a,152
-gov. paciano bangoy,152
-marapangi,147
-"kap. tomas monteverde, sr.",143
-mulig,136
-sirib,133
-lacson,132
-gov. vicente duterte,131
-barangay 7-a,131
-riverside,129
-bago oshiro,123
-tawan-tawan,122
-paquibato,121
-wangan,120
-malabog,119
-tagakpan,118
-tamayong,117
-barangay 2-a,112
-ula,103
-barangay 18-b,102
-wines,100
-barangay 15-b,96
-manuel guianga,92
-ubalde,91
-barangay 27-c,91
-tambobong,83
-vicente hizon sr.,83
-barangay 1-a,82
-cadalian,82
-lamanan,79
-barangay 20-b,79
-eden,77
-waan,76
-subasta,75
-mahayag,75
-barangay 39-d,74
-tibuloy,73
-barangay 32-d,72
-salaysay,70
-carmen,69
-barangay 24-c,68
-angalan,68
-baracatan,67
-barangay 11-b,65
-suawan (tuli),64
-biao guianga,63
-langub,63
-barangay 33-d,63
-barangay 26-c,62
-magtuod,62
-inayangan,62
-catigan,62
-callawa,61
-barangay 40-d,60
-cawayan,60
-biao joaquin,58
-barangay 28-c,57
-biao escuela,57
-bayabas,57
-tungakalan,57
-barangay 16-b,55
-buda,54
-barangay 38-d,52
-daliaon plantation,51
-mudiang,50
-talandang,50
-alambre,49
-lumiad,48
-barangay 6-a,48
-barangay 4-a,47
-matina biao,46
-pangyan,45
-sibulan,45
-acacia,45
-manambulan,43
-barangay 14-b,43
-malamba,41
-gatungan,41
-new valencia,40
-barangay 12-b,39
-paradise embak,39
-tagurano,38
-san isidro (licanan),36
-new carmen,33
-barangay 34-d,33
-barangay 36-d,33
-barangay 17-b,30
-bantol,30
-barangay 25-c,28
-atan-awe,28
-magsaysay,28
-datu salumay,28
-kilate,27
-saloy,27
-barangay 30-c,26
-sumimao,25
-mabuhay,24
-dominga,22
-colosas,22
-lampianao,22
-balengaeng,22
-fatima (benowang),22
-pandaitan,21
-barangay 29-c,21
-baganihan,19
-barangay 3-a,19
-panalum,19
-megkawayan,18
-gumitan,18
-barangay 35-d,17
-camansi,15
-mapula,14
-dalag,14
-tagluno,12
-dalagdag,11
-barangay 13-b,10
+Barangay_key,CaseCount
+talomo,1364
+bucana,1236
+buhangin,1189
+matina crossing,902
+ma a,868
+sasa,841
+cabantian,742
+barangay 19 b,705
+catalunan grande,677
+panacan,617
+tibungco,518
+matina aplaya,487
+calinan,468
+tigatto,440
+alfonso angliongto sr,438
+toril,436
+mintal,407
+indangan,392
+catalunan pequeno,385
+daliao,382
+bago gallera,325
+bunawan,321
+baliok,294
+bago aplaya,285
+tacunan,280
+pampanga,268
+agdao,254
+ilang,253
+lizada,252
+dumoy,247
+lubogan,235
+marilog,231
+barangay 5 a,231
+santo nino,229
+mandug,214
+communal,213
+matina pangi,203
+rafael castillo,196
+barangay 23 c,181
+wilfredo aquino,180
+tugbok,177
+centro,175
+san antonio,175
+barangay 31 d,171
+barangay 8 a,168
+leon garcia sr,161
+los amigos,152
+barangay 21 c,144
+malagos,144
+crossing bayabas,139
+tamugan,139
+barangay 9 a,139
+lapu lapu,139
+binugao,136
+bato,131
+alejandra navarro,130
+sirawan,130
+gov paciano bangoy,127
+kap tomas monteverde sr,125
+baguio,124
+barangay 22 c,120
+gov vicente duterte,114
+barangay 10 a,112
+barangay 37 d,112
+gumalang,105
+marapangi,99
+bangkas heights,97
+barangay 7 a,97
+dacudao,93
+barangay 2 a,91
+talomo river,90
+barangay 18 b,87
+tamayong,85
+paquibato,81
+lacson,81
+barangay 15 b,80
+tawan tawan,78
+ubalde,76
+sirib,76
+barangay 27 c,72
+riverside,71
+mulig,71
+malabog,70
+wangan,68
+bago oshiro,68
+tagakpan,67
+barangay 24 c,58
+waan,57
+barangay 1 a,57
+barangay 39 d,56
+ula,56
+tibuloy,55
+barangay 26 c,54
+barangay 20 b,54
+manuel guianga,51
+barangay 32 d,50
+vicente hizon sr,49
+tambobong,49
+tungakalan,49
+barangay 33 d,48
+barangay 16 b,47
+wines,47
+subasta,47
+callawa,46
+langub,46
+barangay 40 d,46
+baracatan,46
+cadalian,45
+barangay 28 c,45
+barangay 11 b,44
+suawan,43
+magtuod,42
+salaysay,42
+lamanan,42
+sibulan,41
+mahayag,39
+catigan,39
+barangay 38 d,39
+inayangan,39
+bayabas,38
+eden,36
+biao escuela,36
+barangay 6 a,36
+carmen,35
+barangay 14 b,33
+new valencia,33
+barangay 12 b,33
+lumiad,32
+biao guianga,32
+alambre,32
+buda,31
+malamba,31
+mudiang,30
+acacia,30
+biao joaquin,30
+angalan,30
+cawayan,29
+daliaon plantation,29
+barangay 4 a,29
+barangay 36 d,27
+matina biao,27
+talandang,27
+tagurano,26
+manambulan,23
+san isidro,22
+paradise embak,22
+barangay 25 c,22
+barangay 17 b,21
+new carmen,20
+gatungan,20
+fatima,20
+magsaysay,20
+pangyan,20
+barangay 30 c,20
+sumimao,20
+kilate,19
+barangay 34 d,19
+barangay 29 c,18
+lampianao,18
+dominga,17
+atan awe,16
+colosas,16
+pandaitan,15
+bantol,15
+barangay 35 d,14
+barangay 3 a,13
+dalag,12
+mabuhay,11
+megkawayan,11
+baganihan,11
+balengaeng,10
+camansi,10
+panalum,9
+gumitan,9
+mapula,8
 salapawan,8
-tapak,6
+tagluno,8
+saloy,7
+barangay 13 b,6
+tapak,5
+datu salumay,5
+dalagdag,4

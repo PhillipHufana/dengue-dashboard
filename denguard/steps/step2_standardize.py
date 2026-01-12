@@ -1,68 +1,53 @@
 from __future__ import annotations
+
+import re
+import unicodedata
 import pandas as pd
 from typing import Dict
+from denguard.keys import make_barangay_db_key
 
 def standardize_barangays(df: pd.DataFrame) -> pd.DataFrame:
     print("\n== STEP 2: Standardize barangay names ==")
-
     df = df.copy()
 
-    mapping: Dict[str, str] = {
-        # Fix accented canonical mismatches
-        "catalunan pequeno": "catalunan pequeño",
-        "catalunan pequeã±o": "catalunan pequeño",
+    if "Barangay_clean" not in df.columns:
+        raise KeyError("Missing column 'Barangay_clean' (run Step 1 first)")
 
-        # Canonical barangays that require parentheses
-        "alejandra navarro": "alejandra navarro (lasang)",
-        "centro": "centro (san juan)",
-        "fatima": "fatima (benowang)",
-        "san isidro": "san isidro (licanan)",
-        "suawan": "suawan (tuli)",
+    # Create DB-join key
+    df["Barangay_key"] = df["Barangay_clean"].map(make_barangay_db_key)
 
-        # Canonical barangays requiring higher-level mapping
+    # Apply true aliases that should map to DB keys (NOT display names)
+    alias_map: Dict[str, str] = {
+        # Higher-level mapping / known aliasing
         "dalag lumot": "dalag",
         "mati crossing": "matina crossing",
         "puan": "talomo",
 
-        # FIX #1 — KAP TOMAS MONTEVERDE
-        "kap tomas monteverde sr.": "kap. tomas monteverde, sr.",
-        "kap tomas monteverde, sr.": "kap. tomas monteverde, sr.",
-        "kap. tomas monteverde sr.": "kap. tomas monteverde, sr.",
+        # Lanang variants -> DB key
+        "lana": "alfonso angliongto sr",
+        "lanang": "alfonso angliongto sr",
 
-        # FIX #2 — LEON GARCIA
-        "leon garcia, sr.": "leon garcia sr.",
-        "leon garcia sr.": "leon garcia sr.",
+        # Vicente Hizon variants
+        "vicente hizon": "vicente hizon sr",
+        "vicente hizon sr sr": "vicente hizon sr",
 
-        # FIX #3 — LANANG → ALFONSO ANGLIONGTO SR.
-        "lana": "alfonso angliongto sr.",
-        "lanang": "alfonso angliongto sr.",
-        "lanang (alfonso angliongto sr)": "alfonso angliongto sr.",
-        "lanang (alfonso angliongto sr.)": "alfonso angliongto sr.",
+        # Gov Aquino variants
+        "gov wilfredo aquino": "wilfredo aquino",
 
-        # VICENTE HIZON variations
-        "vicente hizon": "vicente hizon sr.",
-        "vicente hizon sr": "vicente hizon sr.",
-        "vicente hizon sr. sr.": "vicente hizon sr.",
-
-        # Gov Aquino standardization
-        "gov. wilfredo aquino": "wilfredo aquino",
+        # FIX the 2 bad rows:
+        "catalunan pequea o": "catalunan pequeno",
     }
 
-
-    df["Barangay_standardized"] = (
-        df["Barangay_clean"]
-        # remove (Pob.), (Pob), (pob.), (pob)
-        .str.replace(r"\s*\(pob\.?\)", "", regex=True)
-        # remove parentheses around canon-mapped names like (Lasang)
-        .str.replace(r"\s*\((.*?)\)", r"", regex=True)
-        .str.strip()
-        .str.lower()
-        .replace(mapping)
+    df["Barangay_key"] = df["Barangay_key"].replace(alias_map)
+    # normalize again so alias outputs are guaranteed DB-key format
+    df["Barangay_key"] = df["Barangay_key"].map(make_barangay_db_key)
+    # Normalize empties
+    df["Barangay_key"] = df["Barangay_key"].replace(
+        ["", "nan", "na", "none", "<na>", "unknown"], pd.NA
     )
 
-    df["Barangay_standardized"] = df["Barangay_standardized"].replace(
-        ["nan", "", "none", "<na>", "unknown"], pd.NA
-    )
+    # Keep a display label if you want (optional)
+    df["Barangay_display"] = df["Barangay_clean"]
 
-    df = df.dropna(subset=["Barangay_standardized"])
+    # DO NOT drop NA keys here; validation step should log them
     return df
