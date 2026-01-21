@@ -32,6 +32,8 @@ from denguard.export_supabase import upload_to_supabase
 from denguard.horizon import resolve_horizon
 
 
+
+
 def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     ensure_outdir(cfg.out)
 
@@ -44,60 +46,48 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     # Step 4–6
     weekly_full = weekly_aggregation(df, cfg)
     city_weekly = build_city_series(weekly_full, cfg)
-    city_prophet, train_city, test_city, forecast_weeks = train_test_split_city(city_weekly, cfg)
+    city_prophet, train_city, test_city, _ = train_test_split_city(city_weekly, cfg)
 
-    # RESOLVED HORIZON (replaces old inline horizon logic)
-    # Testing/thesis mode:
-    #   cfg.forecast_weeks_override = None  -> horizon = forecast_weeks (len(test))
-    # Production/dashboard mode:
-    #   cfg.forecast_weeks_override = N     -> horizon = N
-    horizon = resolve_horizon(cfg, test_len=forecast_weeks)
+    # Horizons
+    eval_horizon = len(test_city)
+    future_horizon = resolve_horizon(cfg, test_len=eval_horizon)
 
-    # Step 7–8
-    # Step 7–8
+    # Step 7–8 (EVALUATION forecasts: full test length)
     PROPHET_OK, model_prophet, forecast_prophet, metrics_prophet = fit_prophet(
-        train_city, test_city, cfg
+        train_city, test_city, cfg, eval_horizon
     )
 
     ARIMA_OK, model_arima, forecast_arima, metrics_arima = fit_arima(
-        train_city, test_city, cfg
+        train_city, test_city, cfg, eval_horizon
     )
 
-    # Build y_train / y_test for ARIMA-style series (weekly W-MON)
-    y_train = (
-        train_city.set_index("ds")["y"]
-        .sort_index()
-    )
+    # Build y_train / y_test for plotting (weekly W-MON)
+    y_train = train_city.set_index("ds")["y"].sort_index()
     y_train.index = pd.DatetimeIndex(y_train.index)
     y_train = y_train.asfreq("W-MON")
 
-    y_test = (
-        test_city.set_index("ds")["y"]
-        .sort_index()
-    )
+    y_test = test_city.set_index("ds")["y"].sort_index()
     y_test.index = pd.DatetimeIndex(y_test.index)
     y_test = y_test.asfreq("W-MON")
-
 
     # Step 9
     comparison_plot(y_test, forecast_arima, forecast_prophet, cfg)
 
-    # Select best city model (Prophet vs ARIMA) + build future horizon
+    # Select best city model + build FUTURE forecast (deployment horizon)
     chosen_city_model, chosen_city_forecast = select_city_model(
         metrics_prophet,
         metrics_arima,
         forecast_prophet,
-        forecast_arima,  # ARIMA test series (still passed for API compatibility)
+        forecast_arima,
         city_prophet,
         y_train,
-        model_prophet,   # <-- NEW
+        model_prophet,
         model_arima,
         cfg,
-        horizon,
+        future_horizon,
     )
 
-
-    # Step 10 — Hybrid disaggregation
+    # Step 10
     barangay_forecasts, diff, chosen = hybrid_disaggregation(
         chosen_city_model,
         chosen_city_forecast,
@@ -112,6 +102,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     avg_smape = prophet_additional_diagnostics(
         PROPHET_OK, forecast_prophet, test_city
     )
+
 
     # Step 12
     plot_sample_barangays(weekly_full, barangay_forecasts, cfg)
@@ -144,7 +135,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         weekly_full,
         test_city,
         train_end,
-        horizon,      # use the resolved horizon here too
+        future_horizon,      # use the resolved horizon here too
         PROPHET_OK,
         cfg,
     )

@@ -6,11 +6,17 @@ import pandas as pd
 from denguard.config import Config
 from denguard.utils import plot_and_save
 
+def smape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> float:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    denom = np.abs(y_true) + np.abs(y_pred) + eps
+    return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
 
 def fit_prophet(
     train_city: pd.DataFrame,
     test_city: pd.DataFrame,
-    cfg: Config
+    cfg: Config,
+    horizon: int,
 ) -> Tuple[bool, Any, Optional[pd.DataFrame], Dict[str, float]]:
     """
     Train a Prophet model on city-level dengue data and evaluate on test set.
@@ -29,13 +35,9 @@ def fit_prophet(
         from prophet import Prophet
     except Exception as e:
         print("⚠️ Prophet unavailable:", e)
-        return False, None, None, {"RMSE": np.nan, "MAE": np.nan, "MAPE": np.nan}
+        return False, None, None, {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
 
-    from sklearn.metrics import (
-        mean_squared_error,
-        mean_absolute_error,
-        mean_absolute_percentage_error,
-    )
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
 
     # Model configuration (why: enforce consistent seasonal structure)
     model = Prophet(
@@ -50,13 +52,10 @@ def fit_prophet(
     model.fit(train_city)
 
     # Forecast horizon (why: Prophet expects only future periods)
-    future_h = (
-        len(test_city)
-        if cfg.forecast_weeks_override is None
-        else int(cfg.forecast_weeks_override)
-    )
+    future_h = int(horizon)
     if future_h <= 0:
         raise ValueError("Forecast horizon must be positive.")
+
 
     # Generate future dates (why: avoid doubling test length)
     future = model.make_future_dataframe(periods=future_h, freq="W-MON")
@@ -70,7 +69,9 @@ def fit_prophet(
     metrics = {
         "RMSE": float(np.sqrt(mean_squared_error(joined["y"], joined["yhat"]))),
         "MAE":  float(mean_absolute_error(joined["y"], joined["yhat"])),
-        "MAPE": float(mean_absolute_percentage_error(joined["y"], joined["yhat"])),
+
+        # sMAPE handles zeros better than MAPE (important for weekly dengue data)
+        "sMAPE": smape(joined["y"].to_numpy(), joined["yhat"].to_numpy()),
     }
 
     print("=== Prophet Metrics ===", metrics)

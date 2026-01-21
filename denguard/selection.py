@@ -36,8 +36,8 @@ def select_city_model(
     horizon: int,
 ) -> Tuple[str, pd.DataFrame]:
     """
-    Select the best city model between Prophet and ARIMA using RMSE on TEST,
-    then build a REAL future-horizon forecast DataFrame for the chosen model.
+    Select the best city model between Prophet and ARIMA using joint TEST metrics
+    (RMSE, MAE, sMAPE) via majority vote
 
     Returns:
         chosen_model: "Prophet" or "ARIMA"
@@ -45,14 +45,67 @@ def select_city_model(
                       for the FUTURE horizon only (no historical or test rows).
     """
 
-    # --- 0) RMSE comparison (NaN-safe) ---
+        # --- 0) Joint metric selection: RMSE + MAE + sMAPE (NaN-safe) ---
+
+    def _better_is_prophet(key: str) -> Optional[bool]:
+        """
+        Returns:
+            True  -> Prophet strictly better on this metric
+            False -> ARIMA strictly better on this metric
+            None  -> cannot compare (both invalid or equal)
+        """
+        p = _safe_metric(metrics_prophet, key)
+        a = _safe_metric(metrics_arima, key)
+
+        # If both invalid, no vote
+        if np.isinf(p) and np.isinf(a):
+            return None
+
+        # If exactly equal (or extremely close), no vote
+        if np.isclose(p, a, rtol=1e-12, atol=1e-12):
+            return None
+
+        return p < a  # lower is better
+
+    votes_prophet = 0
+    votes_arima = 0
+    for k in ("RMSE", "MAE", "sMAPE"):
+        winner = _better_is_prophet(k)
+        if winner is True:
+            votes_prophet += 1
+        elif winner is False:
+            votes_arima += 1
+
+    # Tie-breaker uses RMSE (still NaN-safe)
     rmse_prophet = _safe_metric(metrics_prophet, "RMSE")
     rmse_arima = _safe_metric(metrics_arima, "RMSE")
 
-    if np.isinf(rmse_prophet) and np.isinf(rmse_arima):
-        raise RuntimeError("Both Prophet and ARIMA RMSE are invalid; cannot select city model.")
+    if votes_prophet == 0 and votes_arima == 0:
+        # nothing comparable; fall back to RMSE if possible
+        if np.isinf(rmse_prophet) and np.isinf(rmse_arima):
+            raise RuntimeError("Both models have invalid metrics; cannot select city model.")
+        use_prophet = rmse_prophet <= rmse_arima
+        decision_rule = "fallback_to_RMSE"
+    else:
+        if votes_prophet > votes_arima:
+            use_prophet = True
+            decision_rule = "majority_vote"
+        elif votes_arima > votes_prophet:
+            use_prophet = False
+            decision_rule = "majority_vote"
+        else:
+            # 1–1–0 tie or 1–1–1 tie (if you ever add metrics): break by RMSE
+            use_prophet = rmse_prophet <= rmse_arima
+            decision_rule = "tie_break_by_RMSE"
 
-    use_prophet = rmse_prophet <= rmse_arima
+    print(
+        "=== City model selection (test) === "
+        f"votes Prophet={votes_prophet}, ARIMA={votes_arima}, rule={decision_rule} | "
+        f"RMSE P={rmse_prophet:.4f} A={rmse_arima:.4f} | "
+        f"MAE P={_safe_metric(metrics_prophet,'MAE'):.4f} A={_safe_metric(metrics_arima,'MAE'):.4f} | "
+        f"sMAPE P={_safe_metric(metrics_prophet,'sMAPE'):.4f} A={_safe_metric(metrics_arima,'sMAPE'):.4f}"
+    )
+
 
     # --- 1) Common time info ---
     train_end = pd.to_datetime(cfg.train_end_date)
@@ -83,38 +136,23 @@ def select_city_model(
 
         # Predict from immediately after train_end for test_len + horizon weeks
         total_periods = test_len + horizon
-        preds_full = np.asarray(model_arima.predict(n_periods=total_periods), dtype=float)
+        preds_full, conf = model_arima.predict(
+            n_periods=total_periods,
+            return_conf_int=True,
+            alpha=0.2,
+        )
+        preds_full = np.asarray(preds_full, dtype=float)
+        conf = np.asarray(conf, dtype=float)
 
-        if len(preds_full) != total_periods:
-            raise RuntimeError(
-                f"ARIMA returned {len(preds_full)} predictions but expected {total_periods} "
-                f"(test_len={test_len}, horizon={horizon})."
-            )
-
-        # First test_len steps = test predictions, last horizon steps = real future
         preds_future = preds_full[test_len:]
-
-        # Simple ±1.96 * residual std for intervals
-        resid = getattr(model_arima, "resid", None)
-        if resid is None:
-            resid_std = float("nan")
-        else:
-            resid_series = pd.Series(resid())
-            resid_std = float(resid_series.std(ddof=1))
-
-        if np.isnan(resid_std):
-            yhat_lower = np.full_like(preds_future, np.nan, dtype=float)
-            yhat_upper = np.full_like(preds_future, np.nan, dtype=float)
-        else:
-            yhat_lower = preds_future - 1.96 * resid_std
-            yhat_upper = preds_future + 1.96 * resid_std
+        conf_future = conf[test_len:]
 
         chosen = pd.DataFrame(
             {
                 "ds": future_dates,
                 "yhat": preds_future,
-                "yhat_lower": yhat_lower,
-                "yhat_upper": yhat_upper,
+                "yhat_lower": conf_future[:, 0],
+                "yhat_upper": conf_future[:, 1],
             }
         )
         return "ARIMA", chosen
@@ -163,8 +201,6 @@ def select_city_model(
     else:
         chosen_model, chosen = build_arima_future()
 
-    print(
-        f"✅ Selected City Model (for future): {chosen_model} "
-        f"(Prophet RMSE={rmse_prophet:.4f}, ARIMA RMSE={rmse_arima:.4f})"
-    )
+    print(f"✅ Selected City Model (for future): {chosen_model}")
+
     return chosen_model, chosen

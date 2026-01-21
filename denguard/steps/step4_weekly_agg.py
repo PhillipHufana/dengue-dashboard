@@ -43,6 +43,17 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         [barangays, weeks], names=["Barangay_key", "WeekStart"]
     ).to_frame(index=False)
 
+    # After filtering + dropping NA barangay_key:
+    n_case_rows = len(df)
+
+    # weekly counts should sum exactly to number of case rows
+    sum_weekly = int(weekly["Cases"].sum())
+
+    print("Case rows after onset+date range+barangay_key filters:", n_case_rows)
+    print("Sum of weekly grouped Cases:", sum_weekly)
+
+    if sum_weekly != n_case_rows:
+        raise RuntimeError(f"Weekly sum mismatch: grouped={sum_weekly} vs rows={n_case_rows}")
 
     weekly_full = (
         template.merge(weekly, on=["Barangay_key", "WeekStart"], how="left")
@@ -54,6 +65,9 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     week_counts = weekly_full.groupby("Barangay_key")["WeekStart"].count()
     assert week_counts.nunique() == 1, "❌ Inconsistent week counts per barangay!"
 
+    ws = pd.to_datetime(weekly["WeekStart"]).sort_values()
+    print("Weekly dayofweek unique:", ws.dt.dayofweek.unique())  # should be [0]
+
     print(f"✅ All barangays have {week_counts.iloc[0]} weeks of data.")
 
     weekly_full.to_csv(
@@ -62,5 +76,10 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         encoding="utf-8-sig"
     )
     print(f"✅ Saved full weekly dataset ({len(weekly_full):,} rows)")
+
+    print("Weekly template start:", weeks.min(), "end:", weeks.max(), "n_weeks:", len(weeks))
+    print("Canonical barangays:", len(barangays))
+    print("weekly_full shape:", weekly_full.shape)
+    print("Expected rows:", len(barangays) * len(weeks))
 
     return weekly_full

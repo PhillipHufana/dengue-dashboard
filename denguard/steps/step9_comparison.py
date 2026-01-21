@@ -10,7 +10,7 @@ from denguard.utils import plot_and_save
 
 def build_comparison_frame(
     y_test: pd.Series,
-    forecast_arima: pd.Series,
+    forecast_arima: pd.DataFrame,
     forecast_prophet: Optional[pd.DataFrame],
 ) -> pd.DataFrame:
     """
@@ -31,7 +31,7 @@ def build_comparison_frame(
     df.index.name = "ds"
 
     df["actual"] = y_test
-    df["arima"] = forecast_arima.reindex(df.index)
+    df["arima"] = forecast_arima["yhat"].reindex(df.index)
 
     if forecast_prophet is not None:
         p = (
@@ -46,7 +46,7 @@ def build_comparison_frame(
 
 def comparison_plot(
     y_test: pd.Series,
-    forecast_arima: pd.Series,
+    forecast_arima: pd.DataFrame,
     forecast_prophet: Optional[pd.DataFrame],
     cfg: Config
 ) -> None:

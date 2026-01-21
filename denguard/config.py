@@ -7,7 +7,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class Config:
     # Forecasting horizons and dates
-    forecast_horizon_weeks: int
+    # forecast_horizon_weeks: int
     train_end_date: str
     recent_weight_start: str
     calibration_threshold: int
@@ -29,11 +29,11 @@ class Config:
         return p
 
 DEFAULT_CFG = Config(
-    forecast_horizon_weeks=52,
+    # forecast_horizon_weeks=52,
     train_end_date="2022-12-26",
     recent_weight_start="2022-01-01",
     calibration_threshold=200,
-    incoming_folder=r"C:\Users\Phillip\Downloads\dengue_incoming",
+    incoming_folder=r"C:\Users\Phillip\Downloads\comsci\thesis\dengue-dashboard\dengue_incoming",
     master_data_csv=r"intermediate/dengue_master_cleaned.csv",
     raw_xlsx=r"C:\Users\Phillip\Downloads\dengue2025-2017.xlsx",
     canon_csv=r"C:\Users\Phillip\Downloads\canonical_barangays.csv",

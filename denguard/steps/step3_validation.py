@@ -53,3 +53,16 @@ def validation_summary(df: pd.DataFrame, cfg: Config) -> None:
     if unmatched:
         pd.Series(unmatched, name="Barangay_key").to_csv(cfg.out / "unmatched_barangays.csv", index=False)
         print("Saved unmatched list")
+
+    # How many rows per key (already saved)
+    # Additional: how many distinct raw names map to each key (collapse indicator)
+    collapse = (
+        df.dropna(subset=["Barangay_key"])
+        .groupby("Barangay_key")["Barangay_clean"]
+        .nunique()
+        .sort_values(ascending=False)
+        .reset_index(name="n_raw_names")
+    )
+    collapse.to_csv(cfg.out / "barangay_key_collisions.csv", index=False)
+    print("Keys with >1 raw name mapping:", int((collapse["n_raw_names"] > 1).sum()))
+

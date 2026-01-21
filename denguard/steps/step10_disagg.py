@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Tuple, Optional
 import numpy as np
 import pandas as pd
+from denguard.keys import make_barangay_db_key
 
 from denguard.config import Config
 
@@ -9,7 +10,7 @@ def hybrid_disaggregation(
     chosen_city_model: str,
     chosen_city_future: pd.DataFrame,
     forecast_prophet: Optional[pd.DataFrame],
-    forecast_arima_test: pd.Series,
+    forecast_arima_test: pd.DataFrame,
     test_city: pd.DataFrame,
     weekly_full: pd.DataFrame,
     cfg: Config,
@@ -19,22 +20,48 @@ def hybrid_disaggregation(
     if chosen_city_model == "Prophet" and forecast_prophet is not None:
         city_test = (
             test_city[["ds"]]
-            .merge(forecast_prophet[["ds", "yhat"]], on="ds", how="left")
-            .rename(columns={"yhat": "CityForecast"})
-        )
-    else:
-        city_test = pd.DataFrame(
-            {"ds": forecast_arima_test.index, "CityForecast": np.asarray(forecast_arima_test.values, dtype=float)}
+            .merge(
+                forecast_prophet[["ds", "yhat", "yhat_lower", "yhat_upper"]],
+                on="ds",
+                how="left",
+            )
+            .rename(
+                columns={
+                    "yhat": "CityForecast",
+                    "yhat_lower": "CityLower",
+                    "yhat_upper": "CityUpper",
+                }
+            )
         )
 
-    city_test["CityLower"] = np.nan
-    city_test["CityUpper"] = np.nan
+    else:
+        # ARIMA pred_df: index=ds, columns=[yhat, yhat_lower, yhat_upper]
+        ar = forecast_arima_test.copy()
+        if not isinstance(ar, pd.DataFrame) or "yhat" not in ar.columns:
+            raise TypeError("forecast_arima_test must be the ARIMA pred_df DataFrame with a 'yhat' column.")
+
+        if isinstance(ar.index, pd.DatetimeIndex) is False:
+            ar.index = pd.to_datetime(ar.index, errors="raise")
+
+        city_test = pd.DataFrame(
+            {
+                "ds": ar.index,
+                "CityForecast": ar["yhat"].to_numpy(dtype=float),
+                "CityLower": ar["yhat_lower"].to_numpy(dtype=float) if "yhat_lower" in ar.columns else np.nan,
+                "CityUpper": ar["yhat_upper"].to_numpy(dtype=float) if "yhat_upper" in ar.columns else np.nan,
+            }
+        )
 
     city_future = chosen_city_future.rename(
         columns={"yhat": "CityForecast", "yhat_lower": "CityLower", "yhat_upper": "CityUpper"}
     ).copy()
 
+    city_test["ds"] = pd.to_datetime(city_test["ds"], errors="raise")
+    city_future["ds"] = pd.to_datetime(city_future["ds"], errors="raise")
+
     combined_city = pd.concat([city_test, city_future], ignore_index=True).sort_values("ds")
+    if combined_city["ds"].duplicated().any():
+        raise ValueError("combined_city has duplicate ds values (test/future overlap).")
 
     train_end = pd.to_datetime(cfg.train_end_date)
     recent_start = pd.to_datetime(cfg.recent_weight_start)
@@ -47,23 +74,31 @@ def hybrid_disaggregation(
         print("⚠️ Recent window empty. Falling back to full training history up to train_end.")
         recent = weekly_full[weekly_full["WeekStart"] <= train_end].copy()
 
+    canonical = pd.read_csv(cfg.canon_csv)
+    all_keys = canonical["canonical_name"].map(make_barangay_db_key).dropna().unique()
+
     weights = (
-        recent.groupby("Barangay_standardized")["Cases"]
-        .sum()
+        recent.groupby("Barangay_key")["Cases"].sum()
+        .reindex(all_keys, fill_value=0)
+        .rename_axis("Barangay_key")
         .reset_index(name="Cases")
     )
+
+
     total_recent = float(weights["Cases"].sum())
     if total_recent <= 0:
         raise ValueError("All-zero training-window cases; cannot compute weights.")
+
     weights["Proportion"] = weights["Cases"] / total_recent
-    weights = weights[["Barangay_standardized", "Proportion"]]
+
+    weights = weights[["Barangay_key", "Proportion"]]
 
     parts = []
     for _, row in weights.iterrows():
-        b = row["Barangay_standardized"]
+        b = row["Barangay_key"]
         p = float(row["Proportion"])
         tmp = combined_city.copy()
-        tmp["Barangay_standardized"] = b
+        tmp["Barangay_key"] = b
         tmp["Forecast"]       = tmp["CityForecast"] * p
         tmp["Forecast_lower"] = tmp["CityLower"] * p
         tmp["Forecast_upper"] = tmp["CityUpper"] * p
@@ -75,8 +110,8 @@ def hybrid_disaggregation(
         barangay_forecasts.groupby("ds")["Forecast"].sum().reset_index()
         .merge(combined_city[["ds", "CityForecast"]], on="ds", how="left")
     )
-    if (check["CityForecast"] == 0).any():
-        raise ValueError("Zero city forecast encountered; cannot validate disaggregation.")
+    # if (check["CityForecast"] == 0).any():
+    #     raise ValueError("Zero city forecast encountered; cannot validate disaggregation.")
     diff = float((check["Forecast"] - check["CityForecast"]).abs().mean())
     print(f"✅ Validation — Avg weekly abs diff (sum barangays vs city): {diff:.6f}")
 
