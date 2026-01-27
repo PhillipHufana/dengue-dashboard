@@ -8,6 +8,7 @@ from denguard.utils import ensure_outdir
 # Step modules
 from denguard.steps.step1_load_clean import load_and_clean, persist_clean
 from denguard.steps.step2_standardize import standardize_barangays
+from denguard.steps.step25_fingerprint_dedupe import fingerprint_dedupe
 from denguard.steps.step3_validation import validation_summary
 from denguard.steps.step4_weekly_agg import weekly_aggregation
 from denguard.steps.step5_city_series import build_city_series
@@ -38,10 +39,19 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     ensure_outdir(cfg.out)
 
     # Step 1–3
+    # Step 1–3
     df, _ = load_and_clean(cfg)
+
+    # Save raw+cleaned (but not deduped) snapshot for audits
+    df.to_csv(cfg.out / "dengue_cleaned_pre_fp.csv", index=False, encoding="utf-8-sig")
+
     df = standardize_barangays(df)
+    df = fingerprint_dedupe(df, cfg)
+
+    # Save final deduped version as the master
     persist_clean(df, cfg)
     validation_summary(df, cfg)
+
 
     # Step 4–6
     weekly_full = weekly_aggregation(df, cfg)

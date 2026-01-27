@@ -43,6 +43,7 @@ def load_new_raw_files(incoming_folder: str, processed_registry_csv: str) -> pd.
                 continue
 
             temp = pd.read_excel(f, dtype={"CASE ID": "string"})  # critical
+            temp["__source_row"] = range(len(temp))
             temp["__source_file"] = os.path.basename(f)
             temp["__file_md5"] = md5
             temp["__file_mtime_utc"] = pd.to_datetime(os.path.getmtime(f), unit="s", utc=True)
