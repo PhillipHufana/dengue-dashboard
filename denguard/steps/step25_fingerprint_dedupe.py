@@ -72,32 +72,13 @@ def fingerprint_dedupe(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
           .to_csv(cfg.out / "top_bgy_onset_counts.csv")
 
     # safer dedupe
-    cand = df.loc[df["__fp_complete"]].copy()
-    extra_cols = [c for c in ["District", "MW", "DAdmit", "Admitted", "Case Classification"] if c in cand.columns]
+    before = len(df)
 
-    for c in extra_cols:
-        cand[c] = cand[c].astype("string").fillna("").str.strip().str.lower()
+    complete_df = df[df["__fp_complete"]].copy()
+    incomplete_df = df[~df["__fp_complete"]].copy()
 
-    if not extra_cols:
-        print("⚠️ No extra discriminator columns available; skipping dedupe.")
-        out = df.copy()
-    else:
-        cand["__fp2"] = (
-            cand["__fingerprint"].astype("string") + "|" +
-            cand[extra_cols].astype("string").agg("|".join, axis=1)
-        )
+    complete_dedup = complete_df.drop_duplicates(subset="__fingerprint", keep="last")
 
-        dup2 = cand["__fp2"].duplicated(keep=False)
-        if dup2.any():
-            cand.loc[dup2].to_csv(cfg.out / "fingerprint_fp2_duplicates.csv", index=False)
-
-        before = len(cand)
-        cand_dedup = cand.drop_duplicates(subset=["__fp2"], keep="last")
-        print("Safer fingerprint dedupe dropped:", before - len(cand_dedup))
-
-        out = pd.concat(
-            [cand_dedup.drop(columns=["__fp2"]), df.loc[~df["__fp_complete"]]],
-            ignore_index=True
-        )
-
+    out = pd.concat([complete_dedup, incomplete_df], ignore_index=True)
+    print("Fingerprint dedupe dropped:", before - len(out))
     return out

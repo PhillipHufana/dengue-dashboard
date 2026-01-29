@@ -45,7 +45,7 @@ def fit_prophet(
         weekly_seasonality=False,
         daily_seasonality=False,
         changepoint_prior_scale=0.3,
-        seasonality_mode="multiplicative",
+        seasonality_mode="additive",
         interval_width=0.8,
     )
 

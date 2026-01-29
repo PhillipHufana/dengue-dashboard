@@ -20,6 +20,7 @@ class Config:
     out_dir: str
 
     # Modeling knobs
+    incoming_mode: str = "incremental"  # "incremental" or "full_refresh"
     forecast_weeks_override: Optional[int] = None  # None => len(test)
 
     @property
@@ -39,4 +40,5 @@ DEFAULT_CFG = Config(
     canon_csv=r"C:\Users\Phillip\Downloads\canonical_barangays.csv",
     out_dir="intermediate",
     forecast_weeks_override=None,
+    incoming_mode="incremental",
 )
