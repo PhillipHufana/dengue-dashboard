@@ -5,7 +5,7 @@ from denguard.config import Config as _Config
 
 def tier_classification(weekly_full: pd.DataFrame, cfg: _Config) -> Tuple[pd.DataFrame, List[str], List[str], List[str]]:
     print("\n== STEP 17: Tier Classification ==")
-    case_counts = weekly_full.groupby("Barangay_standardized")["Cases"].sum()
+    case_counts = weekly_full.groupby("Barangay_key")["Cases"].sum()
     tierA = case_counts[case_counts >= 400].index.tolist()
     tierB = case_counts[(case_counts >= 200) & (case_counts < 400)].index.tolist()
     tierC = case_counts[case_counts < 200].index.tolist()

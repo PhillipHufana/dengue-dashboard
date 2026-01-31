@@ -18,7 +18,7 @@ def build_dashboard_export(cfg=DEFAULT_CFG):
 
     dash = final_forecast.merge(
         tiers_df,
-        left_on="Barangay_standardized",
+        left_on="Barangay_key",
         right_on="Barangay",
         how="left"
     )
@@ -26,7 +26,7 @@ def build_dashboard_export(cfg=DEFAULT_CFG):
     dash = dash.merge(city_forecast, on="ds", how="left")
 
     dash = dash.rename(columns={
-        "Barangay_standardized": "Barangay",
+        "Barangay_key": "Barangay",
         "Final": "FinalForecast",
         "Forecast": "HybridForecast",
         "local_forecast": "LocalForecast"

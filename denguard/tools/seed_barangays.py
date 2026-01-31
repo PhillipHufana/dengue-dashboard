@@ -30,7 +30,7 @@ def headers():
 def main():
     df = pd.read_csv(CSV)
     names = (
-        df["Barangay_standardized"]
+        df["Barangay_key"]
         .astype(str)
         .str.strip()
         .str.lower()

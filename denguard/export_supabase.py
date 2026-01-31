@@ -98,7 +98,7 @@ def upload_to_supabase(cfg) -> None:
     # Barangays (master list)
     # ---------------------------------------------------------
     src_bg = pd.read_csv(outdir / "weekly_cases_all_barangays.csv")[
-        "Barangay_standardized"
+        "Barangay_key"
     ].drop_duplicates()
 
     # Normalized name + display_name for UI
@@ -139,7 +139,7 @@ def upload_to_supabase(cfg) -> None:
     # ---------------------------------------------------------
     df_bg_weekly = pd.read_csv(outdir / "weekly_cases_all_barangays.csv").rename(
         columns={
-            "Barangay_standardized": "name",
+            "Barangay_key": "name",
             "WeekStart": "week_start",
             "Cases": "cases",
         }
@@ -165,7 +165,7 @@ def upload_to_supabase(cfg) -> None:
     # ---------------------------------------------------------
     df_fore = pd.read_csv(outdir / "barangay_forecasts_final.csv").rename(
         columns={
-            "Barangay_standardized": "name",
+            "Barangay_key": "name",
             "ds": "week_start",
             "Final": "final_forecast",
             "Forecast": "hybrid_forecast",

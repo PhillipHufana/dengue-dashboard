@@ -1,18 +1,36 @@
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from denguard.utils import smape
 
-def prophet_additional_diagnostics(PROPHET_OK: bool, forecast_prophet, test_city: pd.DataFrame) -> float:
+
+def prophet_additional_diagnostics(PROPHET_OK: bool, city_prophet_test: pd.DataFrame, test_city: pd.DataFrame) -> float:
+    """
+    Expects:
+      - city_prophet_test standardized city df with columns: ds, yhat, ...
+      - test_city with columns: ds, y
+    """
     print("\n== STEP 11: Additional Prophet diagnostics ==")
-    avg_smape = np.nan
-    if PROPHET_OK and forecast_prophet is not None:
-        merged_prophet = test_city.merge(forecast_prophet[["ds", "yhat"]], on="ds", how="left")
-        low_weeks = merged_prophet[merged_prophet["y"] < 100]
-        smape_val = smape(merged_prophet["y"], merged_prophet["yhat"])
-        avg_smape = float(smape_val)
-        print(f"Low-case weeks (<100 cases): {len(low_weeks)} / {len(merged_prophet)}")
-        print(f"SMAPE (Prophet): {smape_val:.3f}")
-    else:
+
+    if not PROPHET_OK or city_prophet_test is None or city_prophet_test.empty:
         print("⚠️ Prophet model not available; skipping SMAPE diagnostic.")
-    return avg_smape
+        return float("nan")
+
+    fc = city_prophet_test.copy()
+    fc["ds"] = pd.to_datetime(fc["ds"], errors="raise")
+    tc = test_city.copy()
+    tc["ds"] = pd.to_datetime(tc["ds"], errors="raise")
+
+    merged = tc.merge(fc[["ds", "yhat"]], on="ds", how="left").dropna(subset=["yhat"])
+    if merged.empty:
+        print("⚠️ No overlap between Prophet test forecast and test_city.")
+        return float("nan")
+
+    low_weeks = merged[merged["y"] < 100]
+    smape_val = float(smape(merged["y"], merged["yhat"]))
+
+    print(f"Low-case weeks (<100 cases): {len(low_weeks)} / {len(merged)}")
+    print(f"SMAPE (Prophet city test): {smape_val:.3f}")
+    return smape_val
+

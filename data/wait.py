@@ -43,12 +43,12 @@ poly_df = pd.DataFrame({"raw": poly_raw, "normalized": poly_norm})
 df = pd.read_csv(csv_path)
 
 # column must match your Supabase normalized name
-if "Barangay_standardized" in df.columns:
-    csv_norm = df["Barangay_standardized"].astype(str).apply(normalize)
+if "Barangay_key" in df.columns:
+    csv_norm = df["Barangay_key"].astype(str).apply(normalize)
 elif "name" in df.columns:
     csv_norm = df["name"].astype(str).apply(normalize)
 else:
-    raise ValueError("CSV must contain 'Barangay_standardized' or 'name' column")
+    raise ValueError("CSV must contain 'Barangay_key' or 'name' column")
 
 csv_df = pd.DataFrame({
     "raw": df.iloc[:,0],

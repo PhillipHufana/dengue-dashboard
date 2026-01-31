@@ -30,7 +30,7 @@ def safe_read_csv(path: Path) -> Optional[pd.DataFrame]:
 def produce_dashboard_forecast(cfg) -> pd.DataFrame:
     """
     Produce a single merged CSV (dashboard_forecast.csv) containing:
-      - Barangay_standardized, ds (date), Final (reconciled), Forecast (hybrid),
+      - Barangay_key, ds (date), Final (reconciled), Forecast (hybrid),
         local_forecast, CityForecast (city-level), ModelUsed, Tier, TotalCases, Proportion
       - Optional geometry if geopandas and geojsons are present.
 
@@ -56,12 +56,12 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
     counts_df = safe_read_csv(case_counts_fp)
 
     # -- normalize columns & minimal schemas --
-    # final_df expected: Barangay_standardized, ds, Final, Forecast, local_forecast (maybe)
-    # hybrid_df expected: Barangay_standardized, ds, Forecast, Forecast_lower, Forecast_upper
-    # local_df expected: Barangay_standardized, ds, local_forecast
+    # final_df expected: Barangay_key, ds, Final, Forecast, local_forecast (maybe)
+    # hybrid_df expected: Barangay_key, ds, Forecast, Forecast_lower, Forecast_upper
+    # local_df expected: Barangay_key, ds, local_forecast
     # city_df expected: ds, CityForecast, ModelUsed (maybe)
     # tiers_df expected: Barangay, TotalCases, Tier
-    # counts_df expected: Barangay_standardized, CaseCount
+    # counts_df expected: Barangay_key, CaseCount
 
     # If final_df missing, try to construct a usable base from hybrid (+ local)
     base: pd.DataFrame
@@ -77,24 +77,24 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
         raise FileNotFoundError("Neither final nor hybrid forecast files found. Cannot produce dashboard table.")
 
     # ensure keys
-    base["Barangay_standardized"] = base["Barangay_standardized"].astype(str).str.strip().str.lower()
+    base["Barangay_key"] = base["Barangay_key"].astype(str).str.strip().str.lower()
 
     # merge hybrid (if exists) to ensure Forecast_Hybrid present
     if hybrid_df is not None and "Forecast_Hybrid" not in base.columns:
         hybrid_df["ds"] = pd.to_datetime(hybrid_df["ds"])
         base = base.merge(
-            hybrid_df[["Barangay_standardized", "ds", "Forecast"]],
-            on=["Barangay_standardized", "ds"],
+            hybrid_df[["Barangay_key", "ds", "Forecast"]],
+            on=["Barangay_key", "ds"],
             how="left"
         ).rename(columns={"Forecast": "Forecast_Hybrid"})
 
     # merge local forecasts
     if local_df is not None:
         local_df["ds"] = pd.to_datetime(local_df["ds"])
-        local_df["Barangay_standardized"] = local_df["Barangay_standardized"].astype(str).str.strip().str.lower()
+        local_df["Barangay_key"] = local_df["Barangay_key"].astype(str).str.strip().str.lower()
         base = base.merge(
-            local_df[["Barangay_standardized", "ds", "local_forecast"]],
-            on=["Barangay_standardized", "ds"],
+            local_df[["Barangay_key", "ds", "local_forecast"]],
+            on=["Barangay_key", "ds"],
             how="left",
         )
 
@@ -112,13 +112,13 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
 
     # merge tier/totalcases
     if tiers_df is not None:
-        tiers_df = tiers_df.rename(columns={"Barangay": "Barangay_standardized"})
-        tiers_df["Barangay_standardized"] = tiers_df["Barangay_standardized"].astype(str).str.strip().str.lower()
-        base = base.merge(tiers_df[["Barangay_standardized", "TotalCases", "Tier"]], on="Barangay_standardized", how="left")
+        tiers_df = tiers_df.rename(columns={"Barangay": "Barangay_key"})
+        tiers_df["Barangay_key"] = tiers_df["Barangay_key"].astype(str).str.strip().str.lower()
+        base = base.merge(tiers_df[["Barangay_key", "TotalCases", "Tier"]], on="Barangay_key", how="left")
     elif counts_df is not None:
-        counts_df["Barangay_standardized"] = counts_df["Barangay_standardized"].astype(str).str.strip().str.lower()
+        counts_df["Barangay_key"] = counts_df["Barangay_key"].astype(str).str.strip().str.lower()
         counts_df = counts_df.rename(columns={"CaseCount": "TotalCases"})
-        base = base.merge(counts_df[["Barangay_standardized", "TotalCases"]], on="Barangay_standardized", how="left")
+        base = base.merge(counts_df[["Barangay_key", "TotalCases"]], on="Barangay_key", how="left")
         base["Tier"] = None
     else:
         base["TotalCases"] = np.nan
@@ -126,10 +126,10 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
 
     # compute proportion within training window if TotalCases exists
     if "TotalCases" in base.columns and base["TotalCases"].notna().any():
-        total = base[["Barangay_standardized", "TotalCases"]].drop_duplicates()["TotalCases"].sum()
+        total = base[["Barangay_key", "TotalCases"]].drop_duplicates()["TotalCases"].sum()
         if total and total > 0:
-            prop_map = (base[["Barangay_standardized", "TotalCases"]].drop_duplicates().set_index("Barangay_standardized")["TotalCases"] / total).to_dict()
-            base["Proportion_train"] = base["Barangay_standardized"].map(prop_map).fillna(0.0)
+            prop_map = (base[["Barangay_key", "TotalCases"]].drop_duplicates().set_index("Barangay_key")["TotalCases"] / total).to_dict()
+            base["Proportion_train"] = base["Barangay_key"].map(prop_map).fillna(0.0)
         else:
             base["Proportion_train"] = 0.0
     else:
@@ -141,7 +141,7 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
         base["Forecast_Final"] = base.get("local_forecast", base.get("Forecast_Hybrid", np.nan))
 
     final_cols = [
-        "Barangay_standardized", "ds",
+        "Barangay_key", "ds",
         "Forecast_Final", "Forecast_Hybrid", "local_forecast",
         "CityForecast", "ModelUsed",
         "TotalCases", "Tier", "Proportion_train"
@@ -151,7 +151,7 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
             base[c] = np.nan
 
     out = base[final_cols].copy()
-    out = out.sort_values(["Barangay_standardized", "ds"]).reset_index(drop=True)
+    out = out.sort_values(["Barangay_key", "ds"]).reset_index(drop=True)
 
     # attempt geo join if geopandas present and geojson(s) exist in working directory
     geo_added = False
@@ -180,7 +180,7 @@ def produce_dashboard_forecast(cfg) -> pd.DataFrame:
                     # if no textual join, try point centroid mapping later; otherwise skip
                     if join_col:
                         gdf[join_col] = gdf[join_col].astype(str).str.strip().str.lower()
-                        out = out.merge(gdf[[join_col, "geometry"]].rename(columns={join_col: "Barangay_standardized"}), on="Barangay_standardized", how="left")
+                        out = out.merge(gdf[[join_col, "geometry"]].rename(columns={join_col: "Barangay_key"}), on="Barangay_key", how="left")
                         geo_added = True
                         print(f"✅ Geo joined using {c} on {join_col}")
                         break
