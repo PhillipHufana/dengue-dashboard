@@ -14,6 +14,7 @@ from denguard.forecast_schema import ensure_barangay_forecast_df
 
 
 def _pad_local_grid(
+
     tierA: List[str],
     test_ds: pd.DatetimeIndex,
     future_ds: pd.DatetimeIndex,
@@ -23,6 +24,8 @@ def _pad_local_grid(
     Ensures every TierA barangay has rows for both local models for all ds
     in both test and future horizons. Missing rows are filled with yhat=0.
     """
+    # Safety: ensure TierA keys are unique + stable ordering
+    tierA = sorted(set(tierA))
     models = ["local_prophet", "local_arima"]
 
     def _template(ds: pd.DatetimeIndex, horizon_type: str) -> pd.DataFrame:
@@ -74,16 +77,30 @@ def local_models_tierA(
     import pmdarima as pm
     from sklearn.metrics import mean_squared_error
 
+    tierA = sorted(set(tierA))
+
     if horizon <= 0:
         raise ValueError("Horizon must be positive.")
 
     test_ds = pd.DatetimeIndex(pd.to_datetime(test_city["ds"], errors="raise")).sort_values()
-    future_ds = pd.date_range(start=test_ds.max() + pd.Timedelta(weeks=1), periods=horizon, freq="W-MON")
+    test_end = test_ds.max()
+    last_obs = pd.to_datetime(weekly_full["WeekStart"], errors="coerce").max()
+    if pd.isna(last_obs):
+        raise ValueError("weekly_full['WeekStart'] contains only invalid dates.")
+
+    # Backtest behavior (current): future starts after test_end.
+    # Production behavior (G0.3 later): future should start after last_obs.
+    start_future = test_end  # <-- keep current behavior for now
+    future_ds = pd.date_range(start=start_future + pd.Timedelta(weeks=1), periods=horizon, freq="W-MON")
+
 
     local_results: List[Dict[str, Any]] = []
     long_parts: List[pd.DataFrame] = []
 
     for bgy in tierA:
+        err_prophet = None
+        err_arima = None
+
         df_full = (
             weekly_full.loc[weekly_full["Barangay_key"] == bgy, ["WeekStart", "Cases"]]
             .rename(columns={"WeekStart": "ds", "Cases": "y"})
@@ -95,14 +112,30 @@ def local_models_tierA(
 
         if len(df_full) < 52:
             local_results.append(
-                {"Barangay_key": bgy, "RMSE_local_prophet": np.inf, "RMSE_local_arima": np.inf, "Chosen": None, "status": "insufficient_history"}
+                {
+                    "Barangay_key": bgy,
+                    "RMSE_local_prophet": np.inf,
+                    "RMSE_local_arima": np.inf,
+                    "Chosen": None,
+                    "status": "insufficient_history",
+                    "err_prophet": None,
+                    "err_arima": None,
+                }
             )
             continue
 
         df_train = df_full[df_full["ds"] <= train_end].reset_index(drop=True)
         if len(df_train) < 52:
             local_results.append(
-                {"Barangay_key": bgy, "RMSE_local_prophet": np.inf, "RMSE_local_arima": np.inf, "Chosen": None, "status": "insufficient_train_history"}
+                {
+                    "Barangay_key": bgy,
+                    "RMSE_local_prophet": np.inf,
+                    "RMSE_local_arima": np.inf,
+                    "Chosen": None,
+                    "status": "insufficient_train_history",
+                    "err_prophet": None,
+                    "err_arima": None,
+                }
             )
             continue
 
@@ -155,8 +188,9 @@ def local_models_tierA(
                 )
                 long_parts.append(ensure_barangay_forecast_df(raw_test, model_name="local_prophet", horizon_type="test"))
                 long_parts.append(ensure_barangay_forecast_df(raw_fut, model_name="local_prophet", horizon_type="future"))
-            except Exception:
-                pass
+            except Exception as e:
+                err_prophet = repr(e)
+
 
         # ARIMA
         rmse_a = np.inf
@@ -182,11 +216,13 @@ def local_models_tierA(
                 conf_fut = conf_full[-horizon:]
                 a_ci_test = np.asarray(conf_test, dtype=float)
                 a_ci_fut = np.asarray(conf_fut, dtype=float)
-            except Exception:
+            except Exception as e_conf:
+                # conf_int failed, fallback to point forecasts
                 pred_test = ma.predict(n_periods=len(test_ds))
                 pred_fut = ma.predict(n_periods=len(test_ds) + horizon)[-horizon:]
                 a_ci_test = None
                 a_ci_fut = None
+
 
             a_test = np.clip(np.asarray(pred_test, dtype=float), 0, None)
             a_fut = np.clip(np.asarray(pred_fut, dtype=float), 0, None)
@@ -204,18 +240,35 @@ def local_models_tierA(
             )
             long_parts.append(ensure_barangay_forecast_df(raw_test, model_name="local_arima", horizon_type="test"))
             long_parts.append(ensure_barangay_forecast_df(raw_fut, model_name="local_arima", horizon_type="future"))
-        except Exception:
-            pass
+        except Exception as e:
+            err_arima = repr(e)
+
 
         chosen = None
         status = "ok"
+        if not np.isfinite(rmse_p) and not np.isfinite(rmse_a):
+            status = "both_failed"
+        elif not np.isfinite(rmse_p):
+            status = "prophet_failed"
+        elif not np.isfinite(rmse_a):
+            status = "arima_failed"
+        else:
+            status = "ok"
+
+        chosen = None
         if np.isfinite(rmse_p) or np.isfinite(rmse_a):
             chosen = "local_prophet" if rmse_p <= rmse_a else "local_arima"
-        else:
-            status = "both_failed"
 
         local_results.append(
-            {"Barangay_key": bgy, "RMSE_local_prophet": float(rmse_p), "RMSE_local_arima": float(rmse_a), "Chosen": chosen, "status": status}
+            {
+                "Barangay_key": bgy,
+                "RMSE_local_prophet": float(rmse_p),
+                "RMSE_local_arima": float(rmse_a),
+                "Chosen": chosen,
+                "status": status,
+                "err_prophet": err_prophet,
+                "err_arima": err_arima,
+            }
         )
 
     local_results_df = pd.DataFrame(local_results)
@@ -226,7 +279,13 @@ def local_models_tierA(
     )
 
     # IMPORTANT: pad for consistent UI plotting
-    local_forecasts_long_df = _pad_local_grid(tierA=tierA, test_ds=test_ds, future_ds=future_ds, existing_long=existing)
+    local_forecasts_long_df = _pad_local_grid(
+        tierA=tierA,
+        test_ds=test_ds,
+        future_ds=future_ds,
+        existing_long=existing,
+    )
+
     local_forecasts_long_df.to_csv(cfg.out / "barangay_local_forecasts_long.csv", index=False)
 
     return local_results_df, local_forecasts_long_df

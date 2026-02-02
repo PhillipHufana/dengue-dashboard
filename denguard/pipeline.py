@@ -107,7 +107,16 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     # diff removed; if your health report expects it, compute diff from disagg coherence if needed.
     model_health_report(df, weekly_full, metrics_prophet, metrics_arima, avg_smape, diff=float("nan"))
 
-    tiers_df, tierA, _, _ = tier_classification(weekly_full, cfg)
+    train_end = pd.to_datetime(cfg.train_end_date)
+    
+    tiers_df, tierA, tierB, tierC = tier_classification(
+        weekly_full,
+        cfg,
+        train_end=train_end,          # <-- same train_end you pass to Step18
+        K_nonzero_weeks=12,
+        C_total_cases=50,
+    )
+
 
     train_end = pd.to_datetime(cfg.train_end_date)
     local_perf_df, local_long_df = local_models_tierA(

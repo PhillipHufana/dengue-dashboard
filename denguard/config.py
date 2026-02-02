@@ -1,3 +1,4 @@
+# denguard/config.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,18 +7,21 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class Config:
+    # --- NEW: run metadata (G0.4) ---
+    run_id: Optional[str] = None
+    run_started_at_utc: Optional[str] = None
+
     # Forecasting horizons and dates
-    # forecast_horizon_weeks: int
-    train_end_date: str
-    recent_weight_start: str
-    calibration_threshold: int
+    train_end_date: str = "2022-12-26"
+    recent_weight_start: str = "2022-01-01"
+    calibration_threshold: int = 200
 
     # IO paths
-    incoming_folder: str
-    master_data_csv: str
-    raw_xlsx: str
-    canon_csv: str
-    out_dir: str
+    incoming_folder: str = ""
+    master_data_csv: str = ""
+    raw_xlsx: str = ""
+    canon_csv: str = ""
+    out_dir: str = ""
 
     # Modeling knobs
     incoming_mode: str = "incremental"  # "incremental" or "full_refresh"
@@ -29,8 +33,8 @@ class Config:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
+
 DEFAULT_CFG = Config(
-    # forecast_horizon_weeks=52,
     train_end_date="2022-12-26",
     recent_weight_start="2022-01-01",
     calibration_threshold=200,
