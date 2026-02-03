@@ -49,18 +49,18 @@ def fit_prophet(
         seasonality_mode="additive",
         interval_width=0.8,
     )
-    model.fit(train_city)
+    model.fit(train_city[["ds", "y"]])
 
     future_h = int(horizon)
     if future_h <= 0:
         raise ValueError("Forecast horizon must be positive.")
 
-    # Prophet makes full history + future. We'll split test/future explicitly.
-    full_future = model.make_future_dataframe(periods=future_h, freq="W-MON")
-    full_forecast = model.predict(full_future)
-
     # Define test and future date indices (Mondays)
     test_ds = pd.DatetimeIndex(pd.to_datetime(test_city["ds"], errors="raise")).sort_values()
+
+    # Prophet makes full history + (test + future). We'll split explicitly.
+    full_future = model.make_future_dataframe(periods=len(test_ds) + future_h, freq="W-MON")
+    full_forecast = model.predict(full_future)
 
     last_obs = pd.to_datetime(pd.concat([train_city["ds"], test_city["ds"]]).max())
     future_ds = pd.date_range(last_obs + pd.Timedelta(weeks=1), periods=future_h, freq="W-MON")

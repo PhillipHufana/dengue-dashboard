@@ -144,6 +144,12 @@ def prophet_split_test_future(
     test = full.reindex(test_ds)[["yhat"] + [c for c in ["yhat_lower", "yhat_upper"] if c in full.columns]].reset_index()
     fut = full.reindex(future_ds)[["yhat"] + [c for c in ["yhat_lower", "yhat_upper"] if c in full.columns]].reset_index()
 
+    if test["yhat"].isna().all():
+        raise RuntimeError("Prophet split: test reindex returned all-NaN yhat (ds mismatch).")
+    if fut["yhat"].isna().all():
+        raise RuntimeError("Prophet split: future reindex returned all-NaN yhat (insufficient periods).")
+
+
     # Rename index column back to ds if it became "index"
     if "index" in test.columns and "ds" not in test.columns:
         test = test.rename(columns={"index": "ds"})

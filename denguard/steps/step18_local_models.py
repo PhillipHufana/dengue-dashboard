@@ -271,21 +271,24 @@ def local_models_tierA(
             }
         )
 
+    # -----------------------
+    # BUILD OUTPUT DATAFRAMES
+    # -----------------------
     local_results_df = pd.DataFrame(local_results)
+    local_results_df["run_id"] = cfg.run_id
     local_results_df.to_csv(cfg.out / "local_model_performance.csv", index=False)
 
     existing = pd.concat(long_parts, ignore_index=True) if long_parts else pd.DataFrame(
         columns=["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type"]
     )
 
-    # IMPORTANT: pad for consistent UI plotting
     local_forecasts_long_df = _pad_local_grid(
         tierA=tierA,
         test_ds=test_ds,
         future_ds=future_ds,
         existing_long=existing,
     )
-
+    local_forecasts_long_df["run_id"] = cfg.run_id
     local_forecasts_long_df.to_csv(cfg.out / "barangay_local_forecasts_long.csv", index=False)
 
     return local_results_df, local_forecasts_long_df

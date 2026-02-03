@@ -50,26 +50,32 @@ def _upsert_df(table: str, df: pd.DataFrame, conflict: str, chunk_size: int = 50
 
     print(f"✅ Upserted {total} rows into {table}")
 
-
 # ============================================================
-# PUBLIC UPSERT FUNCTIONS
+# PUBLIC UPSERT FUNCTIONS (SAFE: subset to table columns)
 # ============================================================
 
 def upsert_barangays(df: pd.DataFrame) -> None:
-    if not {"name"}.issubset(df.columns):
-        raise ValueError("barangays requires column: name")
+    required = {"name", "display_name"}
+    if not required.issubset(df.columns):
+        raise ValueError(f"barangays requires columns: {sorted(required)}")
+    # Only send columns that exist in your Supabase table schema
+    df = df[["name", "display_name"]].copy()
     _upsert_df("barangays", df, conflict="name")
 
 
 def upsert_city_weekly(df: pd.DataFrame) -> None:
-    if not {"week_start", "city_cases"}.issubset(df.columns):
+    required = {"week_start", "city_cases"}
+    if not required.issubset(df.columns):
         raise ValueError("city_weekly requires week_start, city_cases")
+    df = df[["week_start", "city_cases"]].copy()
     _upsert_df("city_weekly", df, conflict="week_start")
 
 
 def upsert_barangay_weekly(df: pd.DataFrame) -> None:
-    if not {"name", "week_start", "cases"}.issubset(df.columns):
+    required = {"name", "week_start", "cases"}
+    if not required.issubset(df.columns):
         raise ValueError("barangay_weekly requires name, week_start, cases")
+    df = df[["name", "week_start", "cases"]].copy()
     _upsert_df("barangay_weekly", df, conflict="name,week_start")
 
 
@@ -83,7 +89,14 @@ def upsert_barangay_forecasts(df: pd.DataFrame) -> None:
         "is_future",
     }
     if not required.issubset(df.columns):
-        raise ValueError(f"barangay_forecasts missing required columns: {required}")
+        missing = required - set(df.columns)
+        raise ValueError(f"barangay_forecasts missing required columns: {sorted(missing)}")
+
+    # Only send the table columns
+    df = df[
+        ["name", "week_start", "final_forecast", "hybrid_forecast", "local_forecast", "is_future"]
+    ].copy()
+
     _upsert_df("barangay_forecasts", df, conflict="name,week_start")
 
 
@@ -161,43 +174,102 @@ def upload_to_supabase(cfg) -> None:
     upsert_barangay_weekly(df_bg_weekly)
 
     # ---------------------------------------------------------
-    # Barangay Forecasts
+    # Barangay Forecasts (keep existing wide table alive OR fallback to preferred long)
     # ---------------------------------------------------------
-    df_fore = pd.read_csv(outdir / "barangay_forecasts_final.csv").rename(
-        columns={
-            "Barangay_key": "name",
-            "ds": "week_start",
-            "Final": "final_forecast",
-            "Forecast": "hybrid_forecast",
-            "local_forecast": "local_forecast",
-        }
-    )
+    wide_path = outdir / "barangay_forecasts_final.csv"
+    preferred_long_path = outdir / "barangay_forecasts_preferred_future_long.csv"
 
-    df_fore["name"] = df_fore["name"].apply(normalize_barangay_name)
+    df_fore = None  # type: ignore
 
-    df_fore["week_start"] = (
-        pd.to_datetime(df_fore["week_start"])
-        .dt.strftime("%Y-%m-%d")
-    )
+    # 1) Prefer legacy wide file IF it has the expected columns
+    if wide_path.exists():
+        tmp = pd.read_csv(wide_path)
 
-    # Mark future weeks relative to last observed barangay weekly date
-    last_observed = df_bg_weekly["week_start"].max()
-    df_fore["is_future"] = (
-        pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
-    )
+        wide_required = {"Barangay_key", "ds", "Final", "Forecast"}
+        if wide_required.issubset(tmp.columns):
+            df_fore = tmp.rename(
+                columns={
+                    "Barangay_key": "name",
+                    "ds": "week_start",
+                    "Final": "final_forecast",
+                    "Forecast": "hybrid_forecast",
+                }
+            )
+            # local_forecast is optional in old files
+            if "local_forecast" not in df_fore.columns:
+                df_fore["local_forecast"] = 0.0
+        else:
+            print("⚠️ barangay_forecasts_final.csv exists but is not in wide schema; falling back to preferred_long.")
+            df_fore = None
 
-    # ORIGINAL, WORKING BEHAVIOR:
-    # Crush inf/NaN/None to 0.0 so JSON is always finite numeric
-    df_fore = df_fore.replace([float("inf"), float("-inf")], None).fillna(0)
 
-    df_fore["final_forecast"] = df_fore["final_forecast"].astype(float)
-    df_fore["hybrid_forecast"] = df_fore["hybrid_forecast"].astype(float)
-    df_fore["local_forecast"] = df_fore["local_forecast"].astype(float)
+    # 2) Otherwise fall back to preferred long file and map into wide schema
+    if df_fore is None and preferred_long_path.exists():
+        pref = pd.read_csv(preferred_long_path)
+        if "model_name" in pref.columns:
+            pref = pref[pref["model_name"] == "preferred"]
+        if "horizon_type" in pref.columns:
+            pref = pref[pref["horizon_type"] == "future"]
 
-    # is_future already bool from comparison; optional explicit cast if you want:
-    # df_fore["is_future"] = df_fore["is_future"].astype(bool)
+        df_fore = pref.rename(
+            columns={"Barangay_key": "name", "ds": "week_start", "yhat": "final_forecast"}
+        )
+        df_fore["hybrid_forecast"] = df_fore["final_forecast"]
+        df_fore["local_forecast"] = 0.0
+        df_fore = df_fore[["name", "week_start", "final_forecast", "hybrid_forecast", "local_forecast"]].copy()
 
-    upsert_barangay_forecasts(df_fore)
+    # 3) No forecasts available
+    if df_fore is None:
+        print("ℹ️ Skipped barangay_forecasts: no usable forecast CSV found.")
+        df_fore = pd.DataFrame(columns=["name", "week_start", "final_forecast", "hybrid_forecast", "local_forecast"])
+    
+    # ---- SAFETY: guarantee required forecast columns exist even if wide file is partially different ----
+    if not df_fore.empty:
+        if "week_start" not in df_fore.columns and "ds" in df_fore.columns:
+            df_fore = df_fore.rename(columns={"ds": "week_start"})
+        if "name" not in df_fore.columns and "Barangay_key" in df_fore.columns:
+            df_fore = df_fore.rename(columns={"Barangay_key": "name"})
+
+        # If wide file had different forecast column names, map them
+        if "final_forecast" not in df_fore.columns:
+            if "Final" in df_fore.columns:
+                df_fore["final_forecast"] = df_fore["Final"]
+            elif "yhat" in df_fore.columns:
+                df_fore["final_forecast"] = df_fore["yhat"]
+            else:
+                df_fore["final_forecast"] = 0.0
+
+        if "hybrid_forecast" not in df_fore.columns:
+            if "Forecast" in df_fore.columns:
+                df_fore["hybrid_forecast"] = df_fore["Forecast"]
+            else:
+                df_fore["hybrid_forecast"] = df_fore["final_forecast"]
+
+        if "local_forecast" not in df_fore.columns:
+            df_fore["local_forecast"] = 0.0
+
+
+
+    if not df_fore.empty:
+        df_fore["name"] = df_fore["name"].apply(normalize_barangay_name)
+
+        df_fore["week_start"] = pd.to_datetime(df_fore["week_start"], errors="coerce").dt.strftime("%Y-%m-%d")
+        if df_fore["week_start"].isna().any():
+            raise ValueError("Forecast week_start contains invalid dates.")
+
+        # Mark future weeks relative to last observed barangay weekly date
+        last_observed = df_bg_weekly["week_start"].max()
+        df_fore["is_future"] = (pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed))
+
+        # Make numeric safe
+        df_fore = df_fore.replace([float("inf"), float("-inf")], None).fillna(0)
+
+        df_fore["final_forecast"] = pd.to_numeric(df_fore["final_forecast"], errors="coerce").fillna(0).astype(float)
+        df_fore["hybrid_forecast"] = pd.to_numeric(df_fore["hybrid_forecast"], errors="coerce").fillna(0).astype(float)
+        df_fore["local_forecast"] = pd.to_numeric(df_fore["local_forecast"], errors="coerce").fillna(0).astype(float)
+
+        upsert_barangay_forecasts(df_fore)
+
 
     print("✅ Supabase export: COMPLETE")
 

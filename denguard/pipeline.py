@@ -32,9 +32,31 @@ from denguard.steps.step19_reconcile import reconcile_forecasts
 from denguard.export_supabase import upload_to_supabase
 from denguard.horizon import resolve_horizon
 
+from dataclasses import replace
+from datetime import datetime, timezone
+from uuid import uuid4
+
 
 def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     ensure_outdir(cfg.out)
+
+    run_id = cfg.run_id or uuid4().hex
+    started_at = cfg.run_started_at_utc or datetime.now(timezone.utc).isoformat()
+
+    # cfg is frozen=True so we clone it
+    cfg = replace(cfg, run_id=run_id, run_started_at_utc=started_at)
+
+    # Write a run manifest (append-friendly)
+    run_row = pd.DataFrame([{
+        "run_id": run_id,
+        "run_started_at_utc": started_at,
+        "train_end_date": cfg.train_end_date,
+        "incoming_mode": cfg.incoming_mode,
+        "forecast_weeks_override": cfg.forecast_weeks_override,
+    }])
+    run_row.to_csv(cfg.out / "runs.csv", mode="a", header=not (cfg.out / "runs.csv").exists(), index=False)
+
+    print(f"🏷️ run_id = {run_id}")
 
     df, _ = load_and_clean(cfg)
     df.to_csv(cfg.out / "dengue_cleaned_pre_fp.csv", index=False, encoding="utf-8-sig")
@@ -114,7 +136,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg,
         train_end=train_end,          # <-- same train_end you pass to Step18
         K_nonzero_weeks=12,
-        C_total_cases=50,
+        C_total_cases=500,
     )
 
 
@@ -131,23 +153,33 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         keep_all_models=True,
     )
-    def _validate_step19(preferred_future: pd.DataFrame, all_models_future: pd.DataFrame, city_future: pd.DataFrame) -> None:
+    def _validate_step19(
+        preferred_future: pd.DataFrame,
+        all_models_future: pd.DataFrame,
+        city_future: pd.DataFrame,
+    ) -> None:
         # A) schema
-        required_pref = {"Barangay_key","ds","yhat","yhat_lower","yhat_upper","model_name","horizon_type"}
-        assert required_pref.issubset(preferred_future.columns), f"preferred missing: {required_pref - set(preferred_future.columns)}"
+        required_pref = {"Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type"}
+        missing_pref = required_pref - set(preferred_future.columns)
+        assert not missing_pref, f"preferred missing: {sorted(missing_pref)}"
 
         required_all = required_pref | {"status"}
-        assert required_all.issubset(all_models_future.columns), f"all_models missing: {required_all - set(all_models_future.columns)}"
+        missing_all = required_all - set(all_models_future.columns)
+        assert not missing_all, f"all_models missing: {sorted(missing_all)}"
 
         # B) Monday + horizon length
-        assert (pd.to_datetime(preferred_future["ds"]).dt.dayofweek == 0).all()
-        assert (pd.to_datetime(all_models_future["ds"]).dt.dayofweek == 0).all()
-        assert preferred_future["ds"].nunique() == city_future["ds"].nunique()
+        pref_ds = pd.to_datetime(preferred_future["ds"], errors="raise")
+        all_ds = pd.to_datetime(all_models_future["ds"], errors="raise")
+        city_ds = pd.to_datetime(city_future["ds"], errors="raise")
+
+        assert (pref_ds.dt.dayofweek == 0).all(), "preferred_future has non-Monday ds"
+        assert (all_ds.dt.dayofweek == 0).all(), "all_models_future has non-Monday ds"
+        assert preferred_future["ds"].nunique() == city_future["ds"].nunique(), "preferred horizon != city horizon"
 
         # C) Coherence
         chk = (
             preferred_future.groupby("ds")["yhat"].sum().reset_index(name="sum_bg")
-            .merge(city_future[["ds","yhat"]].rename(columns={"yhat":"city"}), on="ds")
+            .merge(city_future[["ds", "yhat"]].rename(columns={"yhat": "city"}), on="ds")
         )
         mean_abs = (chk["sum_bg"] - chk["city"]).abs().mean()
         max_abs = (chk["sum_bg"] - chk["city"]).abs().max()
@@ -155,33 +187,28 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         print("STEP19 coherence max abs diff:", float(max_abs))
 
         # D) Grid completeness
+        expected_models = {"disagg", "local_prophet", "local_arima", "preferred"}
+        got_models = set(all_models_future["model_name"].unique())
+        assert got_models == expected_models, f"unexpected model_name values: got={sorted(got_models)}"
+
         n_bgy = all_models_future["Barangay_key"].nunique()
         n_weeks = all_models_future["ds"].nunique()
-        assert set(all_models_future["model_name"].unique()) == {"disagg","local_prophet","local_arima","preferred"}
-        assert len(all_models_future) == n_bgy * n_weeks * 4
-        assert all_models_future.columns.is_unique
+        assert len(all_models_future) == n_bgy * n_weeks * 4, "grid is not complete (rows != bgy*weeks*4)"
+        assert all_models_future.columns.is_unique, "all_models_future has duplicate columns"
 
         print("models:", sorted(all_models_future["model_name"].unique()))
         print("rows:", len(all_models_future))
-        print("unique barangays:", all_models_future["Barangay_key"].nunique())
-        print("unique weeks:", all_models_future["ds"].nunique())
-        print("filled rate:", (all_models_future["status"]=="filled").mean())
-        print("all_models columns:", all_models_future_df.columns.tolist())
-
-        print("status in all_models?", "status" in all_models_future_df.columns)
-        print(all_models_future_df[["model_name","status"]].head())
-
-        # must hold:
-        assert set(all_models_future_df["model_name"].unique()) == {"disagg","local_prophet","local_arima","preferred"}
-        assert "status" in all_models_future_df.columns
-
-
-
-
+        print("unique barangays:", n_bgy)
+        print("unique weeks:", n_weeks)
+        print("filled rate:", float((all_models_future["status"] == "filled").mean()))
+        print("all_models columns:", all_models_future.columns.tolist())
+        print("status in all_models?", "status" in all_models_future.columns)
+        print(all_models_future[["model_name", "status"]].head())
 
         # E) filled rate
         filled_rate = (all_models_future["status"] == "filled").mean()
         print("STEP19 filled_rate:", float(filled_rate))
+
 
 
     _validate_step19(preferred_future_df, all_models_future_df, city_future)

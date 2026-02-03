@@ -12,8 +12,14 @@ def build_city_series(weekly_full: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         weekly_full.groupby("WeekStart")["Cases"].sum().reset_index()
         .rename(columns={"Cases": "CityCases"})
     )
+
+    # ✅ G0.4: tag every row with run_id
+    city_weekly["run_id"] = cfg.run_id
+
     city_weekly["WeekStart"] = pd.to_datetime(city_weekly["WeekStart"], errors="raise")
     city_weekly = city_weekly.sort_values("WeekStart")
+
+    city_weekly = city_weekly[["run_id", "WeekStart", "CityCases"]]
 
     city_weekly.to_csv(cfg.out / "city_weekly.csv", index=False)
     print("✅ Saved citywide weekly totals")

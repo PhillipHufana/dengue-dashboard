@@ -61,6 +61,10 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         .sort_values(["Barangay_key", "WeekStart"])
     )
 
+    # ✅ G0.4: tag every row with run_id
+    weekly_full["run_id"] = cfg.run_id
+
+
     # Ensure all barangays have same week count
     week_counts = weekly_full.groupby("Barangay_key")["WeekStart"].count()
     assert week_counts.nunique() == 1, "❌ Inconsistent week counts per barangay!"
@@ -69,6 +73,8 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     print("Weekly dayofweek unique:", ws.dt.dayofweek.unique())  # should be [0]
 
     print(f"✅ All barangays have {week_counts.iloc[0]} weeks of data.")
+
+    weekly_full = weekly_full[["run_id", "Barangay_key", "WeekStart", "Cases"]]
 
     weekly_full.to_csv(
         cfg.out / "weekly_cases_all_barangays.csv",

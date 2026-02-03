@@ -104,11 +104,11 @@ def reconcile_forecasts(
     dupes = base.columns[base.columns.duplicated()].tolist()
     if dupes:
         raise ValueError(f"base has duplicate columns: {dupes}")
-
+    
     preferred_future = ensure_barangay_forecast_df(preferred_raw, model_name="preferred", horizon_type="future")
+    preferred_future["run_id"] = cfg.run_id
     preferred_future.to_csv(cfg.out / "barangay_forecasts_preferred_future_long.csv", index=False)
 
-    # Optional: all models future grid for UI
     all_models_future = None
     if keep_all_models:
         all_models_future = _grid_fill_future_models(
@@ -118,6 +118,7 @@ def reconcile_forecasts(
             cfg=cfg,
             city_future=city_future,
         )
+        all_models_future["run_id"] = cfg.run_id
         all_models_future.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
 
     # Diagnostic: coherence diff
