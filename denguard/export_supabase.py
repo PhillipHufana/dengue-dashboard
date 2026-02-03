@@ -62,6 +62,56 @@ def upsert_barangays(df: pd.DataFrame) -> None:
     df = df[["name", "display_name"]].copy()
     _upsert_df("barangays", df, conflict="name")
 
+def upsert_runs(df: pd.DataFrame) -> None:
+    required = {"run_id", "mode", "train_end", "horizon_weeks"}
+    missing = required - set(df.columns)
+    if missing:
+            raise ValueError(f"runs missing required columns: {sorted(missing)}")
+    
+    for c in ["data_version", "code_version"]:
+        if c not in df.columns:
+            df[c] = None
+    df = df[["run_id","mode","train_end","horizon_weeks","data_version","code_version"]].copy()
+
+    _upsert_df("runs", df, conflict="run_id")
+
+def upsert_city_forecasts_long(df: pd.DataFrame) -> None:
+    required = {"run_id","week_start","model_name","yhat","horizon_type"}
+    missing = required - set(df.columns)
+    if missing:
+       raise ValueError(f"city_forecasts_long missing required columns: {sorted(missing)}")
+
+    cols = ["run_id","week_start","model_name","yhat","yhat_lower","yhat_upper","horizon_type"]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = None
+    df = df[cols].copy()
+
+    _upsert_df(
+        "city_forecasts_long",
+        df,
+        conflict="run_id,week_start,model_name,horizon_type"
+    )
+
+
+def upsert_barangay_forecasts_long(df: pd.DataFrame) -> None:
+    required = {"run_id","name","week_start","model_name","yhat","horizon_type"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"barangay_forecasts_long missing required columns: {sorted(missing)}")
+
+    cols = ["run_id","name","week_start","model_name","yhat","yhat_lower","yhat_upper","horizon_type","status"]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = None
+    df = df[cols].copy()
+
+    _upsert_df(
+        "barangay_forecasts_long",
+        df,
+        conflict="run_id,name,week_start,model_name,horizon_type"
+    )
+
 
 def upsert_city_weekly(df: pd.DataFrame) -> None:
     required = {"week_start", "city_cases"}
@@ -100,6 +150,7 @@ def upsert_barangay_forecasts(df: pd.DataFrame) -> None:
     _upsert_df("barangay_forecasts", df, conflict="name,week_start")
 
 
+
 # ============================================================
 # MASTER EXPORT FUNCTION
 # ============================================================
@@ -107,169 +158,172 @@ def upsert_barangay_forecasts(df: pd.DataFrame) -> None:
 def upload_to_supabase(cfg) -> None:
     outdir = cfg.out
 
-    # ---------------------------------------------------------
-    # Barangays (master list)
-    # ---------------------------------------------------------
-    src_bg = pd.read_csv(outdir / "weekly_cases_all_barangays.csv")[
-        "Barangay_key"
-    ].drop_duplicates()
+    run_id = cfg.run_id
+    if not run_id:
+        raise RuntimeError("cfg.run_id is missing. run_pipeline must set it (uuid string).")
 
-    # Normalized name + display_name for UI
+    # ---------------------------------------------------------
+    # 1) BARANGAYS FIRST (FK requirement for weekly + forecasts)
+    # ---------------------------------------------------------
+    weekly_path = outdir / "weekly_cases_all_barangays.csv"
+    if not weekly_path.exists():
+        raise FileNotFoundError(f"Missing required file: {weekly_path}")
+
+    src_bg = pd.read_csv(weekly_path)["Barangay_key"].drop_duplicates()
     df_barangays = pd.DataFrame(
-        {
-            "name": src_bg.apply(normalize_barangay_name),
-            "display_name": src_bg,
-        }
+        {"name": src_bg.apply(normalize_barangay_name), "display_name": src_bg}
     )
-
     upsert_barangays(df_barangays)
 
     # ---------------------------------------------------------
-    # City Weekly
+    # 2) RUNS (FK requirement for *_forecasts_long)
     # ---------------------------------------------------------
-    df_city_weekly = pd.read_csv(outdir / "city_weekly.csv")
+    # Try to infer horizon_weeks from any long file that exists
+    horizon_weeks = 0
+    future_candidates = [
+        outdir / "barangay_forecasts_all_models_future_long.csv",
+        outdir / "barangay_forecasts_long_future.csv",
+    ]
 
-    # Rename first, then enforce integer city_cases
-    df_city_weekly = df_city_weekly.rename(
-        columns={"WeekStart": "week_start", "CityCases": "city_cases"}
-    )
+    for p in future_candidates:
+        if p.exists():
+            tmp = pd.read_csv(p)
+            col = "ds" if "ds" in tmp.columns else "week_start"
+            horizon_weeks = int(pd.to_datetime(tmp[col]).nunique())
+            break
 
-    df_city_weekly["city_cases"] = (
-        pd.to_numeric(df_city_weekly["city_cases"], errors="coerce")
-        .fillna(0)
-        .astype(int)
-    )
 
-    df_city_weekly["week_start"] = (
-        pd.to_datetime(df_city_weekly["week_start"])
-        .dt.strftime("%Y-%m-%d")
-    )
-
-    upsert_city_weekly(df_city_weekly)
+    runs_df = pd.DataFrame([{
+        "run_id": run_id,
+        "mode": cfg.incoming_mode,
+        "train_end": cfg.train_end_date,
+        "horizon_weeks": horizon_weeks,
+        "data_version": None,
+        "code_version": None,
+    }])
+    upsert_runs(runs_df)
 
     # ---------------------------------------------------------
-    # Barangay Weekly
+    # 3) CITY FORECASTS LONG (test+future combined)
     # ---------------------------------------------------------
-    df_bg_weekly = pd.read_csv(outdir / "weekly_cases_all_barangays.csv").rename(
-        columns={
-            "Barangay_key": "name",
-            "WeekStart": "week_start",
-            "Cases": "cases",
-        }
-    )
+    city_long_path = outdir / "city_forecasts_long.csv"
+    if city_long_path.exists():
+        city_long = pd.read_csv(city_long_path)
 
+        # Ensure correct cols + types
+        if "run_id" not in city_long.columns:
+            city_long["run_id"] = run_id
+        city_long["week_start"] = pd.to_datetime(city_long["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
+
+        upsert_city_forecasts_long(city_long)
+    else:
+        print("ℹ️ Skipped city_forecasts_long: city_forecasts_long.csv not found.")
+
+    # ---------------------------------------------------------
+    # 4) BARANGAY FORECASTS LONG
+    # Prefer a combined long file if you have it; else fall back to future-only.
+    # ---------------------------------------------------------
+    bg_long_path = outdir / "barangay_forecasts_long.csv"
+    future_only_path = outdir / "barangay_forecasts_all_models_future_long.csv"
+
+    chosen_bg_path = bg_long_path if bg_long_path.exists() else future_only_path
+
+    if chosen_bg_path.exists():
+        bg_long = pd.read_csv(chosen_bg_path)
+
+        # Map pipeline columns → Supabase columns
+        if "Barangay_key" in bg_long.columns:
+            bg_long = bg_long.rename(columns={"Barangay_key": "name"})
+        if "ds" in bg_long.columns:
+            bg_long = bg_long.rename(columns={"ds": "week_start"})
+
+        bg_long["run_id"] = run_id
+        bg_long["name"] = bg_long["name"].apply(normalize_barangay_name)
+        bg_long["week_start"] = pd.to_datetime(bg_long["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
+
+        upsert_barangay_forecasts_long(bg_long)
+    else:
+        print("ℹ️ Skipped barangay_forecasts_long: no long CSV found.")
+
+    # ---------------------------------------------------------
+    # 5) CITY WEEKLY
+    # ---------------------------------------------------------
+    city_weekly_path = outdir / "city_weekly.csv"
+    if city_weekly_path.exists():
+        df_city_weekly = pd.read_csv(city_weekly_path).rename(
+            columns={"WeekStart": "week_start", "CityCases": "city_cases"}
+        )
+        df_city_weekly["city_cases"] = pd.to_numeric(df_city_weekly["city_cases"], errors="coerce").fillna(0).astype(int)
+        df_city_weekly["week_start"] = pd.to_datetime(df_city_weekly["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
+        upsert_city_weekly(df_city_weekly)
+    else:
+        print("ℹ️ Skipped city_weekly: city_weekly.csv not found.")
+
+    # ---------------------------------------------------------
+    # 6) BARANGAY WEEKLY
+    # ---------------------------------------------------------
+    df_bg_weekly = pd.read_csv(weekly_path).rename(
+        columns={"Barangay_key": "name", "WeekStart": "week_start", "Cases": "cases"}
+    )
     df_bg_weekly["name"] = df_bg_weekly["name"].apply(normalize_barangay_name)
-
-    df_bg_weekly["cases"] = (
-        pd.to_numeric(df_bg_weekly["cases"], errors="coerce")
-        .fillna(0)
-        .astype(int)
-    )
-
-    df_bg_weekly["week_start"] = (
-        pd.to_datetime(df_bg_weekly["week_start"])
-        .dt.strftime("%Y-%m-%d")
-    )
-
+    df_bg_weekly["cases"] = pd.to_numeric(df_bg_weekly["cases"], errors="coerce").fillna(0).astype(int)
+    df_bg_weekly["week_start"] = pd.to_datetime(df_bg_weekly["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
     upsert_barangay_weekly(df_bg_weekly)
 
     # ---------------------------------------------------------
-    # Barangay Forecasts (keep existing wide table alive OR fallback to preferred long)
+    # 7) OPTIONAL legacy wide export (only if you still need it)
     # ---------------------------------------------------------
-    wide_path = outdir / "barangay_forecasts_final.csv"
-    preferred_long_path = outdir / "barangay_forecasts_preferred_future_long.csv"
+    # If you're moving fully to long+views, you can delete this block later.
+    try:
+        wide_path = outdir / "barangay_forecasts_final.csv"
+        preferred_long_path = outdir / "barangay_forecasts_preferred_future_long.csv"
 
-    df_fore = None  # type: ignore
+        df_fore = None
 
-    # 1) Prefer legacy wide file IF it has the expected columns
-    if wide_path.exists():
-        tmp = pd.read_csv(wide_path)
-
-        wide_required = {"Barangay_key", "ds", "Final", "Forecast"}
-        if wide_required.issubset(tmp.columns):
-            df_fore = tmp.rename(
-                columns={
+        if wide_path.exists():
+            tmp = pd.read_csv(wide_path)
+            wide_required = {"Barangay_key", "ds", "Final", "Forecast"}
+            if wide_required.issubset(tmp.columns):
+                df_fore = tmp.rename(columns={
                     "Barangay_key": "name",
                     "ds": "week_start",
                     "Final": "final_forecast",
                     "Forecast": "hybrid_forecast",
-                }
-            )
-            # local_forecast is optional in old files
-            if "local_forecast" not in df_fore.columns:
-                df_fore["local_forecast"] = 0.0
-        else:
-            print("⚠️ barangay_forecasts_final.csv exists but is not in wide schema; falling back to preferred_long.")
-            df_fore = None
+                })
+                if "local_forecast" not in df_fore.columns:
+                    df_fore["local_forecast"] = 0.0
 
+        if df_fore is None and preferred_long_path.exists():
+            pref = pd.read_csv(preferred_long_path)
+            if "model_name" in pref.columns:
+                pref = pref[pref["model_name"] == "preferred"]
+            if "horizon_type" in pref.columns:
+                pref = pref[pref["horizon_type"] == "future"]
 
-    # 2) Otherwise fall back to preferred long file and map into wide schema
-    if df_fore is None and preferred_long_path.exists():
-        pref = pd.read_csv(preferred_long_path)
-        if "model_name" in pref.columns:
-            pref = pref[pref["model_name"] == "preferred"]
-        if "horizon_type" in pref.columns:
-            pref = pref[pref["horizon_type"] == "future"]
-
-        df_fore = pref.rename(
-            columns={"Barangay_key": "name", "ds": "week_start", "yhat": "final_forecast"}
-        )
-        df_fore["hybrid_forecast"] = df_fore["final_forecast"]
-        df_fore["local_forecast"] = 0.0
-        df_fore = df_fore[["name", "week_start", "final_forecast", "hybrid_forecast", "local_forecast"]].copy()
-
-    # 3) No forecasts available
-    if df_fore is None:
-        print("ℹ️ Skipped barangay_forecasts: no usable forecast CSV found.")
-        df_fore = pd.DataFrame(columns=["name", "week_start", "final_forecast", "hybrid_forecast", "local_forecast"])
-    
-    # ---- SAFETY: guarantee required forecast columns exist even if wide file is partially different ----
-    if not df_fore.empty:
-        if "week_start" not in df_fore.columns and "ds" in df_fore.columns:
-            df_fore = df_fore.rename(columns={"ds": "week_start"})
-        if "name" not in df_fore.columns and "Barangay_key" in df_fore.columns:
-            df_fore = df_fore.rename(columns={"Barangay_key": "name"})
-
-        # If wide file had different forecast column names, map them
-        if "final_forecast" not in df_fore.columns:
-            if "Final" in df_fore.columns:
-                df_fore["final_forecast"] = df_fore["Final"]
-            elif "yhat" in df_fore.columns:
-                df_fore["final_forecast"] = df_fore["yhat"]
-            else:
-                df_fore["final_forecast"] = 0.0
-
-        if "hybrid_forecast" not in df_fore.columns:
-            if "Forecast" in df_fore.columns:
-                df_fore["hybrid_forecast"] = df_fore["Forecast"]
-            else:
-                df_fore["hybrid_forecast"] = df_fore["final_forecast"]
-
-        if "local_forecast" not in df_fore.columns:
+            df_fore = pref.rename(columns={
+                "Barangay_key": "name",
+                "ds": "week_start",
+                "yhat": "final_forecast",
+            })
+            df_fore["hybrid_forecast"] = df_fore["final_forecast"]
             df_fore["local_forecast"] = 0.0
 
+        if df_fore is not None and not df_fore.empty:
+            df_fore["name"] = df_fore["name"].apply(normalize_barangay_name)
+            df_fore["week_start"] = pd.to_datetime(df_fore["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
 
+            last_observed = df_bg_weekly["week_start"].max()
+            df_fore["is_future"] = pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed)
 
-    if not df_fore.empty:
-        df_fore["name"] = df_fore["name"].apply(normalize_barangay_name)
+            df_fore = df_fore.replace([float("inf"), float("-inf")], None).fillna(0)
+            df_fore["final_forecast"] = pd.to_numeric(df_fore["final_forecast"], errors="coerce").fillna(0).astype(float)
+            df_fore["hybrid_forecast"] = pd.to_numeric(df_fore["hybrid_forecast"], errors="coerce").fillna(0).astype(float)
+            df_fore["local_forecast"] = pd.to_numeric(df_fore["local_forecast"], errors="coerce").fillna(0).astype(float)
 
-        df_fore["week_start"] = pd.to_datetime(df_fore["week_start"], errors="coerce").dt.strftime("%Y-%m-%d")
-        if df_fore["week_start"].isna().any():
-            raise ValueError("Forecast week_start contains invalid dates.")
+            upsert_barangay_forecasts(df_fore)
 
-        # Mark future weeks relative to last observed barangay weekly date
-        last_observed = df_bg_weekly["week_start"].max()
-        df_fore["is_future"] = (pd.to_datetime(df_fore["week_start"]) > pd.to_datetime(last_observed))
-
-        # Make numeric safe
-        df_fore = df_fore.replace([float("inf"), float("-inf")], None).fillna(0)
-
-        df_fore["final_forecast"] = pd.to_numeric(df_fore["final_forecast"], errors="coerce").fillna(0).astype(float)
-        df_fore["hybrid_forecast"] = pd.to_numeric(df_fore["hybrid_forecast"], errors="coerce").fillna(0).astype(float)
-        df_fore["local_forecast"] = pd.to_numeric(df_fore["local_forecast"], errors="coerce").fillna(0).astype(float)
-
-        upsert_barangay_forecasts(df_fore)
-
+    except Exception as e:
+        print(f"ℹ️ Skipped legacy barangay_forecasts export: {e}")
 
     print("✅ Supabase export: COMPLETE")
 

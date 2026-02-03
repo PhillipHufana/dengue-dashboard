@@ -40,7 +40,7 @@ from uuid import uuid4
 def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     ensure_outdir(cfg.out)
 
-    run_id = cfg.run_id or uuid4().hex
+    run_id = cfg.run_id or str(uuid4())
     started_at = cfg.run_started_at_utc or datetime.now(timezone.utc).isoformat()
 
     # cfg is frozen=True so we clone it
@@ -78,7 +78,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
     # City models (test + future for Prophet; test for ARIMA; future via selection)
     PROPHET_OK, model_prophet, city_prophet_test, city_prophet_future, metrics_prophet = fit_prophet(
-        train_city, test_city, cfg, eval_horizon
+        train_city, test_city, cfg, future_horizon
     )
     ARIMA_OK, model_arima, city_arima_test, metrics_arima = fit_arima(
         train_city, test_city, cfg, eval_horizon
@@ -107,6 +107,21 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     )
 
     city_test = city_prophet_test if chosen_city_model == "prophet" else city_arima_test
+
+    # After select_city_model(...) and city_test assignment
+    city_test_out = city_test.copy()
+    city_test_out["run_id"] = cfg.run_id
+    city_test_out = city_test_out.rename(columns={"ds": "week_start"})
+    city_test_out.to_csv(cfg.out / "city_forecasts_test.csv", index=False)
+
+    city_future_out = city_future.copy()
+    city_future_out["run_id"] = cfg.run_id
+    city_future_out = city_future_out.rename(columns={"ds": "week_start"})
+    city_future_out.to_csv(cfg.out / "city_forecasts_future.csv", index=False)
+
+    city_long = pd.concat([city_test_out, city_future_out], ignore_index=True)
+    city_long.to_csv(cfg.out / "city_forecasts_long.csv", index=False)
+
 
     # Step 10 disagg
     bg_disagg_test, bg_disagg_future = hybrid_disaggregation(
@@ -153,6 +168,12 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         keep_all_models=True,
     )
+    all_models_future_out = all_models_future_df.copy()
+    all_models_future_out["run_id"] = cfg.run_id
+    all_models_future_out = all_models_future_out.rename(columns={"Barangay_key": "name", "ds": "week_start"})
+    all_models_future_out.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
+
+
     def _validate_step19(
         preferred_future: pd.DataFrame,
         all_models_future: pd.DataFrame,
@@ -212,6 +233,12 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
 
     _validate_step19(preferred_future_df, all_models_future_df, city_future)
+
+    preferred_future_out = preferred_future_df.copy()
+    preferred_future_out["run_id"] = cfg.run_id
+    preferred_future_out = preferred_future_out.rename(columns={"Barangay_key": "name", "ds": "week_start"})
+    preferred_future_out.to_csv(cfg.out / "barangay_forecasts_preferred_future_long.csv", index=False)
+
 
 
     try:

@@ -57,8 +57,8 @@ def fit_prophet(
 
     # Define test and future date indices (Mondays)
     test_ds = pd.DatetimeIndex(pd.to_datetime(test_city["ds"], errors="raise")).sort_values()
+    future_h = int(horizon)  # now truly future horizon
 
-    # Prophet makes full history + (test + future). We'll split explicitly.
     full_future = model.make_future_dataframe(periods=len(test_ds) + future_h, freq="W-MON")
     full_forecast = model.predict(full_future)
 
