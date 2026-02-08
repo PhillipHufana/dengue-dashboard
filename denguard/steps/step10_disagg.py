@@ -1,3 +1,4 @@
+# denguard/steps/step10_disagg.py
 from __future__ import annotations
 from typing import Tuple
 import numpy as np
@@ -8,19 +9,23 @@ from denguard.forecast_schema import ensure_barangay_forecast_df
 
 
 def hybrid_disaggregation(
-    city_test: pd.DataFrame,     # standardized city TEST forecast
-    city_future: pd.DataFrame,   # standardized city FUTURE forecast
+    city_test: pd.DataFrame,
+    city_future: pd.DataFrame,
     weekly_full: pd.DataFrame,
     cfg: Config,
+    *,
+    train_end: pd.Timestamp,
     alpha_smooth: float = 1.0,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Top-down disaggregation using train-window proportions.
-    Returns standardized barangay forecasts for test and future with model_name='disagg'.
+    train_end is passed in:
+      - backtest: cfg.backtest_end_date
+      - production: last observed week in data
     """
     print("\n== STEP 10: Hybrid top-down disaggregation (standardized) ==")
 
-    train_end = pd.to_datetime(cfg.train_end_date)
+    train_end = pd.to_datetime(train_end)
     recent_start = pd.to_datetime(cfg.recent_weight_start)
 
     recent = weekly_full[(weekly_full["WeekStart"] >= recent_start) & (weekly_full["WeekStart"] <= train_end)].copy()
@@ -37,7 +42,6 @@ def hybrid_disaggregation(
         .reset_index(name="Cases")
     )
 
-    # Smooth to avoid all-zero / permanent zero weights
     weights["Cases_smoothed"] = weights["Cases"].astype(float) + float(alpha_smooth)
     total = float(weights["Cases_smoothed"].sum())
     if total <= 0:
@@ -60,14 +64,21 @@ def hybrid_disaggregation(
         out = pd.concat(parts, ignore_index=True)
         return ensure_barangay_forecast_df(out, model_name="disagg", horizon_type=horizon_type)
 
-    bg_test = _disagg(city_test, "test")
+    bg_test = _disagg(city_test, "test") if (city_test is not None and not city_test.empty) else pd.DataFrame(
+        columns=["Barangay_key","ds","yhat","yhat_lower","yhat_upper","model_name","horizon_type"]
+    )
     bg_future = _disagg(city_future, "future")
 
-    # Validate coherence on each horizon separately
-    for name, bg, city in [("test", bg_test, city_test), ("future", bg_future, city_future)]:
-        s = bg.groupby("ds")["yhat"].sum().reset_index()
-        chk = s.merge(city[["ds", "yhat"]], on="ds", how="left", suffixes=("_sum", "_city"))
+    # coherence checks only if bg_test exists
+    if not bg_test.empty:
+        s = bg_test.groupby("ds")["yhat"].sum().reset_index()
+        chk = s.merge(city_test[["ds", "yhat"]], on="ds", how="left", suffixes=("_sum", "_city"))
         diff = float((chk["yhat_sum"] - chk["yhat_city"]).abs().mean())
-        print(f"✅ Disagg coherence ({name}) mean abs diff: {diff:.6f}")
+        print(f"✅ Disagg coherence (test) mean abs diff: {diff:.6f}")
+
+    s = bg_future.groupby("ds")["yhat"].sum().reset_index()
+    chk = s.merge(city_future[["ds", "yhat"]], on="ds", how="left", suffixes=("_sum", "_city"))
+    diff = float((chk["yhat_sum"] - chk["yhat_city"]).abs().mean())
+    print(f"✅ Disagg coherence (future) mean abs diff: {diff:.6f}")
 
     return bg_test, bg_future

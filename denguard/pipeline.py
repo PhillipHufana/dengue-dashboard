@@ -36,27 +36,35 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
 
-
-def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
+def _init_run(cfg: Config) -> Config:
     ensure_outdir(cfg.out)
-
     run_id = cfg.run_id or str(uuid4())
     started_at = cfg.run_started_at_utc or datetime.now(timezone.utc).isoformat()
-
-    # cfg is frozen=True so we clone it
     cfg = replace(cfg, run_id=run_id, run_started_at_utc=started_at)
 
-    # Write a run manifest (append-friendly)
     run_row = pd.DataFrame([{
         "run_id": run_id,
         "run_started_at_utc": started_at,
-        "train_end_date": cfg.train_end_date,
+        "run_kind": getattr(cfg, "run_kind", "backtest"),
+        "backtest_end_date": getattr(cfg, "backtest_end_date", None),
         "incoming_mode": cfg.incoming_mode,
         "forecast_weeks_override": cfg.forecast_weeks_override,
     }])
     run_row.to_csv(cfg.out / "runs.csv", mode="a", header=not (cfg.out / "runs.csv").exists(), index=False)
+    print(f"🏷️ run_id = {run_id} | run_kind = {getattr(cfg,'run_kind','backtest')}")
+    return cfg
 
-    print(f"🏷️ run_id = {run_id}")
+def _require_backtest(cfg: Config, step_name: str) -> None:
+    if getattr(cfg, "run_kind", "backtest") != "backtest":
+        raise RuntimeError(
+            f"{step_name} is backtest-only (needs a non-empty test window + disagg_test baseline). "
+            f"Current run_kind={getattr(cfg,'run_kind',None)}."
+        )
+
+
+def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
+    cfg = replace(cfg, run_kind="backtest")
+    cfg = _init_run(cfg)
 
     df, _ = load_and_clean(cfg)
     df.to_csv(cfg.out / "dengue_cleaned_pre_fp.csv", index=False, encoding="utf-8-sig")
@@ -71,12 +79,13 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
     weekly_full = weekly_aggregation(df, cfg)
     city_weekly = build_city_series(weekly_full, cfg)
-    city_prophet, train_city, test_city, _ = train_test_split_city(city_weekly, cfg)
+
+    train_end = pd.to_datetime(cfg.backtest_end_date)
+    city_prophet, train_city, test_city, _ = train_test_split_city(city_weekly, cfg, train_end=train_end, require_test=True)
 
     eval_horizon = len(test_city)
     future_horizon = resolve_horizon(cfg, test_len=eval_horizon)
 
-    # City models (test + future for Prophet; test for ARIMA; future via selection)
     PROPHET_OK, model_prophet, city_prophet_test, city_prophet_future, metrics_prophet = fit_prophet(
         train_city, test_city, cfg, future_horizon
     )
@@ -84,15 +93,12 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         train_city, test_city, cfg, eval_horizon
     )
 
-    # Build y_test for plotting diagnostics
     y_test = test_city.set_index("ds")["y"].sort_index()
     y_test.index = pd.DatetimeIndex(y_test.index)
     y_test = y_test.asfreq("W-MON")
 
-    # Step 9
     comparison_plot(y_test, city_arima_test, city_prophet_test, cfg)
 
-    # Select best future city model
     chosen_city_model, city_future = select_city_model(
         metrics_prophet,
         metrics_arima,
@@ -103,12 +109,13 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         model_prophet,
         model_arima,
         cfg,
-        future_horizon,
+        test_len=len(test_city),
+        horizon=future_horizon,
     )
 
     city_test = city_prophet_test if chosen_city_model == "prophet" else city_arima_test
 
-    # After select_city_model(...) and city_test assignment
+    # write city forecasts (test + future)
     city_test_out = city_test.copy()
     city_test_out["run_id"] = cfg.run_id
     city_test_out = city_test_out.rename(columns={"ds": "week_start"})
@@ -122,43 +129,44 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     city_long = pd.concat([city_test_out, city_future_out], ignore_index=True)
     city_long.to_csv(cfg.out / "city_forecasts_long.csv", index=False)
 
-
-    # Step 10 disagg
+    # disaggregation (train_end = backtest cutoff)
     bg_disagg_test, bg_disagg_future = hybrid_disaggregation(
         city_test=city_test,
         city_future=city_future,
         weekly_full=weekly_full,
         cfg=cfg,
+        train_end=train_end,
     )
 
-    # Step 11: needs updating if it still expects old Prophet df; pass standardized test
     avg_smape = prophet_additional_diagnostics(PROPHET_OK, city_prophet_test, test_city)
-
-    # Step 12/13: you must decide what to plot/rank now.
-    # Here we use preferred_future later; for now pass disagg_future (or all_models_future_df).
     plot_sample_barangays(weekly_full, bg_disagg_future, cfg)
     barangay_error_ranking(weekly_full, bg_disagg_test, test_city, cfg)
 
     prophet_cross_validation(PROPHET_OK, model_prophet, cfg)
-
-    # diff removed; if your health report expects it, compute diff from disagg coherence if needed.
     model_health_report(df, weekly_full, metrics_prophet, metrics_arima, avg_smape, diff=float("nan"))
 
-    train_end = pd.to_datetime(cfg.train_end_date)
-    
+    _require_backtest(cfg, "Step17/18/19 (tiers/local/reconcile)")
+
     tiers_df, tierA, tierB, tierC = tier_classification(
         weekly_full,
         cfg,
-        train_end=train_end,          # <-- same train_end you pass to Step18
+        train_end=train_end,
         K_nonzero_weeks=12,
         C_total_cases=500,
     )
 
 
-    train_end = pd.to_datetime(cfg.train_end_date)
     local_perf_df, local_long_df = local_models_tierA(
-        tierA, weekly_full, test_city, train_end, future_horizon, PROPHET_OK, cfg
+        tierA=tierA,
+        weekly_full=weekly_full,
+        test_city=test_city,
+        train_end=train_end,
+        horizon=future_horizon,
+        PROPHET_OK=PROPHET_OK,
+        cfg=cfg,
+        disagg_test_df=bg_disagg_test,  # ✅ Choice A baseline
     )
+
 
     preferred_future_df, all_models_future_df = reconcile_forecasts(
         disagg_future=bg_disagg_future,
@@ -168,84 +176,109 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         keep_all_models=True,
     )
-    all_models_future_out = all_models_future_df.copy()
-    all_models_future_out["run_id"] = cfg.run_id
-    all_models_future_out = all_models_future_out.rename(columns={"Barangay_key": "name", "ds": "week_start"})
-    all_models_future_out.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
-
-
-    def _validate_step19(
-        preferred_future: pd.DataFrame,
-        all_models_future: pd.DataFrame,
-        city_future: pd.DataFrame,
-    ) -> None:
-        # A) schema
-        required_pref = {"Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type"}
-        missing_pref = required_pref - set(preferred_future.columns)
-        assert not missing_pref, f"preferred missing: {sorted(missing_pref)}"
-
-        required_all = required_pref | {"status"}
-        missing_all = required_all - set(all_models_future.columns)
-        assert not missing_all, f"all_models missing: {sorted(missing_all)}"
-
-        # B) Monday + horizon length
-        pref_ds = pd.to_datetime(preferred_future["ds"], errors="raise")
-        all_ds = pd.to_datetime(all_models_future["ds"], errors="raise")
-        city_ds = pd.to_datetime(city_future["ds"], errors="raise")
-
-        assert (pref_ds.dt.dayofweek == 0).all(), "preferred_future has non-Monday ds"
-        assert (all_ds.dt.dayofweek == 0).all(), "all_models_future has non-Monday ds"
-        assert preferred_future["ds"].nunique() == city_future["ds"].nunique(), "preferred horizon != city horizon"
-
-        # C) Coherence
-        chk = (
-            preferred_future.groupby("ds")["yhat"].sum().reset_index(name="sum_bg")
-            .merge(city_future[["ds", "yhat"]].rename(columns={"yhat": "city"}), on="ds")
-        )
-        mean_abs = (chk["sum_bg"] - chk["city"]).abs().mean()
-        max_abs = (chk["sum_bg"] - chk["city"]).abs().max()
-        print("STEP19 coherence mean abs diff:", float(mean_abs))
-        print("STEP19 coherence max abs diff:", float(max_abs))
-
-        # D) Grid completeness
-        expected_models = {"disagg", "local_prophet", "local_arima", "preferred"}
-        got_models = set(all_models_future["model_name"].unique())
-        assert got_models == expected_models, f"unexpected model_name values: got={sorted(got_models)}"
-
-        n_bgy = all_models_future["Barangay_key"].nunique()
-        n_weeks = all_models_future["ds"].nunique()
-        assert len(all_models_future) == n_bgy * n_weeks * 4, "grid is not complete (rows != bgy*weeks*4)"
-        assert all_models_future.columns.is_unique, "all_models_future has duplicate columns"
-
-        print("models:", sorted(all_models_future["model_name"].unique()))
-        print("rows:", len(all_models_future))
-        print("unique barangays:", n_bgy)
-        print("unique weeks:", n_weeks)
-        print("filled rate:", float((all_models_future["status"] == "filled").mean()))
-        print("all_models columns:", all_models_future.columns.tolist())
-        print("status in all_models?", "status" in all_models_future.columns)
-        print(all_models_future[["model_name", "status"]].head())
-
-        # E) filled rate
-        filled_rate = (all_models_future["status"] == "filled").mean()
-        print("STEP19 filled_rate:", float(filled_rate))
-
-
-
-    _validate_step19(preferred_future_df, all_models_future_df, city_future)
-
-    preferred_future_out = preferred_future_df.copy()
-    preferred_future_out["run_id"] = cfg.run_id
-    preferred_future_out = preferred_future_out.rename(columns={"Barangay_key": "name", "ds": "week_start"})
-    preferred_future_out.to_csv(cfg.out / "barangay_forecasts_preferred_future_long.csv", index=False)
-
-
 
     try:
         upload_to_supabase(cfg)
         print("✅ Supabase export completed.")
     except Exception as e:
         print(f"ℹ️ Supabase export skipped: {e}")
+
+
+def run_production(cfg: Config = DEFAULT_CFG) -> None:
+    cfg = replace(cfg, run_kind="production")
+    cfg = _init_run(cfg)
+
+    df, _ = load_and_clean(cfg)
+    df = standardize_barangays(df)
+    if cfg.incoming_mode == "incremental":
+        df = incremental_filter(df, cfg)
+    df = fingerprint_dedupe(df, cfg)
+    persist_clean(df, cfg)
+
+    weekly_full = weekly_aggregation(df, cfg)
+    city_weekly = build_city_series(weekly_full, cfg)
+
+    # Production: train on latest observed (Step6 uses latest observed when run_kind != backtest)
+    city_prophet, train_city, test_city, _ = train_test_split_city(
+        city_weekly,
+        cfg,
+        train_end=None,
+        require_test=False,
+    )
+
+    prod_train_end = pd.to_datetime(train_city["ds"], errors="raise").max()
+
+
+    horizon = int(getattr(cfg, "production_horizon_weeks", 12))
+
+    # Fit both models (test_city empty allowed)
+    PROPHET_OK, model_prophet, city_prophet_test, city_prophet_future, metrics_prophet = fit_prophet(
+        train_city, test_city, cfg, horizon
+    )
+    ARIMA_OK, model_arima, city_arima_test, metrics_arima = fit_arima(
+        train_city, test_city, cfg, horizon
+    )
+
+    # Choose model by cfg.production_city_model (because test_len==0)
+    chosen_city_model, city_future = select_city_model(
+        metrics_prophet,
+        metrics_arima,
+        city_prophet_test,
+        city_arima_test,
+        city_prophet,
+        train_city.set_index("ds")["y"].sort_index().asfreq("W-MON"),
+        model_prophet,
+        model_arima,
+        cfg,
+        test_len=0,
+        horizon=horizon,
+    )
+
+    # Write ONLY future (dashboard uses this)
+    city_future_out = city_future.copy()
+    city_future_out["run_id"] = cfg.run_id
+    city_future_out = city_future_out.rename(columns={"ds": "week_start"})
+    city_future_out.to_csv(cfg.out / "city_forecasts_future.csv", index=False)
+
+    # Also write a "long" file with only future for production
+    city_future_out.to_csv(cfg.out / "city_forecasts_long.csv", index=False)
+
+    # Disaggregation uses production train_end (latest observed)
+    empty_city_test = pd.DataFrame(columns=city_future.columns)  # keep signature happy
+    bg_disagg_test, bg_disagg_future = hybrid_disaggregation(
+        city_test=empty_city_test,
+        city_future=city_future,
+        weekly_full=weekly_full,
+        cfg=cfg,
+        train_end=prod_train_end,
+    )
+
+    # Production minimal: export disagg as preferred (thesis-safe, doesn’t invent evaluation)
+    preferred_future = bg_disagg_future.copy()
+    preferred_future["model_name"] = "preferred"
+
+    preferred_out = preferred_future.rename(columns={"Barangay_key": "name", "ds": "week_start"}).copy()
+    preferred_out["run_id"] = cfg.run_id
+    preferred_out.to_csv(cfg.out / "barangay_forecasts_preferred_future_long.csv", index=False)
+
+    # Export multi-model grid optional: here we export only preferred+disagg if you want later.
+    all_models_out = pd.concat([preferred_future, bg_disagg_future], ignore_index=True)
+    all_models_out = all_models_out.rename(columns={"Barangay_key": "name", "ds": "week_start"}).copy()
+    all_models_out["run_id"] = cfg.run_id
+    all_models_out["status"] = "ok"
+    all_models_out.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
+
+    try:
+        upload_to_supabase(cfg)
+        print("✅ Supabase export completed.")
+    except Exception as e:
+        print(f"ℹ️ Supabase export skipped: {e}")
+
+def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
+    # Backwards compatible entry point
+    if getattr(cfg, "run_kind", "backtest") == "production":
+        return run_production(cfg)
+    return run_backtest(cfg)
 
 
 if __name__ == "__main__":

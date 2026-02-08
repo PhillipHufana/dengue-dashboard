@@ -1,3 +1,4 @@
+# denguard/steps/step7_prophet.py
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
@@ -22,15 +23,19 @@ def fit_prophet(
     horizon: int,
 ) -> Tuple[bool, Any, Optional[pd.DataFrame], Optional[pd.DataFrame], Dict[str, float]]:
     """
-    City Prophet:
-    Returns standardized forecast_test and forecast_future:
-      ds, yhat, yhat_lower, yhat_upper, model_name, horizon_type
+    Backtest (test_city non-empty):
+      returns forecast_test + forecast_future + metrics
+    Production (test_city empty):
+      returns forecast_test=None, forecast_future valid, metrics=nan
     """
     print("\n== STEP 7: Prophet model ==")
 
-    for df_name, df in [("train_city", train_city), ("test_city", test_city)]:
-        if not {"ds", "y"}.issubset(df.columns):
-            raise ValueError(f"{df_name} must contain columns ['ds', 'y'].")
+    if not {"ds", "y"}.issubset(train_city.columns):
+        raise ValueError("train_city must contain columns ['ds','y'].")
+
+    # test_city can be empty in production; only validate if non-empty
+    if not test_city.empty and not {"ds", "y"}.issubset(test_city.columns):
+        raise ValueError("test_city must contain columns ['ds','y'] when provided.")
 
     try:
         from prophet import Prophet
@@ -55,9 +60,20 @@ def fit_prophet(
     if future_h <= 0:
         raise ValueError("Forecast horizon must be positive.")
 
-    # Define test and future date indices (Mondays)
+    # PRODUCTION: no test period
+    if test_city.empty:
+        last_obs = pd.to_datetime(train_city["ds"], errors="raise").max()
+        future_full = model.make_future_dataframe(periods=future_h, freq="W-MON")
+        forecast_full = model.predict(future_full)
+        fut = forecast_full[forecast_full["ds"] > last_obs].copy().sort_values("ds").iloc[:future_h]
+        raw_future = fut[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
+
+        forecast_future = ensure_city_forecast_df(raw_future, model_name="prophet", horizon_type="future")
+        nan_metrics = {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
+        return True, model, None, forecast_future, nan_metrics
+
+    # BACKTEST: has test period
     test_ds = pd.DatetimeIndex(pd.to_datetime(test_city["ds"], errors="raise")).sort_values()
-    future_h = int(horizon)  # now truly future horizon
 
     full_future = model.make_future_dataframe(periods=len(test_ds) + future_h, freq="W-MON")
     full_forecast = model.predict(full_future)
@@ -67,11 +83,9 @@ def fit_prophet(
 
     raw_test, raw_future = prophet_split_test_future(full_forecast, test_ds=test_ds, future_ds=future_ds)
 
-    # Standardize shapes + enforce interval cols exist
-    forecast_test = ensure_city_forecast_df(raw_test.rename(columns={"y": "y"}), model_name="prophet", horizon_type="test")
-    forecast_future = ensure_city_forecast_df(raw_future.rename(columns={"y": "y"}), model_name="prophet", horizon_type="future")
+    forecast_test = ensure_city_forecast_df(raw_test, model_name="prophet", horizon_type="test")
+    forecast_future = ensure_city_forecast_df(raw_future, model_name="prophet", horizon_type="future")
 
-    # Metrics on test (aligned)
     joined = test_city.merge(forecast_test[["ds", "yhat"]], on="ds", how="left").dropna()
     if joined.empty:
         raise RuntimeError("Prophet produced no predictions for the test period.")

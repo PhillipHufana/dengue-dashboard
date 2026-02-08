@@ -3,18 +3,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
+
+RunKind = Literal["backtest", "production"]
 
 @dataclass(frozen=True)
 class Config:
-    # --- NEW: run metadata (G0.4) ---
+    # --- run metadata ---
     run_id: Optional[str] = None
     run_started_at_utc: Optional[str] = None
 
-    # Forecasting horizons and dates
-    train_end_date: str = "2022-12-26"
+    # --- NEW (G0.3): run kind ---
+    run_kind: RunKind = "backtest"  # "backtest" or "production"
+
+    # --- Backtest cutoff (thesis validation) ---
+    backtest_end_date: str = "2022-12-26"  # replaces old fixed train_end_date conceptually
+
+    # --- Production horizon ---
+    production_horizon_weeks: int = 12
+
+    # --- Production fallback model if no test exists ---
+    production_city_model: Literal["prophet", "arima"] = "prophet"
+
+    # --- Weighting window for disaggregation ---
     recent_weight_start: str = "2022-01-01"
     calibration_threshold: int = 200
+
+    # --- Choice A: local only if it beats disagg on test (sMAPE) ---
+    local_vs_disagg_smape_margin: float = 0.03
+
 
     # IO paths
     incoming_folder: str = ""
@@ -23,9 +40,11 @@ class Config:
     canon_csv: str = ""
     out_dir: str = ""
 
-    # Modeling knobs
+    # Pipeline mode (your existing ingestion mode)
     incoming_mode: str = "incremental"  # "incremental" or "full_refresh"
-    forecast_weeks_override: Optional[int] = None  # None => len(test)
+
+    # Horizon override (still useful, especially for backtest)
+    forecast_weeks_override: Optional[int] = None  # None => len(test) (backtest), production uses production_horizon_weeks
 
     @property
     def out(self) -> Path:
@@ -35,7 +54,10 @@ class Config:
 
 
 DEFAULT_CFG = Config(
-    train_end_date="2022-12-26",
+    run_kind="backtest",
+    backtest_end_date="2022-12-26",
+    production_horizon_weeks=12,
+    production_city_model="prophet",
     recent_weight_start="2022-01-01",
     calibration_threshold=200,
     incoming_folder=r"C:\Users\Phillip\Downloads\comsci\thesis\dengue-dashboard\dengue_incoming",
@@ -45,4 +67,5 @@ DEFAULT_CFG = Config(
     out_dir="intermediate",
     forecast_weeks_override=None,
     incoming_mode="incremental",
+    local_vs_disagg_smape_margin=0.03,
 )

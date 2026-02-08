@@ -1,3 +1,4 @@
+# denguard/selection.py
 from __future__ import annotations
 from typing import Dict, Optional, Tuple, Any
 
@@ -22,73 +23,88 @@ def _safe_metric(metrics: Dict[str, float], key: str) -> float:
 def select_city_model(
     metrics_prophet: Dict[str, float],
     metrics_arima: Dict[str, float],
-    forecast_prophet_test: Optional[pd.DataFrame],   # standardized test (unused here; ok)
-    forecast_arima_test: Optional[pd.DataFrame],     # standardized test (unused here; ok)
+    forecast_prophet_test: Optional[pd.DataFrame],
+    forecast_arima_test: Optional[pd.DataFrame],
     city_prophet: pd.DataFrame,
     y_train: pd.Series,
     model_prophet: Any,
     model_arima: Any,
     cfg: Config,
+    *,
+    test_len: int,
     horizon: int,
 ) -> Tuple[str, pd.DataFrame]:
     """
     Returns:
       chosen_model: 'prophet' or 'arima'
-      chosen_future: standardized city future forecast:
+      chosen_future: standardized city FUTURE forecast:
         ds, yhat, yhat_lower, yhat_upper, model_name, horizon_type='future'
+
+    Backtest: test_len > 0 -> select by metrics
+    Production: test_len == 0 -> choose cfg.production_city_model (fallback)
     """
 
-    def _better_is_prophet(key: str) -> Optional[bool]:
-        p = _safe_metric(metrics_prophet, key)
-        a = _safe_metric(metrics_arima, key)
-        if np.isinf(p) and np.isinf(a):
-            return None
-        if np.isclose(p, a, rtol=1e-12, atol=1e-12):
-            return None
-        return p < a
-
-    votes_prophet = 0
-    votes_arima = 0
-    for k in ("RMSE", "MAE", "sMAPE"):
-        winner = _better_is_prophet(k)
-        if winner is True:
-            votes_prophet += 1
-        elif winner is False:
-            votes_arima += 1
-
-    rmse_prophet = _safe_metric(metrics_prophet, "RMSE")
-    rmse_arima = _safe_metric(metrics_arima, "RMSE")
-
-    if votes_prophet == 0 and votes_arima == 0:
-        if np.isinf(rmse_prophet) and np.isinf(rmse_arima):
-            raise RuntimeError("Both models have invalid metrics; cannot select city model.")
-        use_prophet = rmse_prophet <= rmse_arima
-    else:
-        if votes_prophet > votes_arima:
-            use_prophet = True
-        elif votes_arima > votes_prophet:
-            use_prophet = False
-        else:
-            use_prophet = rmse_prophet <= rmse_arima
-
-    train_end = pd.to_datetime(cfg.train_end_date)
-    mask_test = city_prophet["ds"] > train_end
-    test_len = int(mask_test.sum())
+    # ---------------------------------------------------------
+    # A) Decide winner
+    # ---------------------------------------------------------
     if test_len <= 0:
-        raise RuntimeError("No test period found; cannot derive future dates.")
+        # Production: no ground-truth test period, cannot compare metrics honestly.
+        use_prophet = (getattr(cfg, "production_city_model", "prophet") == "prophet")
+    else:
+        def _better_is_prophet(key: str) -> Optional[bool]:
+            p = _safe_metric(metrics_prophet, key)
+            a = _safe_metric(metrics_arima, key)
+            if np.isinf(p) and np.isinf(a):
+                return None
+            if np.isclose(p, a, rtol=1e-12, atol=1e-12):
+                return None
+            return p < a
 
-    last_obs_ds = pd.to_datetime(city_prophet["ds"]).max()
-    future_dates = pd.date_range(last_obs_ds + pd.Timedelta(weeks=1), periods=horizon, freq="W-MON")
+        votes_prophet = 0
+        votes_arima = 0
+        for k in ("RMSE", "MAE", "sMAPE"):
+            winner = _better_is_prophet(k)
+            if winner is True:
+                votes_prophet += 1
+            elif winner is False:
+                votes_arima += 1
 
+        rmse_prophet = _safe_metric(metrics_prophet, "RMSE")
+        rmse_arima = _safe_metric(metrics_arima, "RMSE")
+
+        if votes_prophet == 0 and votes_arima == 0:
+            if np.isinf(rmse_prophet) and np.isinf(rmse_arima):
+                raise RuntimeError("Both models have invalid metrics; cannot select city model.")
+            use_prophet = rmse_prophet <= rmse_arima
+        else:
+            if votes_prophet > votes_arima:
+                use_prophet = True
+            elif votes_arima > votes_prophet:
+                use_prophet = False
+            else:
+                use_prophet = rmse_prophet <= rmse_arima
+
+    # ---------------------------------------------------------
+    # B) Build future dates from LAST OBSERVED WEEK
+    # ---------------------------------------------------------
+    last_obs_ds = pd.to_datetime(city_prophet["ds"], errors="raise").max()
+    future_dates = pd.date_range(last_obs_ds + pd.Timedelta(weeks=1), periods=int(horizon), freq="W-MON")
+
+    # ---------------------------------------------------------
+    # C) Build future forecasts for each model
+    # ---------------------------------------------------------
     def build_arima_future() -> Tuple[str, pd.DataFrame]:
         if model_arima is None:
             raise RuntimeError("ARIMA model is None.")
-        total_periods = test_len + horizon
+        # In backtest we want to generate beyond the test window; in production test_len=0 so this is just horizon.
+        total_periods = int(test_len) + int(horizon)
         preds_full, conf = model_arima.predict(n_periods=total_periods, return_conf_int=True, alpha=0.2)
         preds_full = np.asarray(preds_full, dtype=float)
         conf = np.asarray(conf, dtype=float)
-        preds_future = preds_full[test_len:]
-        conf_future = conf[test_len:]
+
+        preds_future = preds_full[int(test_len):]
+        conf_future = conf[int(test_len):]
+
         raw = pd.DataFrame(
             {"ds": future_dates, "yhat": preds_future, "yhat_lower": conf_future[:, 0], "yhat_upper": conf_future[:, 1]}
         )
@@ -97,14 +113,17 @@ def select_city_model(
     def build_prophet_future() -> Tuple[str, pd.DataFrame]:
         if model_prophet is None:
             raise RuntimeError("Prophet model is None.")
-        total_periods = test_len + horizon
+        total_periods = int(test_len) + int(horizon)
         future_full = model_prophet.make_future_dataframe(periods=total_periods, freq="W-MON")
         forecast_full = model_prophet.predict(future_full)
-        fut = forecast_full[forecast_full["ds"] > last_obs_ds].copy().sort_values("ds").iloc[:horizon]
+        fut = forecast_full[forecast_full["ds"] > last_obs_ds].copy().sort_values("ds").iloc[: int(horizon)]
         raw = fut[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
         return "prophet", ensure_city_forecast_df(raw, model_name="prophet", horizon_type="future")
 
-    if use_prophet and not np.isinf(rmse_prophet):
+    # ---------------------------------------------------------
+    # D) Choose + fallback
+    # ---------------------------------------------------------
+    if use_prophet:
         try:
             chosen_model, chosen_future = build_prophet_future()
         except Exception as e:

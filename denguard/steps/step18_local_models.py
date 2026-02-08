@@ -12,6 +12,23 @@ import warnings
 from denguard.config import Config
 from denguard.forecast_schema import ensure_barangay_forecast_df
 
+def _smape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> float:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    denom = np.abs(y_true) + np.abs(y_pred) + eps
+    return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
+
+
+def _safe_float(x: Any) -> float:
+    try:
+        v = float(x)
+        if np.isnan(v) or np.isinf(v):
+            return float("nan")
+        return v
+    except Exception:
+        return float("nan")
+
+
 
 def _pad_local_grid(
 
@@ -73,6 +90,8 @@ def local_models_tierA(
     horizon: int,
     PROPHET_OK: bool,
     cfg: Config,
+    *,
+    disagg_test_df: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     import pmdarima as pm
     from sklearn.metrics import mean_squared_error
@@ -116,8 +135,9 @@ def local_models_tierA(
                     "Barangay_key": bgy,
                     "RMSE_local_prophet": np.inf,
                     "RMSE_local_arima": np.inf,
-                    "Chosen": None,
+                    "Chosen": "disagg",
                     "status": "insufficient_history",
+                    "decision_reason": "insufficient_history_default_disagg",
                     "err_prophet": None,
                     "err_arima": None,
                 }
@@ -131,8 +151,9 @@ def local_models_tierA(
                     "Barangay_key": bgy,
                     "RMSE_local_prophet": np.inf,
                     "RMSE_local_arima": np.inf,
-                    "Chosen": None,
+                    "Chosen": "disagg",
                     "status": "insufficient_train_history",
+                    "decision_reason": "insufficient_train_history_default_disagg",
                     "err_prophet": None,
                     "err_arima": None,
                 }
@@ -141,9 +162,35 @@ def local_models_tierA(
 
         y_true_test = df_full.set_index("ds").reindex(test_ds, fill_value=0.0)["y"].to_numpy(dtype=float)
 
+        # ----------------------------
+        # Disagg baseline (Choice A)
+        # ----------------------------
+        smape_disagg = float("inf")
+        
+
+        try:
+            dis_bgy = disagg_test_df[
+                (disagg_test_df["Barangay_key"] == bgy) &
+                (disagg_test_df["horizon_type"] == "test")
+            ].copy()
+            if not dis_bgy.empty:
+                dis_bgy["ds"] = pd.to_datetime(dis_bgy["ds"], errors="raise")
+                dis_bgy = dis_bgy.set_index("ds").sort_index()
+                dis_pred = dis_bgy.reindex(test_ds, fill_value=0.0)["yhat"].to_numpy(dtype=float)
+                dis_pred = np.clip(dis_pred, 0, None)
+                smape_disagg = _smape(y_true_test, dis_pred)
+                
+        except Exception:
+            smape_disagg = float("inf")
+        
+        disagg_available = np.isfinite(smape_disagg)
+
+
         # Prophet
+        smape_p = float("inf")
         rmse_p = np.inf
         if PROPHET_OK:
+
             try:
                 from prophet import Prophet
 
@@ -175,6 +222,8 @@ def local_models_tierA(
                     raise ValueError("Prophet produced NaN outputs.")
 
                 rmse_p = float(np.sqrt(mean_squared_error(y_true_test, p_test)))
+                smape_p = _smape(y_true_test, p_test)
+
 
                 raw_test = pd.DataFrame(
                     {"Barangay_key": bgy, "ds": test_ds, "yhat": p_test,
@@ -193,10 +242,13 @@ def local_models_tierA(
 
 
         # ARIMA
+        smape_a = float("inf")
         rmse_a = np.inf
         try:
-            y_train = df_train.set_index("ds")["y"]
-            y_train.index = pd.DatetimeIndex(y_train.index, freq="W-MON")
+            y_train = df_train.set_index("ds")["y"].sort_index()
+            y_train.index = pd.DatetimeIndex(y_train.index)
+            y_train = y_train.asfreq("W-MON").fillna(0.0)
+
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*force_all_finite.*", category=FutureWarning)
@@ -227,6 +279,7 @@ def local_models_tierA(
             a_test = np.clip(np.asarray(pred_test, dtype=float), 0, None)
             a_fut = np.clip(np.asarray(pred_fut, dtype=float), 0, None)
             rmse_a = float(np.sqrt(mean_squared_error(y_true_test, a_test)))
+            smape_a = _smape(y_true_test, a_test)
 
             raw_test = pd.DataFrame(
                 {"Barangay_key": bgy, "ds": test_ds, "yhat": a_test,
@@ -244,7 +297,12 @@ def local_models_tierA(
             err_arima = repr(e)
 
 
-        chosen = None
+        # ----------------------------
+        # Choice A decision (sMAPE)
+        # local only if it beats disagg by margin
+        # ----------------------------
+        margin = float(getattr(cfg, "local_vs_disagg_smape_margin", 0.03))
+
         status = "ok"
         if not np.isfinite(rmse_p) and not np.isfinite(rmse_a):
             status = "both_failed"
@@ -252,19 +310,45 @@ def local_models_tierA(
             status = "prophet_failed"
         elif not np.isfinite(rmse_a):
             status = "arima_failed"
-        else:
-            status = "ok"
 
-        chosen = None
-        if np.isfinite(rmse_p) or np.isfinite(rmse_a):
-            chosen = "local_prophet" if rmse_p <= rmse_a else "local_arima"
+        best_local_model = None
+        smape_best_local = float("inf")
+        if np.isfinite(smape_p) or np.isfinite(smape_a):
+            if smape_p <= smape_a:
+                best_local_model = "local_prophet"
+                smape_best_local = smape_p
+            else:
+                best_local_model = "local_arima"
+                smape_best_local = smape_a
+
+        # Default to disagg if local doesn't clearly win
+        chosen = "disagg"
+        decision_reason = (
+            f"default_disagg_or_local_not_better_by_margin({margin:.2f})"
+            if disagg_available else "disagg_baseline_missing_default_disagg"
+        )
+
+        delta = np.nan
+
+        if np.isfinite(smape_disagg) and np.isfinite(smape_best_local):
+            delta = float(smape_disagg - smape_best_local)
+            if smape_best_local <= (smape_disagg - margin):
+                chosen = str(best_local_model)
+                decision_reason = f"local_beats_disagg_by_margin({margin:.2f})"
 
         local_results.append(
             {
                 "Barangay_key": bgy,
                 "RMSE_local_prophet": float(rmse_p),
                 "RMSE_local_arima": float(rmse_a),
-                "Chosen": chosen,
+                "sMAPE_local_prophet_test": float(smape_p),
+                "sMAPE_local_arima_test": float(smape_a),
+                "sMAPE_disagg_test": float(smape_disagg),
+                "sMAPE_best_local_test": float(smape_best_local),
+                "delta_disagg_minus_local": _safe_float(delta),
+                "best_local_model": best_local_model,
+                "Chosen": chosen,  # ✅ now: local_prophet/local_arima/disagg
+                "decision_reason": decision_reason,
                 "status": status,
                 "err_prophet": err_prophet,
                 "err_arima": err_arima,

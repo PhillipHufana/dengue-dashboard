@@ -27,8 +27,10 @@ def train_test_split_city(
     # - Backtest: typically cfg.train_end_date (fixed cutoff)
     # - Production: train_end can be last observed week (pass train_end=None + require_test=False)
     if train_end is None:
-        if getattr(cfg, "train_end_date", None):
-            train_end = pd.to_datetime(cfg.train_end_date)
+        # Backtest default: cfg.backtest_end_date
+        # Production default (require_test=False): latest observed
+        if getattr(cfg, "run_kind", "backtest") == "backtest":
+            train_end = pd.to_datetime(getattr(cfg, "backtest_end_date"))
         else:
             train_end = city_prophet["ds"].max()
 

@@ -193,15 +193,21 @@ def upload_to_supabase(cfg) -> None:
             break
 
 
+    # For backtest, record the cutoff date; for production, store None
+    train_end_value = None
+    if getattr(cfg, "run_kind", "backtest") == "backtest":
+        train_end_value = getattr(cfg, "backtest_end_date", None)
+
     runs_df = pd.DataFrame([{
         "run_id": run_id,
         "mode": cfg.incoming_mode,
-        "train_end": cfg.train_end_date,
+        "train_end": train_end_value,
         "horizon_weeks": horizon_weeks,
         "data_version": None,
         "code_version": None,
     }])
     upsert_runs(runs_df)
+
 
     # ---------------------------------------------------------
     # 3) CITY FORECASTS LONG (test+future combined)

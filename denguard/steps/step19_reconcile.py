@@ -47,17 +47,34 @@ def reconcile_forecasts(
         raise ValueError("local_perf must include columns: Barangay_key, Chosen")
 
     # --- Choose local series per barangay based on local_perf ---
+    # We keep TWO versions:
+    #   loc_all_future: all local model forecasts (for UI "what local would have predicted")
+    #   chosen_local: only the chosen local forecasts (for preferred override)
     if loc.empty:
-        chosen_local = loc
+        loc_all_future = loc  # empty
+        chosen_local = pd.DataFrame(columns=["Barangay_key","ds","yhat","yhat_lower","yhat_upper"])
     else:
-        chosen_map = perf.set_index("Barangay_key")["Chosen"].to_dict()
-        loc["chosen_for_bgy"] = loc["Barangay_key"].map(chosen_map)
-        chosen_local = loc[loc["model_name"] == loc["chosen_for_bgy"]].drop(columns=["chosen_for_bgy"])
+        loc_all_future = loc.copy()  # keep everything for UI
 
-    # ✅ ROBUSTNESS FIX: if chosen_local is empty w/ no columns, prevent KeyError
-    needed_local_cols = ["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type"]
-    if chosen_local is None or chosen_local.empty:
-        chosen_local = pd.DataFrame(columns=needed_local_cols)
+        chosen_map = perf.set_index("Barangay_key")["Chosen"].to_dict()
+
+        loc_for_choice = loc.copy()
+        loc_for_choice["chosen_for_bgy"] = loc_for_choice["Barangay_key"].map(chosen_map)
+
+        # If choice is "disagg", we provide NO local override into preferred
+        loc_for_choice = loc_for_choice[loc_for_choice["chosen_for_bgy"].isin(["local_prophet", "local_arima"])].copy()
+
+        chosen_local = loc_for_choice[loc_for_choice["model_name"] == loc_for_choice["chosen_for_bgy"]].copy()
+        chosen_local = chosen_local[["Barangay_key","ds","yhat","yhat_lower","yhat_upper"]]
+
+    disagg["ds"] = pd.to_datetime(disagg["ds"], errors="raise")
+    chosen_local["ds"] = pd.to_datetime(chosen_local["ds"], errors="raise")
+
+    if not loc_all_future.empty:
+        loc_all_future["ds"] = pd.to_datetime(loc_all_future["ds"], errors="raise")
+ 
+
+
 
     # Merge disagg + chosen local (local overrides disagg where present)
     base = disagg.merge(
@@ -113,7 +130,7 @@ def reconcile_forecasts(
     if keep_all_models:
         all_models_future = _grid_fill_future_models(
             disagg_future_df=disagg,
-            loc_future_df=loc,
+            loc_future_df=loc_all_future,
             preferred_future_df=preferred_future,
             cfg=cfg,
             city_future=city_future,
@@ -177,9 +194,23 @@ def _grid_fill_future_models(
         loc = loc[loc["model_name"].isin(["local_prophet", "local_arima"])].copy()
         loc = loc[base_cols]
 
+    # --- Key alignment guard: only keep local rows for barangays that exist in disagg ---
+    disagg_keys = set(dis["Barangay_key"].unique())
+    if not loc.empty:
+        loc = loc[loc["Barangay_key"].isin(disagg_keys)].copy()
+
+
     pref = preferred_future_df.copy()
     pref = pref[pref["horizon_type"] == "future"].copy()
     pref = pref[base_cols]
+    
+    # --- Ensure ds types match grid (datetime64) ---
+    dis["ds"] = pd.to_datetime(dis["ds"], errors="raise")
+
+    if not loc.empty:
+        loc["ds"] = pd.to_datetime(loc["ds"], errors="raise")
+
+    pref["ds"] = pd.to_datetime(pref["ds"], errors="raise")
 
     combined = pd.concat([dis, loc, pref], ignore_index=True)
 
