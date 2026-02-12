@@ -26,11 +26,12 @@ from denguard.steps.step12_plot_sample import plot_sample_barangays
 from denguard.steps.step13_errors import barangay_error_ranking
 from denguard.steps.step15_prophet_cv import prophet_cross_validation
 from denguard.steps.step16_health import model_health_report
-from denguard.steps.step17_tiers import tier_classification
+# from denguard.steps.step17_tiers import tier_classification
 from denguard.steps.step18_local_models import local_models_tierA
 from denguard.steps.step19_reconcile import reconcile_forecasts
 from denguard.export_supabase import upload_to_supabase
 from denguard.horizon import resolve_horizon
+from denguard.steps.step17_tiers import local_eligibility
 
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -147,24 +148,20 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
 
     _require_backtest(cfg, "Step17/18/19 (tiers/local/reconcile)")
 
-    tiers_df, tierA, tierB, tierC = tier_classification(
-        weekly_full,
-        cfg,
-        train_end=train_end,
-        K_nonzero_weeks=12,
-        C_total_cases=500,
-    )
+    elig_df, eligible_keys = local_eligibility(weekly_full, cfg, train_end=train_end)
 
+    all_barangays = sorted(weekly_full["Barangay_key"].unique().tolist())
 
     local_perf_df, local_long_df = local_models_tierA(
-        tierA=tierA,
+        barangay_keys=all_barangays,
+        eligible_keys=eligible_keys,
         weekly_full=weekly_full,
         test_city=test_city,
         train_end=train_end,
         horizon=future_horizon,
         PROPHET_OK=PROPHET_OK,
         cfg=cfg,
-        disagg_test_df=bg_disagg_test,  # ✅ Choice A baseline
+        disagg_test_df=bg_disagg_test,
     )
 
 

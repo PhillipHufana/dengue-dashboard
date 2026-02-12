@@ -1,11 +1,183 @@
 Barangay_key,RMSE_local_prophet,RMSE_local_arima,sMAPE_local_prophet_test,sMAPE_local_arima_test,sMAPE_disagg_test,sMAPE_best_local_test,delta_disagg_minus_local,best_local_model,Chosen,decision_reason,status,err_prophet,err_arima,run_id
-barangay 19 b,1.960363405340945,1.8418163465721098,1.4516528735597367,1.1444062614577095,0.9316486855840291,1.1444062614577095,-0.21275757587368038,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-bucana,5.567393102534033,4.812776305688147,1.6376673039436465,0.7796522964113585,0.6223357221482002,0.7796522964113585,-0.15731657426315826,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-buhangin,5.277210308776212,5.493994339266993,1.5793616060788798,1.392548037395183,0.5708121736140825,1.392548037395183,-0.8217358637811005,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-cabantian,2.5474821313626004,2.1621687230702564,1.1645608593689012,0.7326751260028531,0.7694689412760415,0.7326751260028531,0.03679381527318837,local_arima,local_arima,local_beats_disagg_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-catalunan grande,3.291452712568824,2.9556471289208557,1.1446591224056333,0.7163542769884289,0.6646183264395873,0.7163542769884289,-0.051735950548841614,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-ma a,4.12075276403568,4.073401435202239,1.616104503036682,1.3615198252415714,0.7246925591154192,1.3615198252415714,-0.6368272661261523,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-matina crossing,3.882196613484566,2.9179544027554507,1.5475876309182275,0.7072176336780586,0.6802130205116597,0.7072176336780586,-0.027004613166398905,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-panacan,2.2456724680095443,2.5100019744036284,0.7055396389244053,0.7908147572292703,0.7576118288231618,0.7055396389244053,0.052072189898756505,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-sasa,2.3474233264172524,2.303921660880025,0.7942471065838629,0.7411006272938637,0.8250318419076822,0.7411006272938637,0.08393121461381847,local_arima,local_arima,local_beats_disagg_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
-talomo,5.669267333398622,4.689249519975733,1.3601635784400066,0.6640505244842181,0.6652512799204503,0.6640505244842181,0.0012007554362322148,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,afcc0a02-be07-415f-ad7a-57839034e31a
+acacia,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+agdao,1.3286113454137283,1.37687419069259,1.3294165523473667,1.3356657369791447,1.139799874797893,1.3294165523473667,-0.18961667754947364,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+alambre,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+alejandra navarro,1.0624330230628989,0.9552714118906853,1.4938218295134644,1.4692000133279515,1.50388559012651,1.4692000133279515,0.03468557679855855,local_arima,local_arima,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+alfonso angliongto sr,1.5055492547743756,1.2597630861494686,1.094329645801037,1.4531949312672165,1.2695144444839694,1.094329645801037,0.17518479868293246,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+angalan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+atan awe,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+baganihan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bago aplaya,1.3688162955708287,1.4046188118443,1.2592896302348964,1.2034422622602765,1.207117562816849,1.2034422622602765,0.0036753005565723917,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bago gallera,2.523608306753988,2.5185337483400856,1.2598455344556152,1.0256137189209438,0.8103892650275987,1.0256137189209438,-0.2152244538933451,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bago oshiro,0.8868671429155079,0.8970267175307592,1.7463318724477215,1.8340026373926026,1.750864550333203,1.7463318724477215,0.004532677885481506,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+baguio,1.8637052366061961,2.051830989515276,1.39979321446334,1.7367844924121827,1.123446296564654,1.39979321446334,-0.27634691789868615,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+balengaeng,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+baliok,1.8133265009387134,1.7852468818803207,1.4207278399104704,1.231021353069937,1.1434075180968222,1.231021353069937,-0.08761383497311481,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bangkas heights,1.1238525644962796,1.10085958726124,1.6650550717883186,1.695655702372151,1.5810297811031908,1.6650550717883186,-0.08402529068512776,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bantol,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+baracatan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 1 a,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 10 a,0.7950133806690493,0.7819652130530439,1.6255351777496796,1.8005183902950126,1.7123046897715237,1.6255351777496796,0.08676951202184413,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 11 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 12 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 13 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 14 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 15 b,0.48323029676964574,0.4670324262039431,1.403647451589364,1.9189335200702626,1.9177975142154688,1.403647451589364,0.5141500626261049,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 16 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 17 b,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 18 b,0.34969239087199416,0.368509043083464,1.1779771888362234,1.9255909347976927,1.8885381045696032,1.1779771888362234,0.7105609157333799,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 19 b,1.960363405340945,1.8418163465721098,1.4516528735597367,1.1444062614577095,0.9316486855840291,1.1444062614577095,-0.21275757587368038,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 2 a,0.5151097983883646,0.49549228144531304,0.9258985776853395,1.9302225720373785,1.892446832871012,0.9258985776853395,0.9665482551856726,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 20 b,0.4736984586473053,0.4643981396565728,1.0513892238741842,1.9472572892481712,1.8905911145842518,1.0513892238741842,0.8392018907100676,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 21 c,0.7323643657123554,0.7269605770406204,1.6673173886919124,1.6795690035082134,1.5532088693734796,1.6673173886919124,-0.1141085193184328,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 22 c,0.7808839734553973,0.7403879392374686,1.2449228316631324,1.820554761336567,1.723255910802146,1.2449228316631324,0.47833307913901346,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 23 c,0.9315852539304541,0.8625824003521803,1.1069824574910312,1.7516618680186542,1.518721175501254,1.1069824574910312,0.41173871801022277,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 24 c,0.3801997263914869,0.3649837032682995,0.6000502302828589,1.9515379463937395,1.9442098387109863,0.6000502302828589,1.3441596084281273,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 25 c,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 26 c,0.24777635873178985,0.2618384521675085,1.4466705419088817,1.9659767178649337,1.959981108679081,1.4466705419088817,0.5133105667701994,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 27 c,0.3822101357877991,0.353811113423956,1.355618101544515,1.8977265568710566,1.8430253314835134,1.355618101544515,0.48740722993899843,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 28 c,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 29 c,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 3 a,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 30 c,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 31 d,0.9596252441723432,0.9116492691229269,1.487113058577459,1.5071454703467564,1.339602566356697,1.487113058577459,-0.14751049222076196,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 32 d,0.3928545419255968,0.38752440690451706,1.2440657750958795,1.9435727752096688,1.9085653717115962,1.2440657750958795,0.6644995966157168,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 33 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 34 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 35 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 36 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 37 d,0.8237263331962009,0.7876130135498933,1.4407919426970945,1.7104305939219617,1.5315755429629743,1.4407919426970945,0.09078360026587973,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 38 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 39 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 4 a,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 40 d,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 5 a,1.489203898111876,1.3664664932614354,1.302995941318684,1.4637324575071855,1.297212138022039,1.302995941318684,-0.005783803296645074,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 6 a,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 7 a,0.7280450137538197,0.6839872301744863,1.0487393348073744,1.856917278278708,1.8186438198830805,1.0487393348073744,0.7699044850757062,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 8 a,1.138913240475366,1.0384538001035064,1.0880331640496905,1.63575782819279,1.425619926516985,1.0880331640496905,0.3375867624672946,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+barangay 9 a,1.0183569901667566,1.0165805576647886,1.5134668322692622,1.645692866551638,1.465520871777514,1.5134668322692622,-0.04794596049174826,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bato,1.2388862202225208,1.1950900543444423,1.6379769509172513,1.6201372060921932,1.427274852614591,1.6201372060921932,-0.19286235347760217,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bayabas,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+biao escuela,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+biao guianga,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+biao joaquin,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+binugao,0.9230213566684842,0.9270141020155847,1.4651022934183606,1.5277687477265023,1.3445723602775068,1.4651022934183606,-0.1205299331408538,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bucana,5.567393102534033,4.812776305688147,1.6376673039436465,0.7796522964113585,0.6223357221482002,0.7796522964113585,-0.15731657426315826,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+buda,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+buhangin,5.277210308776212,5.493994339266993,1.5793616060788798,1.392548037395183,0.5708121736140825,1.392548037395183,-0.8217358637811005,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+bunawan,1.894470885234138,1.931389649323339,0.8512574087303937,0.8675353049524811,0.8519804450126157,0.8512574087303937,0.0007230362822220338,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+cabantian,2.5474821313626004,2.1621687230702564,1.1645608593689012,0.7326751260028531,0.7694689412760415,0.7326751260028531,0.03679381527318837,local_arima,local_arima,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+cadalian,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+calinan,4.084558204232645,4.394791125627702,0.8544597719621057,0.9775341705295792,0.7616791973485944,0.8544597719621057,-0.0927805746135113,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+callawa,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+camansi,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+carmen,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+catalunan grande,3.291452712568824,2.9556471289208557,1.1446591224056333,0.7163542769884289,0.6646183264395873,0.7163542769884289,-0.051735950548841614,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+catalunan pequeno,2.5816672845972595,2.797817616471123,0.9554825269480975,0.9522126657630763,0.8609876578852845,0.9522126657630763,-0.09122500787779175,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+catigan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+cawayan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+centro,0.7850087269595988,0.7001451300753191,1.3306417388725187,1.7824140087054523,1.656681787503955,1.3306417388725187,0.3260400486314363,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+colosas,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+communal,1.22235902689887,1.268208139849141,1.154935254776119,1.2363947526261825,1.0986624322329304,1.154935254776119,-0.05627282254318855,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+crossing bayabas,1.6716968934644205,1.6325760673776855,1.598994596398662,1.571126783318456,1.3252645505161673,1.571126783318456,-0.24586223280228858,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+dacudao,1.769987835829737,1.7666238305102482,1.5749480433729908,1.5807034201440666,1.4532762747075165,1.5749480433729908,-0.12167176866547424,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+dalag,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+dalagdag,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+daliao,2.007047048397283,1.6964752026292687,1.395126900230994,0.9635812370436783,0.9233044555255704,0.9635812370436783,-0.040276781518107874,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+daliaon plantation,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+datu salumay,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+dominga,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+dumoy,1.5524220707738363,1.565388257112284,1.4300879797965802,1.3196264049027284,1.1639332081538374,1.3196264049027284,-0.15569319674889104,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+eden,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+fatima,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+gatungan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+gov paciano bangoy,0.6515905751139087,0.6193262371821049,1.0603466184108392,1.8775881102290128,1.7249305781823894,1.0603466184108392,0.6645839597715502,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+gov vicente duterte,0.43481879631850046,0.42704905935292764,0.9864436535590357,1.8778164229438938,1.8681631768430311,0.9864436535590357,0.8817195232839954,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+gumalang,1.9167956918228015,1.9764625361730805,1.5851171335273946,1.7293555589487601,1.5192723272940662,1.5851171335273946,-0.06584480623332833,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+gumitan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+ilang,1.6688869850574712,1.8006710842183162,1.0274685430487616,1.048165396557742,1.1008496326795638,1.0274685430487616,0.07338108963080225,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+inayangan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+indangan,1.7540741361724876,1.5435874525843032,1.3213769702483802,1.0502461911930454,1.0198018405553713,1.0502461911930454,-0.030444350637674145,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+kap tomas monteverde sr,0.5433089121322133,0.5308934289397419,0.8882645117201634,1.9348728441345895,1.836223029184029,0.8882645117201634,0.9479585174638655,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+kilate,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lacson,0.9019428250614643,0.9238844209333432,1.743580512739927,1.7547123926470727,1.6721031970973377,1.743580512739927,-0.07147731564258941,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lamanan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lampianao,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+langub,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lapu lapu,0.729465570067507,0.6714918917420833,1.6923075320339094,1.6986116759839365,1.5460341022567883,1.6923075320339094,-0.1462734297771211,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+leon garcia sr,0.8704439785367166,0.7650196581540847,1.341009706378001,1.6076438605140195,1.6297356966373715,1.341009706378001,0.2887259902593704,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lizada,2.0251607198740325,1.9308272809754485,1.3510509998195037,1.2008985861255221,1.088451947692181,1.2008985861255221,-0.11244663843334113,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+los amigos,1.3956842561221183,1.4259725278635973,1.1286362975852755,1.1132048092049183,1.1213453280403094,1.1132048092049183,0.00814051883539113,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lubogan,1.9976863951858668,1.7862003437139027,1.4874957380630554,1.5213286571644196,1.3828310714954453,1.4874957380630554,-0.10466466656761009,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+lumiad,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+ma a,4.12075276403568,4.073401435202239,1.616104503036682,1.3615198252415714,0.7246925591154192,1.3615198252415714,-0.6368272661261523,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mabuhay,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+magsaysay,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+magtuod,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mahayag,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+malabog,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+malagos,1.769800114576847,1.8462821047465678,1.4128361797624607,1.5565673082088922,1.1193931871994809,1.4128361797624607,-0.2934429925629798,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+malamba,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+manambulan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mandug,1.7542157593449783,1.5530079166321749,1.4363505641270309,1.2165549043301105,1.1354501860639563,1.2165549043301105,-0.08110471826615417,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+manuel guianga,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mapula,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+marapangi,0.8541965021370752,0.7650073980722577,1.0924105543154679,1.7182792658618704,1.772463089665188,1.0924105543154679,0.6800525353497202,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+marilog,1.6121559451509135,1.6878400644431313,1.2289476531367587,1.3125450080533694,1.0549087776717088,1.2289476531367587,-0.17403887546504992,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+matina aplaya,2.3807653987586783,2.065982773759686,1.2967763517184296,0.9646399831342022,0.8551329486959804,0.9646399831342022,-0.10950703443822174,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+matina biao,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+matina crossing,3.882196613484566,2.9179544027554507,1.5475876309182275,0.7072176336780586,0.6802130205116597,0.7072176336780586,-0.027004613166398905,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+matina pangi,1.2117941265187837,1.209330458409646,1.4448967401441308,1.323645773795373,1.0276924513582817,1.323645773795373,-0.2959533224370914,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+megkawayan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mintal,2.2286717684444985,2.031215355983067,1.2212077093493034,0.9868019455524228,0.8943113726157851,0.9868019455524228,-0.09249057293663776,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mudiang,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+mulig,0.9680612355282462,0.987033956047881,1.7612686540892333,1.8234830871024557,1.7026736041367496,1.7612686540892333,-0.05859504995248366,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+new carmen,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+new valencia,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+pampanga,0.9440805988775617,0.93665803515139,1.507294136016466,1.3592907387318718,1.3124764881354503,1.3592907387318718,-0.046814250596421525,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+panacan,2.2456724680095443,2.5100019744036284,0.7055396389244053,0.7908147572292703,0.7576118288231618,0.7055396389244053,0.052072189898756505,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+panalum,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+pandaitan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+pangyan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+paquibato,0.9073090713055343,0.8517191641182683,1.4998155495434466,1.573523659785093,1.5000352102369678,1.4998155495434466,0.00021966069352119533,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+paradise embak,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+rafael castillo,0.6944560662197347,0.7030932149477671,1.5774605159724469,1.6166432603467076,1.4975691548025296,1.5774605159724469,-0.07989136116991724,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+riverside,0.8074460544961287,0.8204692675929234,1.7093504002592503,1.7726635377828295,1.6643098486683916,1.7093504002592503,-0.045040551590858735,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+salapawan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+salaysay,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+saloy,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+san antonio,0.6986214534202192,0.6743858769682671,0.9724131903474966,1.7698280599194791,1.6806492471931451,0.9724131903474966,0.7082360568456485,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+san isidro,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+santo nino,1.9924224490640603,2.0612072276811526,1.247481788733666,1.2725993194297824,1.0162442857426337,1.247481788733666,-0.2312375029910323,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+sasa,2.3474233264172524,2.303921660880025,0.7942471065838629,0.7411006272938637,0.8250318419076822,0.7411006272938637,0.08393121461381847,local_arima,local_arima,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+sibulan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+sirawan,0.9872987407024912,0.9671393961212542,1.449257634407375,1.4537024914966166,1.385414613852579,1.449257634407375,-0.06384302055479618,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+sirib,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+suawan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+subasta,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+sumimao,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tacunan,1.9473966967765095,1.972277678751923,0.9690090078819624,0.9866079412415747,0.9093593877107556,0.9690090078819624,-0.059649620171206785,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tagakpan,0.9023076778972434,0.9316725240668964,1.7469462650107346,1.8170851824645413,1.6555572484087457,1.7469462650107346,-0.09138901660198884,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tagluno,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tagurano,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+talandang,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+talomo,5.669267333398622,4.689249519975733,1.3601635784400066,0.6640505244842181,0.6652512799204503,0.6640505244842181,0.0012007554362322148,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+talomo river,1.6179217480446852,1.640092346715586,1.6902292038669537,1.764222444881524,1.5649044064423319,1.6902292038669537,-0.12532479742462188,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tamayong,0.848142982671092,0.8261935180184399,1.7698762429279395,1.8348058327177168,1.7557774121036256,1.7698762429279395,-0.014098830824313957,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tambobong,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tamugan,0.9565099569203876,0.9342273209555945,1.4347456316413738,1.567782155695216,1.3666530065749807,1.4347456316413738,-0.06809262506639313,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tapak,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tawan tawan,0.945763564247619,0.9528982129255197,1.6494161320225127,1.8510628435576106,1.7698835569553626,1.6494161320225127,0.1204674249328499,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tibuloy,0.480489363819361,0.45771538061568307,1.8959787653814895,1.933428219994399,1.8821568878221933,1.8959787653814895,-0.013821877559296203,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tibungco,2.7335594499816067,2.580531954121316,0.7327582189306845,0.6973977483976699,0.6933370610155584,0.6973977483976699,-0.004060687382111516,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tigatto,1.8927578036146646,1.5231548212428452,1.3912539297846458,0.8952500869071728,0.8405981632386867,0.8952500869071728,-0.054651923668486035,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+toril,2.8466498259712107,2.5463387630203647,1.4130765052953296,0.9791467451581094,0.9096598000698926,0.9791467451581094,-0.06948694508821684,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tugbok,1.9574045860197806,2.0962315834328673,1.294437582156639,1.4539919283356484,1.044494583218952,1.294437582156639,-0.2499429989376869,local_prophet,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+tungakalan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+ubalde,0.36455278519115986,0.35142867523675353,0.8912731946545284,1.968005203478535,1.911442108703943,0.8912731946545284,1.0201689140494148,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+ula,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+vicente hizon sr,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+waan,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+wangan,0.9888466329749662,0.9835140348126783,1.7865919879505032,1.766179057555349,1.6739489547368367,1.766179057555349,-0.0922301028185124,local_arima,disagg,default_disagg_or_local_not_better_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+wilfredo aquino,0.6857864672095909,0.6336024530319436,0.8899820403269464,1.8248512222070756,1.698467516300435,0.8899820403269464,0.8084854759734886,local_prophet,local_prophet,local_beats_disagg_by_margin(0.03),ok,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6
+wines,inf,inf,inf,inf,inf,inf,,,disagg,ineligible_data_sufficiency,ineligible,,,3b3037b5-04af-4a5f-9543-4a8abd2c1cc6

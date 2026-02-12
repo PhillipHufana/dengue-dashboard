@@ -31,22 +31,24 @@ def _safe_float(x: Any) -> float:
 
 
 def _pad_local_grid(
-
-    tierA: List[str],
+    barangay_keys: List[str],
     test_ds: pd.DatetimeIndex,
     future_ds: pd.DatetimeIndex,
     existing_long: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Ensures every TierA barangay has rows for both local models for all ds
+    Ensures every barangay has rows for both local models for all ds
     in both test and future horizons. Missing rows are filled with yhat=0.
     """
-    # Safety: ensure TierA keys are unique + stable ordering
-    tierA = sorted(set(tierA))
+    # Safety: ensure keys are unique + stable ordering
+    barangay_keys = sorted(set(barangay_keys))
     models = ["local_prophet", "local_arima"]
 
     def _template(ds: pd.DatetimeIndex, horizon_type: str) -> pd.DataFrame:
-        mi = pd.MultiIndex.from_product([tierA, ds, models], names=["Barangay_key", "ds", "model_name"])
+        mi = pd.MultiIndex.from_product(
+            [barangay_keys, ds, models],
+            names=["Barangay_key", "ds", "model_name"]
+        )
         tmp = mi.to_frame(index=False)
         tmp["yhat"] = 0.0
         tmp["yhat_lower"] = 0.0
@@ -59,10 +61,13 @@ def _pad_local_grid(
     tmpl = pd.concat([tmpl_test, tmpl_fut], ignore_index=True)
 
     ex = existing_long.copy()
+    if not ex.empty:
+        ex["ds"] = pd.to_datetime(ex["ds"], errors="raise")
+        ex = ex.drop_duplicates(subset=["Barangay_key", "ds", "model_name", "horizon_type"], keep="last")
+
     if ex.empty:
         merged = tmpl
     else:
-        ex["ds"] = pd.to_datetime(ex["ds"], errors="raise")
         merged = tmpl.merge(
             ex[["Barangay_key", "ds", "model_name", "horizon_type", "yhat", "yhat_lower", "yhat_upper"]],
             on=["Barangay_key", "ds", "model_name", "horizon_type"],
@@ -83,7 +88,8 @@ def _pad_local_grid(
 
 
 def local_models_tierA(
-    tierA: List[str],
+    barangay_keys: List[str],
+    eligible_keys: List[str],
     weekly_full: pd.DataFrame,
     test_city: pd.DataFrame,
     train_end: pd.Timestamp,
@@ -96,7 +102,6 @@ def local_models_tierA(
     import pmdarima as pm
     from sklearn.metrics import mean_squared_error
 
-    tierA = sorted(set(tierA))
 
     if horizon <= 0:
         raise ValueError("Horizon must be positive.")
@@ -116,7 +121,32 @@ def local_models_tierA(
     local_results: List[Dict[str, Any]] = []
     long_parts: List[pd.DataFrame] = []
 
-    for bgy in tierA:
+    all_keys = sorted(set(barangay_keys))
+    eligible_set = set(eligible_keys)
+
+    min_train_weeks = int(getattr(cfg, "local_min_train_weeks", 104))
+
+
+    for bgy in all_keys:
+        if bgy not in eligible_set:
+            local_results.append({
+                "Barangay_key": bgy,
+                "RMSE_local_prophet": np.inf,
+                "RMSE_local_arima": np.inf,
+                "sMAPE_local_prophet_test": float("inf"),
+                "sMAPE_local_arima_test": float("inf"),
+                "sMAPE_disagg_test": float("inf"),
+                "sMAPE_best_local_test": float("inf"),
+                "delta_disagg_minus_local": float("nan"),
+                "best_local_model": None,
+                "Chosen": "disagg",
+                "decision_reason": "ineligible_data_sufficiency",
+                "status": "ineligible",
+                "err_prophet": None,
+                "err_arima": None,
+            })
+            continue
+
         err_prophet = None
         err_arima = None
 
@@ -129,23 +159,18 @@ def local_models_tierA(
         df_full["y"] = pd.to_numeric(df_full["y"], errors="coerce").fillna(0.0)
         df_full = df_full.dropna(subset=["ds"]).groupby("ds", as_index=False).agg({"y": "sum"}).sort_values("ds")
 
-        if len(df_full) < 52:
-            local_results.append(
-                {
-                    "Barangay_key": bgy,
-                    "RMSE_local_prophet": np.inf,
-                    "RMSE_local_arima": np.inf,
-                    "Chosen": "disagg",
-                    "status": "insufficient_history",
-                    "decision_reason": "insufficient_history_default_disagg",
-                    "err_prophet": None,
-                    "err_arima": None,
-                }
-            )
-            continue
 
         df_train = df_full[df_full["ds"] <= train_end].reset_index(drop=True)
-        if len(df_train) < 52:
+
+        # ✅ force weekly grid so local models train on consistent W-MON
+        df_train = (
+            df_train.set_index("ds")
+            .asfreq("W-MON")
+            .fillna({"y": 0.0})
+            .reset_index()
+        )
+
+        if len(df_train) < min_train_weeks:
             local_results.append(
                 {
                     "Barangay_key": bgy,
@@ -160,10 +185,21 @@ def local_models_tierA(
             )
             continue
 
-        y_true_test = df_full.set_index("ds").reindex(test_ds, fill_value=0.0)["y"].to_numpy(dtype=float)
+        y_true_test = (
+            weekly_full.loc[weekly_full["Barangay_key"] == bgy, ["WeekStart", "Cases"]]
+            .rename(columns={"WeekStart": "ds", "Cases": "y"})
+            .assign(ds=lambda d: pd.to_datetime(d["ds"], errors="coerce"),
+                    y=lambda d: pd.to_numeric(d["y"], errors="coerce").fillna(0.0))
+            .dropna(subset=["ds"])
+            .groupby("ds", as_index=False)["y"].sum()
+            .set_index("ds")
+            .reindex(test_ds, fill_value=0.0)["y"]
+            .to_numpy(dtype=float)
+        )
+
 
         # ----------------------------
-        # Disagg baseline (Choice A)
+        # Disagg baseline (Choice A) 
         # ----------------------------
         smape_disagg = float("inf")
         
@@ -367,7 +403,7 @@ def local_models_tierA(
     )
 
     local_forecasts_long_df = _pad_local_grid(
-        tierA=tierA,
+        barangay_keys=all_keys,
         test_ds=test_ds,
         future_ds=future_ds,
         existing_long=existing,

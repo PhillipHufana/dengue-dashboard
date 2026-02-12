@@ -32,6 +32,10 @@ class Config:
     # --- Choice A: local only if it beats disagg on test (sMAPE) ---
     local_vs_disagg_smape_margin: float = 0.03
 
+    # --- Local model eligibility (data sufficiency) ---
+    local_min_train_weeks: int = 104          # 2 yearly cycles (defensible for yearly seasonality)
+    local_min_nonzero_weeks: int = 20         # avoids “mostly-zero” series
+    local_min_total_cases: int = 50           # prevents fitting on near-empty signals
 
     # IO paths
     incoming_folder: str = ""

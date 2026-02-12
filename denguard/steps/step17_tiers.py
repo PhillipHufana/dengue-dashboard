@@ -1,50 +1,47 @@
 from __future__ import annotations
-from typing import Tuple, List
 import pandas as pd
-from denguard.config import Config as _Config
 import numpy as np
+from denguard.config import Config
 
-def tier_classification(
+def local_eligibility(
     weekly_full: pd.DataFrame,
-    cfg: _Config,
+    cfg: Config,
     *,
-    train_end: pd.Timestamp | None = None,
-    K_nonzero_weeks: int = 12,
-    C_total_cases: int = 500,
-) -> Tuple[pd.DataFrame, List[str], List[str], List[str]]:
-    print("\n== STEP 17: Tier Classification ==")
-
+    train_end: pd.Timestamp,
+) -> tuple[pd.DataFrame, list[str]]:
     df = weekly_full.copy()
-    required = {"Barangay_key", "WeekStart", "Cases"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"weekly_full missing required cols: {sorted(missing)}")
-
     df["WeekStart"] = pd.to_datetime(df["WeekStart"], errors="coerce")
-    if df["WeekStart"].isna().any():
-        raise ValueError("weekly_full.WeekStart has invalid dates.")
+    df = df.dropna(subset=["WeekStart"])
+    df = df[df["WeekStart"] <= train_end].copy()
 
-    if train_end is not None:
-        df = df[df["WeekStart"] <= pd.to_datetime(train_end)].copy()
+    agg = (df.groupby("Barangay_key", as_index=False)
+             .agg(train_weeks=("WeekStart","nunique"),
+                  nonzero_weeks=("Cases", lambda s: int((pd.to_numeric(s, errors="coerce").fillna(0) > 0).sum())),
+                  total_cases=("Cases", lambda s: float(pd.to_numeric(s, errors="coerce").fillna(0).sum()))
+             ))
 
-    g = df.groupby("Barangay_key")["Cases"]
-    stats = pd.DataFrame({
-        "Barangay_key": g.sum().index,
-        "TotalCases": g.sum().values,
-        "NonZeroWeeks": g.apply(lambda s: int((s > 0).sum())).values,
-        "Weeks": g.size().values,
-    })
+    min_weeks = int(getattr(cfg, "local_min_train_weeks", 104))
+    min_nonzero = int(getattr(cfg, "local_min_nonzero_weeks", 20))
+    min_cases = float(getattr(cfg, "local_min_total_cases", 50))
 
-    eligible = (stats["NonZeroWeeks"] >= K_nonzero_weeks) & (stats["TotalCases"] >= C_total_cases)
-    stats["Tier"] = np.where(eligible, "A", "C")
+    agg["eligible_local"] = (
+        (agg["train_weeks"] >= min_weeks) &
+        (agg["nonzero_weeks"] >= min_nonzero) &
+        (agg["total_cases"] >= min_cases)
+    )
 
-    tierA = stats.loc[stats["Tier"] == "A", "Barangay_key"].tolist()
-    tierB = stats.loc[stats["Tier"] == "B", "Barangay_key"].tolist()  # currently empty unless you define B
-    tierC = stats.loc[stats["Tier"] == "C", "Barangay_key"].tolist()
+    def _reason(r):
+        reasons = []
+        if r["train_weeks"] < min_weeks: reasons.append("insufficient_train_weeks")
+        if r["nonzero_weeks"] < min_nonzero: reasons.append("too_sparse_nonzero_weeks")
+        if r["total_cases"] < min_cases: reasons.append("too_few_total_cases")
+        return "ok" if not reasons else "+".join(reasons)
 
-    out = stats.rename(columns={"Barangay_key": "Barangay"})
-    out["run_id"] = cfg.run_id  # ✅ add run_id AFTER out exists
-    out.to_csv(cfg.out / "barangay_tiers.csv", index=False)
+    agg["eligibility_reason"] = agg.apply(_reason, axis=1)
 
-    print(f"Tier A: {len(tierA)}, Tier B: {len(tierB)}, Tier C: {len(tierC)}")
-    return out, tierA, tierB, tierC
+    eligible_keys = agg.loc[agg["eligible_local"], "Barangay_key"].tolist()
+
+    agg["run_id"] = cfg.run_id
+    agg.to_csv(cfg.out / "local_eligibility.csv", index=False)
+
+    return agg, eligible_keys
