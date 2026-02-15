@@ -16,6 +16,11 @@ class Config:
     # --- NEW (G0.3): run kind ---
     run_kind: RunKind = "backtest"  # "backtest" or "production"
 
+    # Config fields
+    policy_local_perf_csv: str = ""   # pinned backtest policy
+    production_enable_local_overrides: bool = True
+
+
     # --- Backtest cutoff (thesis validation) ---
     backtest_end_date: str = "2022-12-26"  # replaces old fixed train_end_date conceptually
 
@@ -71,5 +76,7 @@ DEFAULT_CFG = Config(
     out_dir="intermediate",
     forecast_weeks_override=None,
     incoming_mode="incremental",
+    policy_local_perf_csv=r"policies/local_model_performance_backtest_2022-12-26_3b3037b5.csv",
+    production_enable_local_overrides=True,
     local_vs_disagg_smape_margin=0.03,
 )

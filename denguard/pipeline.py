@@ -33,6 +33,9 @@ from denguard.export_supabase import upload_to_supabase
 from denguard.horizon import resolve_horizon
 from denguard.steps.step17_tiers import local_eligibility
 
+from denguard.steps.step18_local_models_production import local_models_production
+
+
 from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -250,20 +253,69 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         train_end=prod_train_end,
     )
 
-    # Production minimal: export disagg as preferred (thesis-safe, doesn’t invent evaluation)
-    preferred_future = bg_disagg_future.copy()
-    preferred_future["model_name"] = "preferred"
 
-    preferred_out = preferred_future.rename(columns={"Barangay_key": "name", "ds": "week_start"}).copy()
-    preferred_out["run_id"] = cfg.run_id
-    preferred_out.to_csv(cfg.out / "barangay_forecasts_preferred_future_long.csv", index=False)
+    # eligibility on production train window
+    elig_df, eligible_keys = local_eligibility(weekly_full, cfg, train_end=prod_train_end)
+    all_barangays = sorted(weekly_full["Barangay_key"].unique().tolist())
 
-    # Export multi-model grid optional: here we export only preferred+disagg if you want later.
-    all_models_out = pd.concat([preferred_future, bg_disagg_future], ignore_index=True)
-    all_models_out = all_models_out.rename(columns={"Barangay_key": "name", "ds": "week_start"}).copy()
-    all_models_out["run_id"] = cfg.run_id
-    all_models_out["status"] = "ok"
-    all_models_out.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
+    # ----------------------------
+    # Pinned policy + override gate
+    # ----------------------------
+    if getattr(cfg, "production_enable_local_overrides", True):
+        if not cfg.policy_local_perf_csv:
+            raise RuntimeError("policy_local_perf_csv is empty but production_enable_local_overrides=True")
+        policy = pd.read_csv(cfg.policy_local_perf_csv)
+    else:
+        policy = pd.DataFrame({"Barangay_key": all_barangays, "Chosen": ["disagg"] * len(all_barangays)})
+
+    # Coverage diagnostics (recommended)
+    if "Barangay_key" not in policy.columns or "Chosen" not in policy.columns:
+        raise RuntimeError("Policy file must contain columns: Barangay_key, Chosen")
+
+    policy_keys = set(policy["Barangay_key"].astype(str))
+    prod_keys = set(map(str, all_barangays))
+
+    print(f"Policy coverage: {len(prod_keys & policy_keys)}/{len(prod_keys)}")
+    missing_in_policy = sorted(prod_keys - policy_keys)[:10]
+    extra_in_policy = sorted(policy_keys - prod_keys)[:10]
+    if missing_in_policy:
+        print("⚠️ Missing in policy (sample):", missing_in_policy)
+    if extra_in_policy:
+        print("⚠️ Extra in policy (sample):", extra_in_policy)
+
+
+    # build locals future forecasts
+    local_long_future = local_models_production(
+        barangay_keys=all_barangays,
+        eligible_keys=eligible_keys,
+        weekly_full=weekly_full,
+        train_end=prod_train_end,
+        horizon=horizon,
+        PROPHET_OK=PROPHET_OK,
+        cfg=cfg,
+    )
+
+    # reconcile with overrides + grid-fill all 4 models
+    preferred_future_df, all_models_future_df = reconcile_forecasts(
+        disagg_future=bg_disagg_future,
+        local_forecasts_long=local_long_future,
+        local_perf=policy,
+        city_future=city_future,
+        cfg=cfg,
+        keep_all_models=True,
+    )
+
+    all_models_future_df.to_csv(cfg.out / "barangay_forecasts_long.csv", index=False)
+
+    vc = all_models_future_df["model_name"].value_counts(dropna=False)
+    print("model_name counts:\n", vc)
+
+    expected = len(all_barangays) * horizon
+    for m in ["disagg", "local_prophet", "local_arima", "preferred"]:
+        if vc.get(m, 0) != expected:
+            print(f"⚠️ Unexpected count for {m}: got {vc.get(m,0)} expected {expected}")
+
+
 
     try:
         upload_to_supabase(cfg)
