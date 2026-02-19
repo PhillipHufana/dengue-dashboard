@@ -4,13 +4,17 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
 import { useSummary } from "@/lib/query/hooks";
-
+import { useDashboardStore } from "@/lib/store/dashboard-store";
 // Types based on your real API
+
 type BarangayLatest = {
   name: string;
+  display_name?: string;
   forecast: number | null;
   week_start: string;
+  risk_level?: string;
 };
+
 
 type SummaryResponse = {
   city_latest: {
@@ -24,7 +28,9 @@ type SummaryResponse = {
 
 export function KpiCards() {
   // 🔥 Hooks MUST be at the very top
-  const { data, isLoading, error } = useSummary();
+  const runId = useDashboardStore((s) => s.runId);
+  const modelName = useDashboardStore((s) => s.modelName);
+  const { data, isLoading, error } = useSummary(runId, modelName);
 
   // Ensure we always have a usable structure to avoid conditional hook execution
   const summary: SummaryResponse | null = data ?? null;
@@ -145,7 +151,10 @@ export function KpiCards() {
             <p className="text-xl font-bold">
               {topBarangay?.forecast?.toFixed(2) ?? "—"}
             </p>
-            <p className="text-xs text-muted-foreground">{topBarangay?.name ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {topBarangay?.display_name ?? topBarangay?.name ?? "—"}
+            </p>
+
           </div>
         </CardContent>
       </Card>

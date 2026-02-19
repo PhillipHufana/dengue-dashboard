@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .supabase_client import get_supabase
 from .utils import normalize_name  # must match how "name" is stored in Supabase
+from .run_helpers import resolve_run_id, resolve_model_name
 
 router = APIRouter(tags=["Timeseries"])
 
@@ -15,13 +16,6 @@ router = APIRouter(tags=["Timeseries"])
 # ------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------
-
-MODEL_COLUMN_MAP: Dict[str, str] = {
-    "preferred": "final_forecast",  # your best / ensemble
-    "final": "final_forecast",
-    "hybrid": "hybrid_forecast",
-    "local": "local_forecast",
-}
 
 
 def _resample_series(
@@ -91,16 +85,14 @@ def _resample_series(
 # Main endpoint
 # ------------------------------------------------------------
 
-@router.get("")
+@router.get("/")
 def get_timeseries(
     level: Literal["barangay", "city"] = Query("barangay"),
     name: Optional[str] = Query(None, description="Required when level=barangay"),
-    freq: Literal["weekly", "monthly", "yearly"] = Query(
-        "weekly", description="Aggregation level"
-    ),
-    model: Literal["preferred", "final", "hybrid", "local"] = Query(
-        "preferred", description="Which forecast column to use"
-    ),
+    freq: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+    horizon_type: Literal["test", "future"] = Query("future"),
 ):
     """
     Unified timeseries endpoint.
@@ -110,9 +102,8 @@ def get_timeseries(
     """
     sb = get_supabase()
 
-    forecast_col = MODEL_COLUMN_MAP.get(model)
-    if forecast_col is None:
-        raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
     # --------------------------------------------------------
     # BARANGAY LEVEL
@@ -135,14 +126,18 @@ def get_timeseries(
         )
         weekly_rows = weekly_resp.data or []
 
-        fore_resp = (
-            sb.table("barangay_forecasts")
-            .select(f"week_start, {forecast_col}, is_future")
+        fore_rows = (
+            sb.table("barangay_forecasts_long")
+            .select("week_start, yhat, yhat_lower, yhat_upper, horizon_type")
+            .eq("run_id", rid)
             .eq("name", nm)
+            .eq("model_name", model)
+            .eq("horizon_type", horizon_type)
             .order("week_start")
             .execute()
-        )
-        fore_rows = fore_resp.data or []
+            .data
+        ) or []
+
 
         if not weekly_rows and not fore_rows:
             raise HTTPException(
@@ -164,22 +159,21 @@ def get_timeseries(
         # Forecast rows
         for row in fore_rows:
             d = row["week_start"]
-            val = row.get(forecast_col)
-            is_future = row.get("is_future", False)
+            val = row.get("yhat")
 
             series_map.setdefault(
-                d,
-                {"date": d, "cases": None, "forecast": None, "is_future": is_future},
+                d, {"date": d, "cases": None, "forecast": None, "is_future": (horizon_type == "future")}
             )
 
             if val is not None:
                 series_map[d]["forecast"] = float(val)
 
-            # If cases exist, it's historical regardless of model flag
+            # If cases exist, it’s historical regardless
             if series_map[d].get("cases") is not None:
                 series_map[d]["is_future"] = False
             else:
-                series_map[d]["is_future"] = is_future
+                series_map[d]["is_future"] = (horizon_type == "future")
+
 
         series = sorted(series_map.values(), key=lambda r: r["date"])
         series = _resample_series(series, freq=freq)
@@ -188,9 +182,11 @@ def get_timeseries(
             "level": "barangay",
             "name": nm,
             "freq": freq,
-            "model": model,
             "n_points": len(series),
             "series": series,
+            "run_id": rid,
+            "model_name": model,
+            "horizon_type": horizon_type,
         }
 
     # --------------------------------------------------------
@@ -207,21 +203,25 @@ def get_timeseries(
     if not city_rows:
         raise HTTPException(status_code=404, detail="No city_weekly data found")
 
-    fore_resp = (
-        sb.table("barangay_forecasts")
-        .select(f"week_start, {forecast_col}")
+    fore_rows = (
+        sb.table("city_forecasts_long")
+        .select("week_start, yhat, horizon_type")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", horizon_type)
         .order("week_start")
         .execute()
-    )
-    fore_rows = fore_resp.data or []
+        .data
+    ) or []
 
+    # Map forecast by week
     city_fore_map: Dict[str, float] = {}
     for row in fore_rows:
         d = row["week_start"]
-        val = row.get(forecast_col)
+        val = row.get("yhat")
         if val is None:
             continue
-        city_fore_map[d] = city_fore_map.get(d, 0.0) + float(val)
+        city_fore_map[d] = float(val)
 
     series_map: Dict[str, Dict[str, Any]] = {}
     for row in city_rows:
@@ -265,7 +265,9 @@ def get_timeseries(
         "level": "city",
         "name": None,
         "freq": freq,
-        "model": model,
         "n_points": len(series),
         "series": series,
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": horizon_type,
     }

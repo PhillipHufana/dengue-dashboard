@@ -15,40 +15,28 @@ const GeoJSON = dynamic(() => import("react-leaflet").then(m => m.GeoJSON), { ss
 import "leaflet/dist/leaflet.css";
 
 import { useChoropleth, useSummary } from "@/lib/query/hooks";
+import { useDashboardStore } from "@/lib/store/dashboard-store";
+
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export function cleanName(name: string): string {
-  if (!name) return "";
-
-  let x = name.toLowerCase().trim();
-
-  // remove accents
-  x = x.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  // remove (pob.) or any parentheses
-  x = x.replace(/\(.*?\)/g, "");
-
-  // convert hyphens to spaces
-  x = x.replace(/-/g, " ");
-
-  // remove punctuation
-  x = x.replace(/[^a-z0-9 ]/g, "");
-
-  // collapse multiple spaces
-  x = x.replace(/\s+/g, " ").trim();
-
-  return x;
-}
-
-
 interface BarangayForecast {
   name: string;
-  forecast: number | null;
+  display_name?: string;
   week_start: string;
+
+  // legacy
+  forecast: number | null;
   risk_level: "low" | "medium" | "high" | "critical" | "unknown";
+
+  // new
+  forecast_cases?: number | null;
+  forecast_incidence_per_100k?: number | null;
+  risk_level_cases?: "low" | "medium" | "high" | "critical" | "unknown";
+  risk_level_incidence?: "low" | "medium" | "high" | "critical" | "unknown" | null;
 }
+
 
 // ---------------------------------------------------------------------------
 // Risk → Color
@@ -108,6 +96,10 @@ export function ChoroplethMap({
   const [mapView, setMapView] = useState<"choropleth" | "hotspots">("choropleth");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const riskMetric = useDashboardStore((s) => s.riskMetric);
+  const setRiskMetric = useDashboardStore((s) => s.setRiskMetric);
+
+
   useEffect(() => {
     if (isPlaying) {
       intervalRef.current = setInterval(() => {
@@ -124,9 +116,11 @@ export function ChoroplethMap({
   }, [isPlaying]);
 
   // API Data
-  const { data: geo, isLoading: loadingGeo } = useChoropleth();
-  const { data: summary, isLoading: loadingSummary } = useSummary();
+const runId = useDashboardStore((s) => s.runId);
+const modelName = useDashboardStore((s) => s.modelName);
 
+const { data: geo, isLoading: loadingGeo } = useChoropleth(runId, modelName);
+const { data: summary, isLoading: loadingSummary } = useSummary(runId, modelName);
   const barangayForecast: BarangayForecast[] = summary?.barangay_latest ?? [];
 
   // ---------------------------------------------------------------------------
@@ -163,42 +157,70 @@ export function ChoroplethMap({
   // GeoJSON Styling + Tooltip
   // ---------------------------------------------------------------------------
 
-  const style = (feature: any) => {
-    const name = feature.properties.ADM4_EN;
-    const selected = selectedBarangay?.pretty === name;
+const nameToLabel = useMemo(() => {
+  if (!geo) return new Map<string, string>();
+  return new Map(
+    geo.features.map((f) => [f.properties.name, f.properties.display_name])
+  );
+}, [geo]);
 
-    return {
-      fillColor: getColor(feature.properties.risk_level),
-      fillOpacity: 0.75,
-      color: selected ? "#ffffff" : "#333",
-      weight: selected ? 3 : 1,
-    };
+
+const style = (feature: any) => {
+  const label = feature.properties.display_name;
+  const selected = selectedBarangay?.pretty === label;
+
+  const risk =
+    riskMetric === "cases"
+      ? feature.properties.risk_level_cases
+      : feature.properties.risk_level_incidence;
+
+  return {
+    fillColor: getColor(risk),
+    fillOpacity: 0.75,
+    color: selected ? "#ffffff" : "#333",
+    weight: selected ? 3 : 1,
   };
+};
+
+
 
 
   const onEachFeature = (feature: any, layer: any) => {
-    const name = feature.properties.ADM4_EN;
+    const key = feature.properties.name;          // canonical
+    const label = feature.properties.display_name; // display label
+    const match = barangayForecast.find((bg) => bg.name === key);
 
-    const match = barangayForecast.find(
-      (bg) => cleanName(bg.name) === cleanName(name)
-    );
 
-    const risk = match?.risk_level ?? "unknown";
+    const risk =
+      riskMetric === "cases"
+        ? feature.properties.risk_level_cases ?? feature.properties.risk_level
+        : feature.properties.risk_level_incidence ?? "unknown";
+
+
+    const forecastValue =
+      riskMetric === "cases"
+        ? (match as any)?.forecast_cases ?? match?.forecast ?? 0
+        : (match as any)?.forecast_incidence_per_100k ?? 0;
+
+    const forecastLabel = riskMetric === "cases" ? "Forecast cases" : "Forecast /100k";
+
     const forecast = match?.forecast ?? 0;
 
     layer.bindTooltip(
       `
-        <strong>${name}</strong><br/>
+        <strong>${label}</strong><br/>
         Risk: <strong>${risk}</strong><br/>
-        Forecast: <strong>${forecast.toFixed(2)}</strong><br/>
+        ${forecastLabel}: <strong>${forecastValue.toFixed(2)}</strong>
         <span style="font-size:11px;color:#aaa">Click to view trend</span>
       `,
       { sticky: true }
     );
 
+
     layer.on("click", () => {
-      const pretty = feature.properties.ADM4_EN;
-      const clean = cleanName(pretty);
+      const pretty = feature.properties.display_name;
+      const clean = feature.properties.name; // canonical key; no need to cleanName()
+
 
       if (selectedBarangay?.clean === clean) {
         onBarangaySelect(null);
@@ -247,6 +269,24 @@ export function ChoroplethMap({
               </Button>
             </div>
           </div>
+
+          <div className="flex gap-2">
+            <Button
+                variant={riskMetric === "cases" ? "default" : "outline"}
+                 size="sm"
+                onClick={() => setRiskMetric("cases")}
+            >
+                  Cases
+            </Button>
+             <Button
+                 variant={riskMetric === "incidence" ? "default" : "outline"}
+                size="sm"
+                 onClick={() => setRiskMetric("incidence")}
+              >
+                Incidence
+              </Button>
+          </div>
+
 
           {selectedBarangay && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -315,7 +355,7 @@ export function ChoroplethMap({
           <div className="absolute top-2 right-2 bg-red-500/10 border border-red-500/40 p-2 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[10px] text-red-500 font-medium">HOTSPOT</div>
             <div className="text-sm font-bold text-red-500">
-              {stats.hottest?.name}
+              {nameToLabel.get(stats.hottest?.name) ?? stats.hottest?.name}
             </div>
             <div className="text-xs text-red-500/70">
               {stats.hottest?.forecast?.toFixed(2)} cases

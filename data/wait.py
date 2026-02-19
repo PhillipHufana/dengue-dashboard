@@ -1,89 +1,72 @@
-import json
-import pandas as pd
+import csv
+import os
 import re
+import unicodedata
+from datetime import date
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
-poly_path = BASE / "DAVAO_Poly_geo.geojson"
-csv_path = BASE / "weekly_cases_all_barangays.csv"     # update if needed
+from api.supabase_client import get_supabase  # uses your get_supabase()
 
-# ----------------------------
-# Normalization function
-# ----------------------------
-def normalize(x: str | None):
-    if not x:
-        return ""
-    x = x.lower()
-    x = re.sub(r"\(.*?\)", "", x)       # remove (Pob.), etc
+def normalize_name(s: str) -> str:
+    x = (s or "").lower().strip()
+    x = unicodedata.normalize("NFD", x)
+    x = "".join(ch for ch in x if unicodedata.category(ch) != "Mn")
+    x = re.sub(r"\(.*?\)", "", x)          # drop parentheticals
     x = x.replace("-", " ")
-    x = re.sub(r"\s+", " ", x)
-    x = re.sub(r"[^\w\s]", "", x)       # remove punctuation
-    return x.strip()
+    x = re.sub(r"[^a-z0-9 ]", "", x)       # drop punctuation
+    x = re.sub(r"\s+", " ", x).strip()
+    return x
 
-# ----------------------------
-# Load polygon barangay names
-# ----------------------------
-with open(poly_path, "r", encoding="utf-8") as f:
-    gj = json.load(f)
+SRC = Path("C:\\Users\\Phillip\\Downloads\\comsci\\thesis\\dengue-dashboard\\data\\population.csv")  # set path
+AS_OF = date(2024, 7, 1)      # change if you want another date
 
-poly_raw = []
-poly_norm = []
+BATCH = 200
 
-for feat in gj["features"]:
-    props = feat.get("properties", {})
-    name = props.get("ADM4_EN") or props.get("ADM4_REF") or ""
-    poly_raw.append(name)
-    poly_norm.append(normalize(name))
+def main():
+    sb = get_supabase()
 
-poly_df = pd.DataFrame({"raw": poly_raw, "normalized": poly_norm})
+    rows = []
+    with SRC.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            raw = r.get("Name") or ""
+            pop_raw = r.get("Population")
+            if not raw or pop_raw is None or str(pop_raw).strip() == "":
+                continue
 
-# ----------------------------
-# Load your barangay dataset
-# ----------------------------
-df = pd.read_csv(csv_path)
+            name = normalize_name(raw)
+            pop = int(str(pop_raw).replace(",", "").strip())
 
-# column must match your Supabase normalized name
-if "Barangay_key" in df.columns:
-    csv_norm = df["Barangay_key"].astype(str).apply(normalize)
-elif "name" in df.columns:
-    csv_norm = df["name"].astype(str).apply(normalize)
-else:
-    raise ValueError("CSV must contain 'Barangay_key' or 'name' column")
+            rows.append({
+                "name": name,
+                "as_of_date": AS_OF.isoformat(),
+                "population": pop,
+            })
 
-csv_df = pd.DataFrame({
-    "raw": df.iloc[:,0],
-    "normalized": csv_norm
-})
+    # sanity: count and sample
+    print("rows:", len(rows))
+    print("sample:", rows[:5])
 
-# ----------------------------
-# Compare both sets
-# ----------------------------
-set_poly = set(poly_norm)
-set_csv = set(csv_norm)
+    # upsert in one batch (or chunk)
+    for i in range(0, len(rows), BATCH):
+        chunk = rows[i:i+BATCH]
+        sb.table("barangay_population").upsert(
+            chunk,
+            on_conflict="name,as_of_date",
+        ).execute()
 
-intersect = sorted(set_poly & set_csv)
-missing_in_polygon = sorted(set_csv - set_poly)
-missing_in_csv = sorted(set_poly - set_csv)
+    # validate coverage: which normalized names don’t exist in barangays?
+    missing = []
+    for r in rows:
+        nm = r["name"]
+        hit = sb.table("barangays").select("name").eq("name", nm).limit(1).execute().data
+        if not hit:
+            missing.append(nm)
 
-# ----------------------------
-# Print Report
-# ----------------------------
-print("\n==============================")
-print(" RECONCILIATION REPORT")
-print("==============================")
+    if missing:
+        print("WARNING: population names not found in barangays (first 30):", missing[:30])
+    else:
+        print("All population rows matched barangays.name")
 
-print(f"\nTotal polygon names: {len(set_poly)}")
-print(f"Total CSV names:     {len(set_csv)}")
-print(f"Matches:             {len(intersect)}")
-
-print("\n--- Missing in POLYGONS (exists in CSV but polygon name mismatch) ---")
-for n in missing_in_polygon:
-    print("  •", n)
-
-print("\n--- Missing in CSV (exists in polygon but not in dengue data) ---")
-for n in missing_in_csv:
-    print("  •", n)
-
-print("\n==============================")
-print(" Done. Review mismatches above.")
-print("==============================\n")
+if __name__ == "__main__":
+    main()

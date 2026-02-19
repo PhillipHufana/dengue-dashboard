@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RankingRow, RankingResponse } from "@/lib/api";
-
+import { useDashboardStore } from "@/lib/store/dashboard-store";
 import {
   TrendingUp,
   Search,
@@ -19,24 +19,12 @@ import {
 } from "lucide-react";
 
 import { useRankings } from "@/lib/query/hooks";
-import { cleanName } from "./choropleth-map";
 
 interface ForecastRankingsProps {
   selectedBarangay: { pretty: string; clean: string } | null;
   onBarangaySelect: (value: { pretty: string; clean: string } | null) => void;
 }
 
-// interface RankingRow {
-//   name: string;
-//   pretty_name: string;
-//   total_forecast: number;
-//   risk_level: string;
-//   trend: number;
-//   this_week: number | null;
-//   last_week: number | null;
-//   trend_source: string;       // NEW
-//   trend_message: string;      // NEW
-// }
 
 type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
 
@@ -54,6 +42,8 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   onBarangaySelect,
 }: ForecastRankingsProps) {
 
+  const riskMetric = useDashboardStore((s) => s.riskMetric);
+
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("1m");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -61,11 +51,13 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     useState<"all" | "critical" | "high" | "medium" | "low">("all");
 
   // 🔥 Calls FastAPI `/forecast/rankings?period=X`
-  const { data, isLoading } = useRankings(timePeriod);
+  const runId = useDashboardStore((s) => s.runId);
+  const modelName = useDashboardStore((s) => s.modelName);
+
+  const { data, isLoading } = useRankings(timePeriod, runId, modelName);
   const barangays: RankingRow[] = data?.rankings ?? [];
 
   const lastUpdated = data?.model_current_date;
-
 
 
   // -------------------------------------------------------------
@@ -75,8 +67,12 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     let list = barangays;
 
     if (riskFilter !== "all") {
-      list = list.filter((b) => b.risk_level === riskFilter);
+      list = list.filter((b) => {
+        const risk = riskMetric === "cases" ? b.risk_level_cases : (b.risk_level_incidence ?? "unknown");
+        return risk === riskFilter;
+      });
     }
+
 
     return list.filter((b) =>
       b.pretty_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -210,17 +206,25 @@ export const ForecastRankings = React.memo(function ForecastRankings({
           <div className="space-y-2">
             {displayed.map((b, index) => {
               const rank = index + 1;
-              const isSelected = selectedBarangay?.clean === cleanName(b.name);
+              const isSelected = selectedBarangay?.clean === b.name;
+
+                const risk =
+                  riskMetric === "cases"
+                    ? b.risk_level_cases ?? b.risk_level
+                    : b.risk_level_incidence ?? "unknown";
+
+                const value =
+                  riskMetric === "cases"
+                    ? b.total_forecast_cases ?? b.total_forecast
+                    : b.total_forecast_incidence_per_100k ?? 0;
+
+
 
               return (
                 <div
                   key={b.name}
                   onClick={() =>
-                    onBarangaySelect(
-                      isSelected
-                        ? null
-                        : { pretty: b.pretty_name, clean: cleanName(b.name) }
-                    )
+                    onBarangaySelect(isSelected ? null : { pretty: b.pretty_name, clean: b.name })
                   }
                   className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
                     isSelected

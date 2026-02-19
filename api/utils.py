@@ -1,8 +1,15 @@
 # api/utils.py
-
-def normalize_name(name: str) -> str:
-    """Standardize barangay names for lookup."""
-    return name.strip().lower().replace("-", " ").replace("_", " ")
+import re, unicodedata
+def normalize_name(x: str | None) -> str:
+    if not x:
+        return ""
+    x = str(x).lower().strip()
+    x = unicodedata.normalize("NFKD", x).encode("ascii", "ignore").decode()
+    x = re.sub(r"\(.*?\)", "", x)
+    x = x.replace("-", " ").replace("_", " ")
+    x = re.sub(r"[^a-z0-9 ]", "", x)
+    x = re.sub(r"\s+", " ", x).strip()
+    return x
 
 
 def color_scale(value: float) -> str:

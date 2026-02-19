@@ -9,16 +9,23 @@ import {
 
 // Literal type unions for safety
 type Freq = "weekly" | "monthly" | "yearly";
-type Model = "preferred" | "final" | "hybrid" | "local";
+type ModelName = string; // "preferred" by default
 
 // --------------------------------------
 // 1. City timeseries
 // --------------------------------------
 export async function fetchCityTimeseries(
   freq: Freq = "weekly",
-  model: Model = "preferred"
+  runId?: string | null,
+  modelName: ModelName = "preferred",
+  horizonType: "test" | "future" = "future"
 ) {
-  const res = await getTimeseries("city", { freq, model });
+  const res = await getTimeseries("city", {
+    freq,
+    runId: runId ?? undefined,
+    modelName,
+    horizonType,
+  });
 
   return res.series.map((d: any) => ({
     date: d.date,
@@ -28,15 +35,20 @@ export async function fetchCityTimeseries(
   }));
 }
 
-// --------------------------------------
-// 2. Barangay timeseries
-// --------------------------------------
 export async function fetchBarangayTimeseries(
   name: string,
   freq: Freq = "weekly",
-  model: Model = "preferred"
+  runId?: string | null,
+  modelName: ModelName = "preferred",
+  horizonType: "test" | "future" = "future"
 ) {
-  const res = await getTimeseries("barangay", { name, freq, model });
+  const res = await getTimeseries("barangay", {
+    name,
+    freq,
+    runId: runId ?? undefined,
+    modelName,
+    horizonType,
+  });
 
   return res.series.map((d: any) => ({
     date: d.date,
@@ -72,10 +84,11 @@ export async function fetchBarangayPolygons() {
 // --------------------------------------
 export async function fetchDashboardSummary() {
   const raw = await getSummary();
-
+  const cityCases = raw.city_latest?.city_cases ?? 0;
+  const cityWeek = raw.city_latest?.week_start ?? null;
   return {
-    cityCases: raw.city_latest.city_cases,
-    cityWeek: raw.city_latest.week_start,
+    cityCases,
+    cityWeek,
     totalForecast: raw.total_forecasted_cases,
     topBarangays: raw.barangay_latest
       .sort((a: any, b: any) => (b.forecast ?? 0) - (a.forecast ?? 0))
@@ -83,7 +96,7 @@ export async function fetchDashboardSummary() {
       .map((b: any) => ({
         name: b.name,
         forecast: b.forecast,
-        cases: b.cases,
+        cases: 0,
       })),
   };
 }

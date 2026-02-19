@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Activity, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-
+import { useBarangaySeries, useCitySeries } from "@/lib/query/hooks";
+import { useDashboardStore } from "@/lib/store/dashboard-store";
 
 import {
   LineChart,
@@ -17,8 +18,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-
-import { useTimeseries } from "@/lib/query/useTimeseries";
 
 interface ForecastChartProps {
   selectedBarangay: { pretty: string; clean: string } | null;
@@ -59,13 +58,28 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
-  const { data, isLoading, isError } = useTimeseries(selectedBarangay?.clean ?? null);
+  const runId = useDashboardStore((s) => s.runId);
+  const modelName = useDashboardStore((s) => s.modelName);
+  const horizonType = useDashboardStore((s) => s.horizonType);
+  const freq = useDashboardStore((s) => s.freq);
+  const brgyName = selectedBarangay?.clean ?? null;
+  const q = brgyName
+    ? useBarangaySeries(brgyName, freq, runId, modelName, horizonType)
+    : useCitySeries(freq, runId, modelName, horizonType);
 
+  const { data, isLoading, isError } = q;
   const series = data?.series ?? [];
   const locationName =
     selectedBarangay?.pretty ?? "City-Wide (All 182 Barangays)";
 
   const isBarangay = selectedBarangay !== null;
+
+  const freqLabel = {
+    weekly: "Weekly",
+    monthly: "Monthly",
+    yearly: "Yearly",
+  }[freq];
+
 
   const forecastStartIndex = series.findIndex(
     (d: { is_future: boolean }) => d.is_future
@@ -133,8 +147,8 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
                 Predictive Forecast
               </CardTitle>
               <Badge variant="secondary" className="text-[10px]">
-                Weekly
-              </Badge>
+                {freqLabel}
+              </Badge> 
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">

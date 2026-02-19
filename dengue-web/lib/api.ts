@@ -1,5 +1,6 @@
 // lib/api.ts
 const API_BASE = "http://127.0.0.1:8000";
+import type { FeatureCollection, Geometry } from "geojson";
 
 export function cleanName(name: string): string {
   if (!name) return "";
@@ -24,30 +25,94 @@ export function cleanName(name: string): string {
   return x;
 }
 
+export type RiskLevel = "low" | "medium" | "high" | "critical" | "unknown";
 
-export async function getSummary() {
-  const res = await fetch(`${API_BASE}/forecast/summary`);
+export interface SummaryBarangayRow {
+  name: string;           // canonical key
+  forecast: number;
+  week_start: string;
+  risk_level: RiskLevel;
+}
+
+export type ChoroplethFeatureProps = {
+  name: string;
+  display_name: string;
+  risk_level: RiskLevel;
+  latest_cases: number;
+  latest_week: string | null;
+  latest_forecast: number;
+  latest_future_week: string | null;
+  run_id: string;
+  model_name: string;
+  horizon_type: "future";
+};
+
+export type ChoroplethFC = FeatureCollection<Geometry, ChoroplethFeatureProps>;
+
+export interface SummaryResponse {
+  run_id: string;
+  model_name: string;
+  horizon_type: "future";
+  data_last_updated: string | null;
+  city_latest: any | null;
+  total_forecasted_cases: number;
+  barangay_latest: SummaryBarangayRow[];
+}
+
+
+export async function getSummary(
+  options?: { runId?: string; modelName?: string }
+): Promise<SummaryResponse> {
+  const params = new URLSearchParams();
+  if (options?.runId) params.set("run_id", options.runId);
+  if (options?.modelName) params.set("model_name", options.modelName);
+
+  const url = params.toString()
+    ? `${API_BASE}/forecast/summary?${params.toString()}`
+    : `${API_BASE}/forecast/summary`;
+
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load summary");
   return res.json();
 }
 
-export async function getChoropleth() {
-  const res = await fetch(`${API_BASE}/geo/choropleth`);
+
+export async function getChoropleth(
+  options?: { runId?: string; modelName?: string }
+): Promise<ChoroplethFC> {
+  const params = new URLSearchParams();
+  if (options?.runId) params.set("run_id", options.runId);
+  if (options?.modelName) params.set("model_name", options.modelName);
+
+  const url = params.toString()
+    ? `${API_BASE}/geo/choropleth?${params.toString()}`
+    : `${API_BASE}/geo/choropleth`;
+
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load choropleth");
   return res.json();
 }
 
-export async function getBarangaySeries(name: string) {
+
+export async function getBarangaySeries(
+  name: string,
+  options?: { runId?: string; modelName?: string; horizonType?: "test" | "future" }
+) {
   const safe = encodeURIComponent(cleanName(name));
-  const res = await fetch(`${API_BASE}/forecast/barangay/${safe}`);
+  const params = new URLSearchParams();
+  if (options?.runId) params.set("run_id", options.runId);
+  if (options?.modelName) params.set("model_name", options.modelName);
+  if (options?.horizonType) params.set("horizon_type", options.horizonType);
 
-  if (!res.ok) {
-    console.error("Barangay fetch failed", safe, res.status);
-    throw new Error("Failed to load barangay series");
-  }
+  const url = params.toString()
+    ? `${API_BASE}/forecast/barangay/${safe}?${params.toString()}`
+    : `${API_BASE}/forecast/barangay/${safe}`;
 
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load barangay series");
   return res.json();
 }
+
 
 export async function getCitySeries() {
   const res = await fetch(`${API_BASE}/forecast/city`);
@@ -55,17 +120,34 @@ export async function getCitySeries() {
   return res.json();
 }
 
-export async function getForecastRankings(period: string): Promise<RankingResponse> {
-  const res = await fetch(`${API_BASE}/forecast/rankings?period=${period}`);
-  if (!res.ok) throw new Error("Failed to load rankings");232
+export async function getForecastRankings(
+  period: string,
+  options?: { runId?: string; modelName?: string }
+): Promise<RankingResponse> {
+  const params = new URLSearchParams();
+  params.set("period", period);
+  if (options?.runId) params.set("run_id", options.runId);
+  if (options?.modelName) params.set("model_name", options.modelName);
+
+  const res = await fetch(`${API_BASE}/forecast/rankings?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to load rankings");
   return res.json();
 }
 
 export interface RankingRow {
   name: string;
   pretty_name: string;
+
+  // legacy
   total_forecast: number;
   risk_level: string;
+
+  // new
+  total_forecast_cases: number;
+  total_forecast_incidence_per_100k: number | null;
+  risk_level_cases: string;
+  risk_level_incidence: string | null;
+
   trend: number;
   this_week: number | null;
   last_week: number | null;
@@ -73,27 +155,53 @@ export interface RankingRow {
   trend_message: string;
 }
 
+
 export interface RankingResponse {
   period: string;
   model_current_date: string | null;
   user_current_date: string;
   data_last_updated: string | null;
   rankings: RankingRow[];
+  run_id: string;
+  model_name: string;
+  horizon_type: "future";
 }
+
+
+export async function getRuns() {
+  const res = await fetch(`${API_BASE}/forecast/runs`);
+  if (!res.ok) throw new Error("Failed to load runs");
+  return res.json();
+}
+
+export async function getModels(runId?: string) {
+  const url = runId
+    ? `${API_BASE}/forecast/models?run_id=${encodeURIComponent(runId)}`
+    : `${API_BASE}/forecast/models`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load models");
+  return res.json();
+}
+
 
 export async function getTimeseries(
   level: "barangay" | "city",
   options: {
     name?: string;
     freq?: "weekly" | "monthly" | "yearly";
-    model?: "preferred" | "final" | "hybrid" | "local";
+    runId?: string;
+    modelName?: string;
+    horizonType?: "test" | "future";
   }
 ) {
   const params = new URLSearchParams();
   params.set("level", level);
   if (options.name) params.set("name", cleanName(options.name));
   params.set("freq", options.freq ?? "weekly");
-  params.set("model", options.model ?? "preferred");
+  params.set("model_name", options.modelName ?? "preferred");
+  params.set("horizon_type", options.horizonType ?? "future");
+  if (options.runId) params.set("run_id", options.runId);
+
 
   const url = `${API_BASE}/timeseries?${params.toString()}`;
 
@@ -119,3 +227,4 @@ export async function getTimeseries(
     throw err;
   }
 }
+

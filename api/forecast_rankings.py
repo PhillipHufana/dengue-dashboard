@@ -5,9 +5,12 @@ from .supabase_client import get_supabase
 from .utils import normalize_name
 from .forecast import (
     _load_weekly_history,
-    _compute_thresholds,
-    _classify_risk,
 )
+from typing import Optional
+from .run_helpers import resolve_run_id, resolve_model_name
+from .risk import risk_from_baseline_percentiles
+from .forecast import _load_population_map
+
 
 router = APIRouter()
 
@@ -20,6 +23,17 @@ PERIOD_WEEKS = {
     "6m": 26,
     "1y": 52,
 }
+
+def fetch_all(q, page_size: int = 1000):
+    out = []
+    start = 0
+    while True:
+        chunk = q.range(start, start + page_size - 1).execute().data or []
+        out.extend(chunk)
+        if len(chunk) < page_size:
+            break
+        start += page_size
+    return out
 
 
 def compute_hybrid_trend(weekly_rows, forecast_rows):
@@ -87,44 +101,60 @@ def compute_hybrid_trend(weekly_rows, forecast_rows):
 
 
 @router.get("/rankings")
-def get_forecast_rankings(period: str = Query("1m")):
+def get_forecast_rankings(
+    period: str = Query("1m"),
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+):
     sb = get_supabase()
-
     weeks_to_sum = PERIOD_WEEKS.get(period, 4)
 
-    # =======================================================
-    # 0️⃣ Load thresholds once for ALL barangays
-    # =======================================================
-    history = _load_weekly_history(sb)
-    thresholds = _compute_thresholds(history)
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
-    # =======================================================
-    # 1️⃣ Fetch ALL future forecast rows (for horizon sums)
-    # =======================================================
-    forecasts = (
-        sb.table("barangay_forecasts")
-        .select("*")
-        .eq("is_future", True)
-        .order("week_start")
+    # Load once
+    history = _load_weekly_history(sb)
+    pop_map = _load_population_map(sb)
+
+    brg = (
+        sb.table("barangays")
+        .select("name, display_name")
         .execute()
         .data
+    ) or []
+    display_map = {
+        normalize_name(b["name"]): (b.get("display_name") or b["name"])
+        for b in brg
+        if b.get("name")
+    }
+
+    forecasts_q = (
+        sb.table("barangay_forecasts_long")
+        .select("name, week_start, yhat")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start")  # ASC
     )
+    forecasts = fetch_all(forecasts_q)
+
 
     grouped_future = {}
     for row in forecasts:
         nm = normalize_name(row["name"])
         grouped_future.setdefault(nm, []).append(row)
 
-    # =======================================================
-    # 2️⃣ Fetch ALL weekly rows (for trends + data_last_updated)
-    # =======================================================
-    weekly_rows_raw = (
+    print("forecast rows:", len(forecasts), "unique barangays:", len(grouped_future))
+
+    weekly_q = (
         sb.table("barangay_weekly")
         .select("name, cases, week_start")
-        .order("name, week_start", desc=True)
-        .execute()
-        .data
+        .order("name")
+        .order("week_start", desc=True)
     )
+    weekly_rows_raw = fetch_all(weekly_q)
+
 
     grouped_weekly = {}
     latest_week_date = None
@@ -132,69 +162,76 @@ def get_forecast_rankings(period: str = Query("1m")):
     for row in weekly_rows_raw:
         nm = normalize_name(row["name"])
         grouped_weekly.setdefault(nm, [])
-        # keep up to 2 latest rows per barangay
         if len(grouped_weekly[nm]) < 2:
             grouped_weekly[nm].append(row)
 
-        # track global latest week_start for disclaimer
-        ws = row["week_start"]
-        if latest_week_date is None or ws > latest_week_date:
-            latest_week_date = ws
+        ws = row.get("week_start")
+        if ws:
+            if latest_week_date is None:
+                latest_week_date = ws
+            else:
+                try:
+                    if datetime.fromisoformat(ws) > datetime.fromisoformat(latest_week_date):
+                        latest_week_date = ws
+                except Exception:
+                    if ws > latest_week_date:
+                        latest_week_date = ws
 
-    # =======================================================
-    # 3️⃣ Fetch ALL last 2 forecast rows per barangay (for fallback trend)
-    # =======================================================
-    last_forecasts = (
-        sb.table("barangay_forecasts")
-        .select("name, final_forecast, is_future, week_start")
-        .order("name, week_start", desc=True)
-        .execute()
-        .data
+    last_forecasts_q = (
+        sb.table("barangay_forecasts_long")
+        .select("name, week_start, yhat")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start", desc=True)
     )
+    last_forecasts = fetch_all(last_forecasts_q)
+
 
     grouped_last_fore = {}
     for row in last_forecasts:
         nm = normalize_name(row["name"])
         grouped_last_fore.setdefault(nm, [])
-
-        # Insert at position 0 so the list becomes [older, newer]
         if len(grouped_last_fore[nm]) < 2:
             grouped_last_fore[nm].insert(
-                0,
-                {
-                    "forecast": row["final_forecast"],
-                    "is_future": row["is_future"],
-                },
+                0, {"forecast": float(row.get("yhat") or 0.0), "is_future": True}
             )
 
-    # =======================================================
-    # 4️⃣ Compute rankings per barangay
-    # =======================================================
     results = []
-
     for name, future_rows in grouped_future.items():
-        # 4.1 Future horizon sum for the selected period
-        total_forecast = sum(
-            float(r["final_forecast"]) for r in future_rows[:weeks_to_sum]
-        )
+        total_forecast = sum(float(r.get("yhat") or 0.0) for r in future_rows[:weeks_to_sum])
 
-        # 4.2 Trend calculation
         weekly = grouped_weekly.get(name, [])
         last2_fore = grouped_last_fore.get(name, [])
         trend, last_week, this_week, trend_source, trend_message = compute_hybrid_trend(
             weekly, last2_fore
         )
 
-        # 4.3 Risk level using SAME thresholds as /forecast/summary
-        th = thresholds.get(name, {})
-        risk = _classify_risk(total_forecast, th)
+        series = history.get(name, [])
+        pop = pop_map.get(name)
 
+        risk_pack = risk_from_baseline_percentiles(
+            forecast_cases=total_forecast,
+            history_cases=series,
+            population=pop,
+        )
+
+        # ✅ keep legacy keys for frontend
         results.append(
             {
                 "name": name,
-                "pretty_name": name.replace("-", " ").title(),
+                "pretty_name": display_map.get(name, name),
+
                 "total_forecast": round(total_forecast, 2),
-                "risk_level": risk,
+                "risk_level": risk_pack["risk_level_cases"],
+
+                # ✅ new richer fields
+                "total_forecast_cases": round(total_forecast, 2),
+                "total_forecast_incidence_per_100k": risk_pack["forecast_incidence_per_100k"],
+                "risk_level_cases": risk_pack["risk_level_cases"],
+                "risk_level_incidence": risk_pack["risk_level_incidence"],
+
                 "trend": trend,
                 "trend_source": trend_source,
                 "last_week": last_week,
@@ -203,14 +240,18 @@ def get_forecast_rankings(period: str = Query("1m")):
             }
         )
 
-    # Sort by descending forecast
-    results.sort(key=lambda x: x["total_forecast"], reverse=True)
+    results.sort(key=lambda x: x["total_forecast_cases"], reverse=True)
+
+
 
     return {
         "period": period,
-        "model_current_date": latest_week_date,        # <-- NEW
-        "user_current_date": str(date.today()),        # <-- NEW
         "data_last_updated": latest_week_date,
+        "model_current_date": latest_week_date,  # ✅ add this because UI expects it
+        "user_current_date": str(date.today()),
         "rankings": results,
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": "future",
     }
 

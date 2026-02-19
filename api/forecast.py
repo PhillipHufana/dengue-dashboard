@@ -1,12 +1,13 @@
 # api/forecast.py
 from __future__ import annotations
-
-from fastapi import APIRouter
+import statistics
+from fastapi import APIRouter, Query, HTTPException
+from typing import Dict, List, Optional, Literal
+from datetime import date
 from .supabase_client import get_supabase
 from .utils import normalize_name
-
-import statistics
-from typing import Dict, Any, List, Optional
+from .run_helpers import resolve_run_id, resolve_model_name, DEFAULT_MODEL
+from .risk import risk_from_baseline_percentiles
 
 router = APIRouter()
 
@@ -14,6 +15,14 @@ router = APIRouter()
 # 🔧 HELPERS — LOAD WEEKLY HISTORY + COMPUTE THRESHOLDS
 # ================================================================
 
+def _load_population_map(sb) -> Dict[str, int]:
+    rows = (
+        sb.table("latest_barangay_population")
+        .select("name, population")
+        .execute()
+        .data
+    ) or []
+    return {r["name"]: int(r["population"]) for r in rows if r.get("population") is not None}
 
 def _load_weekly_history(sb) -> Dict[str, List[int]]:
     """
@@ -43,91 +52,84 @@ def _load_weekly_history(sb) -> Dict[str, List[int]]:
     return out
 
 
-def _compute_thresholds(history: Dict[str, List[int]]) -> Dict[str, Dict[str, float]]:
-    """
-    For each barangay, compute:
-      - alert    = mean + 2σ
-      - epidemic = mean + 3σ
-      - critical = 2 × epidemic
+@router.get("/runs")
+def list_runs(limit: int = 50):
+    sb = get_supabase()
+    rows = (
+        sb.table("runs")
+        .select("run_id, created_at, mode, train_end, horizon_weeks")
+        .order("created_at", desc=True)
+        .order("run_id", desc=True)
+        .limit(limit)
+        .execute()
+        .data
+    ) or []
+    return {"runs": rows}
 
-    This works for now on raw case counts.
-    Later, when population is added, we switch to incidence rate.
-    """
-    out: Dict[str, Dict[str, float]] = {}
+@router.get("/models")
+def list_models(run_id: Optional[str] = Query(None)):
+    sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
 
-    for nm, series in history.items():
-        if len(series) == 0:
-            out[nm] = {"alert": 0, "epidemic": 0, "critical": 0}
-            continue
-
-        mean_val = statistics.mean(series)
-        std_val = statistics.pstdev(series) if len(series) > 1 else 0
-
-        alert = mean_val + 2 * std_val
-        epidemic = mean_val + 3 * std_val
-        critical = 2 * epidemic
-
-        out[nm] = {
-            "alert": alert,
-            "epidemic": epidemic,
-            "critical": critical,
-        }
-
-    return out
-
-
-def _classify_risk(forecast: Optional[float], th: Dict[str, float]) -> str:
-    """
-    Map forecast value to a risk category based on thresholds.
-    """
-    if forecast is None:
-        return "unknown"
-
-    f = float(forecast)
-
-    alert = th.get("alert")
-    epidemic = th.get("epidemic")
-    critical = th.get("critical")
-
-    if alert is None:
-        return "unknown"
-
-    if f < alert:
-        return "low"
-    if f < epidemic:
-        return "medium"
-    if f < critical:
-        return "high"
-    return "critical"
-
+    # Use city_forecasts_long to avoid scanning huge barangay_forecasts_long
+    rows = (
+        sb.table("city_forecasts_long")
+        .select("model_name")
+        .eq("run_id", rid)
+        .execute()
+        .data
+    ) or []
+    models = sorted({r["model_name"] for r in rows if r.get("model_name")})
+    default = DEFAULT_MODEL if DEFAULT_MODEL in models else (models[0] if models else None)
+    return {"run_id": rid, "models": models, "default_model": default}
 
 # ================================================================
 # 🟦 1. Barangay-level FORECAST TIMESERIES (unchanged)
 # ================================================================
 @router.get("/barangay/{name}")
-def get_barangay_forecast(name: str):
+def get_barangay_forecast(
+    name: str,
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+    horizon_type: Literal["test", "future"] = Query("future"),
+):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
     nm = normalize_name(name)
 
-    resp = (
-        sb.table("barangay_forecasts")
-        .select("*")
+    rows = (
+        sb.table("barangay_forecasts_long")
+        .select(
+            "run_id, name, week_start, model_name, horizon_type, yhat, yhat_lower, yhat_upper"
+        )
+        .eq("run_id", rid)
         .eq("name", nm)
+        .eq("model_name", model)
+        .eq("horizon_type", horizon_type)
         .order("week_start")
         .execute()
-    )
+        .data
+    ) or []
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No forecast series found")
 
     return {
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": horizon_type,
         "barangay": nm,
-        "series": resp.data or [],
+        "series": rows,
     }
+
 
 
 # ================================================================
 # 🟦 2. City-level (unchanged)
 # ================================================================
 @router.get("/city")
-def get_city_forecast():
+def get_city_actual():
     sb = get_supabase()
     resp = (
         sb.table("city_weekly")
@@ -137,81 +139,60 @@ def get_city_forecast():
     )
     return resp.data or []
 
-
-# ================================================================
-# 🟦 3. Last N weeks (unchanged)
-# ================================================================
-@router.get("/weeks/{n}")
-def get_recent_weeks(n: int):
+@router.get("/city/forecast")
+def get_city_forecast_series(
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+    horizon_type: Literal["test", "future"] = Query("future"),
+):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
-    city = (
-        sb.table("city_weekly")
-        .select("*")
-        .order("week_start", desc=True)
-        .limit(n)
+    rows = (
+        sb.table("city_forecasts_long")
+        .select("run_id, week_start, model_name, horizon_type, yhat, yhat_lower, yhat_upper")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", horizon_type)
+        .order("week_start")
         .execute()
-    ).data or []
-
-    barangays = (
-        sb.table("barangay_forecasts")
-        .select("*")
-        .order("week_start", desc=True)
-        .limit(n * 200)
-        .execute()
-    ).data or []
+        .data
+    ) or []
 
     return {
-        "city": list(reversed(city)),
-        "barangays": barangays,
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": horizon_type,
+        "series": rows,
     }
+
 
 
 # ================================================================
 # 🟩 4. LATEST forecast per barangay — WITH RISK
 # ================================================================
 @router.get("/latest/barangay")
-def get_latest_forecast_for_all_barangays():
+def get_latest_future_forecast_for_all_barangays(
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
-    # Load historical weekly cases → thresholds
-    history = _load_weekly_history(sb)
-    thresholds = _compute_thresholds(history)
-
-    # Load forecasts
-    resp = (
-        sb.table("barangay_forecasts")
-        .select("*")
-        .order("week_start", desc=True)
+    rows = (
+        sb.table("latest_barangay_forecast")
+        .select("name, week_start, yhat, yhat_lower, yhat_upper")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
         .execute()
-    )
+        .data
+    ) or []
+    return {"run_id": rid, "model_name": model, "horizon_type": "future", "latest": rows}
 
-    rows = resp.data or []
-    seen = set()
-    out = []
 
-    for row in rows:
-        nm = normalize_name(row["name"])
-        if nm in seen:
-            continue
-
-        seen.add(nm)
-
-        forecast = row.get("final_forecast")
-        risk = _classify_risk(forecast, thresholds.get(nm, {}))
-
-        out.append(
-            {
-                "name": nm,
-                "latest_forecast": forecast,
-                "week_start": row["week_start"],
-                "is_future": row["is_future"],
-                "risk_level": risk,
-                "thresholds": thresholds.get(nm),
-            }
-        )
-
-    return out
 
 
 # ================================================================
@@ -232,80 +213,104 @@ def get_latest_city_forecast():
     return resp.data[0] if resp.data else None
 
 
-@router.get("/summary")
-def get_forecast_summary():
-    sb = get_supabase()
+def _risk_from_forecast_simple(f: float) -> str:
+    # Keep your existing simple thresholds for now
+    if f < 5:
+        return "low"
+    if f < 15:
+        return "medium"
+    if f < 30:
+        return "high"
+    return "critical"
 
-    # Latest city (used for data_last_updated)
-    city = (
+@router.get("/summary")
+def get_forecast_summary(
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+):
+    sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
+
+    # Latest city observed (for data_last_updated)
+    city_rows = (
         sb.table("city_weekly")
         .select("*")
         .order("week_start", desc=True)
         .limit(1)
         .execute()
-    ).data
+        .data
+    ) or []
+    data_last_updated = city_rows[0]["week_start"] if city_rows else None
 
-    data_last_updated = city[0]["week_start"] if city else None
+    # Preload barangay display names (canonical -> display)
+    brg = (sb.table("barangays").select("name, display_name").execute().data) or []
+    display_map = {
+        (b["name"]): (b.get("display_name") or b["name"])
+        for b in brg
+        if b.get("name")
+    }
 
-    # Load thresholds + full historical weekly data
+    # Thresholds for risk classification
+
     history = _load_weekly_history(sb)
-    thresholds = _compute_thresholds(history)
+    pop_map = _load_population_map(sb)
 
-    # Load ALL forecasts
-    resp = (
-        sb.table("barangay_forecasts")
-        .select("*")
-        .order("week_start", desc=True)
+    # ✅ Use the view: already one latest row per barangay
+    latest_rows = (
+        sb.table("latest_barangay_forecast")
+        .select("name, week_start, yhat, yhat_lower, yhat_upper")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
         .execute()
-    ).data or []
+        .data
+    ) or []
 
-    seen = set()
     barangay_latest = []
-    total_forecast = 0.0
+    total = 0.0
 
-    for row in resp:
-        nm = normalize_name(row["name"])
-        if nm in seen:
-            continue
+    for r in latest_rows:
+        nm = r["name"]  # canonical
+        fc = float(r.get("yhat") or 0.0)
+        total += fc
 
-        seen.add(nm)
+        series = history.get(nm, [])
+        pop = pop_map.get(nm)
 
-        fc = float(row.get("final_forecast") or 0.0)
-        total_forecast += fc
-
-        risk = _classify_risk(fc, thresholds.get(nm, {}))
-
-        # Trend using historical cases (last 2 points)
-        hist_series = history.get(nm, [])
-
-        trend = 0.0
-        last_week = None
-        this_week = None
-
-        if len(hist_series) >= 2:
-            last_week = hist_series[-2]
-            this_week = hist_series[-1]
-
-            if last_week > 0:
-                trend = ((this_week - last_week) / last_week) * 100
-            else:
-                trend = 0.0
-
-        barangay_latest.append(
-            {
-                "name": nm,
-                "forecast": fc,
-                "week_start": row["week_start"],
-                "risk_level": risk,
-                "trend": trend,
-                "last_week": last_week,
-                "this_week": this_week,
-            }
+        risk_pack = risk_from_baseline_percentiles(
+            forecast_cases=fc,
+            history_cases=series,
+            population=pop,
         )
 
+        barangay_latest.append({
+            "name": nm,
+            "display_name": display_map.get(nm, nm),
+            "week_start": r["week_start"],
+
+            # ✅ legacy
+            "forecast": fc,
+            "risk_level": risk_pack["risk_level_cases"],
+
+            # ✅ new
+            "forecast_cases": fc,
+            "forecast_incidence_per_100k": risk_pack["forecast_incidence_per_100k"],
+            "risk_level_cases": risk_pack["risk_level_cases"],
+            "risk_level_incidence": risk_pack["risk_level_incidence"],
+
+            "yhat_lower": r.get("yhat_lower"),
+            "yhat_upper": r.get("yhat_upper"),
+        })
+
+
+
     return {
-        "city_latest": city[0] if city else None,
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": "future",
+        "city_latest": city_rows[0] if city_rows else None,
         "barangay_latest": barangay_latest,
-        "total_forecasted_cases": round(total_forecast, 2),
+        "total_forecasted_cases": round(total, 2),
         "data_last_updated": data_last_updated,
     }

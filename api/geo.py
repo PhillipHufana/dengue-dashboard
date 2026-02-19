@@ -1,223 +1,159 @@
 # api/geo.py
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
-from pathlib import Path
-import json
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Query
 from .supabase_client import get_supabase
-import unicodedata, re
+from typing import Optional, Dict, Any, List
+import json
+from .run_helpers import resolve_run_id, resolve_model_name
+from .risk import risk_from_baseline_percentiles
+from .forecast import _load_weekly_history, _load_population_map
 
 router = APIRouter(prefix="/geo", tags=["geo"])
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-POLY_PATH = DATA_DIR / "DAVAO_Poly_geo.geojson"
-
-
-def load_polygons() -> Dict[str, Any]:
-    """Load polygon GeoJSON file."""
-    if not POLY_PATH.exists():
-        raise HTTPException(500, f"Polygon GeoJSON not found at {POLY_PATH}")
-
-    with POLY_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def normalize_name(x: str | None) -> str:
-    if not x:
-        return ""
-
-    # lowercase
-    x = x.lower().strip()
-
-    # remove accents (e.g., pequeño → pequeno)
-    x = unicodedata.normalize("NFKD", x).encode("ascii", "ignore").decode()
-
-    # remove (pob.) and similar suffixes
-    x = re.sub(r"\(.*?\)", "", x)
-
-    # convert hyphens to spaces
-    x = x.replace("-", " ")
-
-    # remove punctuation
-    x = re.sub(r"[^a-z0-9 ]", "", x)
-
-    # collapse multiple spaces
-    x = re.sub(r"\s+", " ", x).strip()
-
-    return x
 
 @router.get("/choropleth")
-def dengue_choropleth():
-    """
-    Returns full GeoJSON WITH dengue data merged into polygon properties.
-    """
+def get_choropleth(
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
-    # Load polygons
-    geo = load_polygons()
-    features = geo.get("features", [])
-
-    # Load latest weekly cases
-    weekly = (
-        sb.table("barangay_weekly")
-        .select("name, week_start, cases")
-        .order("week_start", desc=True)
+    # 1) polygons
+    brg_rows = (
+        sb.table("barangays")
+        .select("name, display_name, geom_json")
         .execute()
-    ).data or []
+        .data
+    ) or []
 
-    latest_cases = {}
-    for row in weekly:
-        nm = row["name"]
-        if nm not in latest_cases:
-            latest_cases[nm] = {
-                "cases": row["cases"],
-                "week": row["week_start"],
-            }
-
-    # Load forecasts
-    fcast = (
-        sb.table("barangay_forecasts")
-        .select("name, week_start, final_forecast, is_future")
-        .order("week_start", desc=True)
+    # 2) latest forecasts (view)
+    latest_rows = (
+        sb.table("latest_barangay_forecast")
+        .select("name, week_start, yhat")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
         .execute()
-    ).data or []
+        .data
+    ) or []
 
-    latest_forecast = {}
-    for row in fcast:
-        nm = row["name"]
-        if nm not in latest_forecast:
-            latest_forecast[nm] = {
-                "forecast": row["final_forecast"],
-                "week": row["week_start"],
-                "is_future": row["is_future"],
+    forecast_map = {r["name"]: r for r in latest_rows}
+
+    history = _load_weekly_history(sb)
+    pop_map = _load_population_map(sb)
+
+
+    features = []
+    for b in brg_rows:
+        nm = b["name"]
+        geom = b.get("geom_json")
+        if not geom:
+            continue
+
+        fr = forecast_map.get(nm)
+        fc = float(fr["yhat"]) if fr and fr.get("yhat") is not None else None
+        wk = fr["week_start"] if fr else None
+
+        series = history.get(nm, [])
+        pop = pop_map.get(nm)
+
+        if fc is None:
+            risk_pack = {
+                "forecast_incidence_per_100k": None,
+                "risk_level_cases": "unknown",
+                "risk_level_incidence": None,
             }
-
-    # Merge dengue values into polygons
-    for feat in features:
-        props = feat.setdefault("properties", {})
-
-        # ADM4_EN = official barangay boundary name
-        raw_name = (
-            props.get("ADM4_EN")
-            or props.get("ADM4_REF")
-            or props.get("ADM4_PCODE")
-        )
-
-        nm = normalize_name(raw_name)
-        props["name"] = nm
-
-        # Set actual cases
-        if nm in latest_cases:
-            props["latest_cases"] = latest_cases[nm]["cases"]
-            props["latest_week"] = latest_cases[nm]["week"]
         else:
-            props["latest_cases"] = 0
-            props["latest_week"] = None
+            risk_pack = risk_from_baseline_percentiles(
+                forecast_cases=float(fc),
+                history_cases=series,
+                population=pop,
+            )
 
-        # Set forecast
-        if nm in latest_forecast:
-            props["latest_forecast"] = latest_forecast[nm]["forecast"]
-            props["latest_future_week"] = latest_forecast[nm]["week"]
-        else:
-            props["latest_forecast"] = 0.0
-            props["latest_future_week"] = None
 
-        # Risk classification
-        f = props["latest_forecast"] or 0
-        if f < 5:
-            props["risk_level"] = "low"
-        elif f < 15:
-            props["risk_level"] = "medium"
-        else:
-            props["risk_level"] = "high"
+        properties = {
+            "name": nm,
+            "display_name": b.get("display_name") or nm,
+            "latest_future_week": wk,
 
-    # Remove non-barangay polygons
-    features = [
-        feat for feat in features
-        if normalize_name(
-            feat.get("properties", {}).get("ADM4_EN")
-        ) != "mount apo national park under jurisdiction of davao city"
-    ]
+            # 🔥 REQUIRED FOR FRONTEND
+            "risk_level": risk_pack["risk_level_cases"],
+            "latest_forecast": fc,
+
+            "forecast_cases": fc,
+            "forecast_incidence_per_100k": risk_pack["forecast_incidence_per_100k"],
+            "risk_level_cases": risk_pack["risk_level_cases"],
+            "risk_level_incidence": risk_pack["risk_level_incidence"],
+
+            "run_id": rid,
+            "model_name": model,
+            "horizon_type": "future",
+
+            # keep if frontend expects:
+            "latest_cases": 0,
+            "latest_week": None,
+        }
+
+        features.append({"type": "Feature", "geometry": geom, "properties": properties})
 
 
     return {"type": "FeatureCollection", "features": features}
 
+
 @router.get("/hotspots/top")
-def dengue_hotspots_top(n: int = 10):
-    """
-    Returns top N hotspot barangays based on:
-    - latest_cases
-    - latest_forecast
-    - growth = forecast - cases
-    - risk_level
-    """
-
+def dengue_hotspots_top(
+    n: int = 10,
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+    model = resolve_model_name(sb, rid, model_name)
 
-    # ---- 1. LOAD LATEST CASES ----
+    # latest observed week_start (shared baseline)
+    city = (
+        sb.table("city_weekly")
+        .select("week_start")
+        .order("week_start", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    latest_ws = city[0]["week_start"] if city else None
+
     weekly = (
         sb.table("barangay_weekly")
-        .select("name, week_start, cases")
-        .order("week_start", desc=True)
+        .select("name, cases, week_start")
+        .eq("week_start", latest_ws)
         .execute()
-    ).data or []
+        .data
+    ) or []
+    latest_cases = {r["name"]: int(r.get("cases") or 0) for r in weekly}
 
-    latest_cases = {}
-    for row in weekly:
-        nm = row["name"]
-        if nm not in latest_cases:
-            latest_cases[nm] = {
-                "cases": row["cases"],
-                "week": row["week_start"],
-            }
-
-    # ---- 2. LOAD LATEST FORECAST ----
-    fcast = (
-        sb.table("barangay_forecasts")
-        .select("name, week_start, final_forecast, is_future")
-        .order("week_start", desc=True)
+    frows = (
+        sb.table("latest_barangay_forecast")
+        .select("name, week_start, yhat")
+        .eq("run_id", rid)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
         .execute()
-    ).data or []
+        .data
+    ) or []
+    latest_fc = {r["name"]: float(r.get("yhat") or 0.0) for r in frows}
 
-    latest_forecast = {}
-    for row in fcast:
-        nm = row["name"]
-        if nm not in latest_forecast:
-            latest_forecast[nm] = {
-                "forecast": row["final_forecast"],
-                "week": row["week_start"],
-                "is_future": row["is_future"]
-            }
-
-    # ---- 3. BUILD HOTSPOT LIST ----
+    all_brgy = set(latest_cases) | set(latest_fc)
     hotspots = []
+    for nm in all_brgy:
+        cases = latest_cases.get(nm, 0)
+        forecast = latest_fc.get(nm, 0.0)
+        growth = float(forecast) - float(cases)
 
-    # Combine all barangay names from both tables
-    all_brgy = set(latest_cases.keys()) | set(latest_forecast.keys())
+        hotspots.append(
+            {"name": nm, "latest_cases": cases, "latest_forecast": forecast, "growth": growth}
+        )
 
-    for name in all_brgy:
-        cases = latest_cases.get(name, {}).get("cases", 0)
-        forecast = latest_forecast.get(name, {}).get("forecast", 0)
-        growth = forecast - cases
-
-        # risk classification (same as choropleth)
-        if forecast < 5:
-            risk = "low"
-        elif forecast < 15:
-            risk = "medium"
-        else:
-            risk = "high"
-
-        hotspots.append({
-            "name": name,
-            "latest_cases": cases,
-            "latest_forecast": forecast,
-            "growth": growth,
-            "risk_level": risk,
-        })
-
-    # ---- 4. SORT AND RETURN TOP N ----
-    hotspots_sorted = sorted(hotspots, key=lambda x: x["growth"], reverse=True)
-
-    return hotspots_sorted[:n]
+    hotspots.sort(key=lambda x: x["growth"], reverse=True)
+    return hotspots[:n]
