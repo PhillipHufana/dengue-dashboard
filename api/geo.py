@@ -42,7 +42,7 @@ def get_choropleth(
 
     forecast_map = {r["name"]: r for r in latest_rows}
 
-    history = _load_weekly_history(sb)
+    history = _load_weekly_history(sb, rid)
     pop_map = _load_population_map(sb)
 
 
@@ -100,7 +100,13 @@ def get_choropleth(
         features.append({"type": "Feature", "geometry": geom, "properties": properties})
 
 
-    return {"type": "FeatureCollection", "features": features}
+    return {
+    "type": "FeatureCollection",
+    "run_id": rid,
+    "model_name": model,
+    "horizon_type": "future",
+    "features": features
+    }
 
 
 @router.get("/hotspots/top")
@@ -115,22 +121,43 @@ def dengue_hotspots_top(
 
     # latest observed week_start (shared baseline)
     city = (
-        sb.table("city_weekly")
+        sb.table("city_weekly_runs")
         .select("week_start")
+        .eq("run_id", rid)
         .order("week_start", desc=True)
         .limit(1)
         .execute()
         .data
     ) or []
+
+    if not city:
+        city = (
+            sb.table("city_weekly")
+            .select("week_start")
+            .order("week_start", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        ) or []
     latest_ws = city[0]["week_start"] if city else None
 
     weekly = (
-        sb.table("barangay_weekly")
+        sb.table("barangay_weekly_runs")
         .select("name, cases, week_start")
+        .eq("run_id", rid)
         .eq("week_start", latest_ws)
         .execute()
         .data
     ) or []
+
+    if not weekly:
+        weekly = (
+            sb.table("barangay_weekly")
+            .select("name, cases, week_start")
+            .eq("week_start", latest_ws)
+            .execute()
+            .data
+        ) or []
     latest_cases = {r["name"]: int(r.get("cases") or 0) for r in weekly}
 
     frows = (

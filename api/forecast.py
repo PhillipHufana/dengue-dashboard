@@ -24,31 +24,35 @@ def _load_population_map(sb) -> Dict[str, int]:
     ) or []
     return {r["name"]: int(r["population"]) for r in rows if r.get("population") is not None}
 
-def _load_weekly_history(sb) -> Dict[str, List[int]]:
+def _load_weekly_history(sb, run_id: str) -> Dict[str, List[int]]:
     """
-    Loads full historical dengue cases per barangay.
-
-    Returns:
-      {
-        "acacia": [0, 1, 0, 2, 3, ...],
-        "buhangin": [...],
-      }
+    Loads historical dengue cases per barangay for a single published run.
+    Fallbacks to legacy barangay_weekly if run-scoped table is not populated yet.
     """
     resp = (
-        sb.table("barangay_weekly")
+        sb.table("barangay_weekly_runs")
         .select("name, week_start, cases")
+        .eq("run_id", run_id)
         .order("week_start")
         .execute()
     )
-
     rows = resp.data or []
-    out: Dict[str, List[int]] = {}
 
+    # TEMP fallback while migrating pipeline exports
+    if not rows:
+        resp = (
+            sb.table("barangay_weekly")
+            .select("name, week_start, cases")
+            .order("week_start")
+            .execute()
+        )
+        rows = resp.data or []
+
+    out: Dict[str, List[int]] = {}
     for row in rows:
         nm = normalize_name(row["name"])
         cases = int(row.get("cases") or 0)
         out.setdefault(nm, []).append(cases)
-
     return out
 
 
@@ -57,7 +61,7 @@ def list_runs(limit: int = 50):
     sb = get_supabase()
     rows = (
         sb.table("runs")
-        .select("run_id, created_at, mode, train_end, horizon_weeks")
+        .select("run_id, created_at, mode, run_kind, status, train_end, horizon_weeks, started_at, finished_at, error_message")
         .order("created_at", desc=True)
         .order("run_id", desc=True)
         .limit(limit)
@@ -129,15 +133,30 @@ def get_barangay_forecast(
 # 🟦 2. City-level (unchanged)
 # ================================================================
 @router.get("/city")
-def get_city_actual():
+def get_city_actual(run_id: Optional[str] = Query(None)):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+
     resp = (
-        sb.table("city_weekly")
-        .select("*")
+        sb.table("city_weekly_runs")
+        .select("run_id, week_start, city_cases")
+        .eq("run_id", rid)
         .order("week_start")
         .execute()
     )
-    return resp.data or []
+    rows = resp.data or []
+
+    # TEMP fallback
+    if not rows:
+        resp = (
+            sb.table("city_weekly")
+            .select("week_start, city_cases")
+            .order("week_start")
+            .execute()
+        )
+        rows = resp.data or []
+
+    return {"run_id": rid, "series": rows}
 
 @router.get("/city/forecast")
 def get_city_forecast_series(
@@ -199,18 +218,32 @@ def get_latest_future_forecast_for_all_barangays(
 # 🟩 5. LATEST city-level (unchanged)
 # ================================================================
 @router.get("/latest/city")
-def get_latest_city_forecast():
+def get_latest_city_forecast(run_id: Optional[str] = Query(None)):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
 
     resp = (
-        sb.table("city_weekly")
-        .select("*")
+        sb.table("city_weekly_runs")
+        .select("week_start, city_cases")
+        .eq("run_id", rid)
         .order("week_start", desc=True)
         .limit(1)
         .execute()
     )
+    rows = resp.data or []
 
-    return resp.data[0] if resp.data else None
+    # TEMP fallback
+    if not rows:
+        resp = (
+            sb.table("city_weekly")
+            .select("week_start, city_cases")
+            .order("week_start", desc=True)
+            .limit(1)
+            .execute()
+        )
+        rows = resp.data or []
+
+    return rows[0] if rows else None
 
 
 def _risk_from_forecast_simple(f: float) -> str:
@@ -234,15 +267,25 @@ def get_forecast_summary(
 
     # Latest city observed (for data_last_updated)
     city_rows = (
-        sb.table("city_weekly")
-        .select("*")
+        sb.table("city_weekly_runs")
+        .select("week_start, city_cases")
+        .eq("run_id", rid)
         .order("week_start", desc=True)
         .limit(1)
         .execute()
         .data
     ) or []
+    
+    if not city_rows:
+        city_rows = (
+            sb.table("city_weekly")
+            .select("week_start, city_cases")
+            .order("week_start", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        ) or []
     data_last_updated = city_rows[0]["week_start"] if city_rows else None
-
     # Preload barangay display names (canonical -> display)
     brg = (sb.table("barangays").select("name, display_name").execute().data) or []
     display_map = {
@@ -253,7 +296,7 @@ def get_forecast_summary(
 
     # Thresholds for risk classification
 
-    history = _load_weekly_history(sb)
+    history = _load_weekly_history(sb, rid)
     pop_map = _load_population_map(sb)
 
     # ✅ Use the view: already one latest row per barangay

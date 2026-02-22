@@ -124,7 +124,25 @@ def get_timeseries(
             .order("week_start")
             .execute()
         )
-        weekly_rows = weekly_resp.data or []
+        weekly_rows = (
+            sb.table("barangay_weekly_runs")
+            .select("week_start, cases")
+            .eq("run_id", rid)
+            .eq("name", nm)
+            .order("week_start")
+            .execute()
+            .data
+        ) or []
+
+        if not weekly_rows:
+            weekly_rows = (
+                sb.table("barangay_weekly")
+                .select("week_start, cases")
+                .eq("name", nm)
+                .order("week_start")
+                .execute()
+                .data
+            ) or []
 
         fore_rows = (
             sb.table("barangay_forecasts_long")
@@ -192,13 +210,23 @@ def get_timeseries(
     # --------------------------------------------------------
     # CITY LEVEL
     # --------------------------------------------------------
-    city_resp = (
-        sb.table("city_weekly")
+    city_rows = (
+        sb.table("city_weekly_runs")
         .select("week_start, city_cases")
+        .eq("run_id", rid)
         .order("week_start")
         .execute()
-    )
-    city_rows = city_resp.data or []
+        .data
+    ) or []
+
+    if not city_rows:
+        city_rows = (
+            sb.table("city_weekly")
+            .select("week_start, city_cases")
+            .order("week_start")
+            .execute()
+            .data
+        ) or []
 
     if not city_rows:
         raise HTTPException(status_code=404, detail="No city_weekly data found")

@@ -113,7 +113,7 @@ def get_forecast_rankings(
     model = resolve_model_name(sb, rid, model_name)
 
     # Load once
-    history = _load_weekly_history(sb)
+    history = _load_weekly_history(sb, rid)
     pop_map = _load_population_map(sb)
 
     brg = (
@@ -148,12 +148,23 @@ def get_forecast_rankings(
     print("forecast rows:", len(forecasts), "unique barangays:", len(grouped_future))
 
     weekly_q = (
-        sb.table("barangay_weekly")
+        sb.table("barangay_weekly_runs")
         .select("name, cases, week_start")
+        .eq("run_id", rid)
         .order("name")
         .order("week_start", desc=True)
     )
     weekly_rows_raw = fetch_all(weekly_q)
+
+    # TEMP fallback
+    if not weekly_rows_raw:
+        weekly_q = (
+            sb.table("barangay_weekly")
+            .select("name, cases, week_start")
+            .order("name")
+            .order("week_start", desc=True)
+        )
+        weekly_rows_raw = fetch_all(weekly_q)
 
 
     grouped_weekly = {}

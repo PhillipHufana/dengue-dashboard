@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Bug, Calendar, Menu } from "lucide-react"
 import dynamic from "next/dynamic";
+// import { DataUploadLogs } from "./dashboard/upload-logs"
 import { useDashboardStore } from "@/lib/store/dashboard-store"
 
 const ChoroplethMap = dynamic(
@@ -124,6 +125,8 @@ export function DengueDashboard() {
             selectedBarangay={selectedBarangay}
             onBarangaySelect={setSelectedBarangay}
           />
+
+          {/* <DataUploadLogs /> */}
 
 
         </div>
