@@ -203,6 +203,12 @@ def _quick_validate_headers(file_bytes: bytes, filename: str) -> dict:
             "barangay": barangay_col,
         },
     }
+
+@router.post("/login")
+def admin_login(x_admin_token: str | None = Header(default=None)):
+    _require_admin_token(x_admin_token)
+    return {"ok": True}
+
 @router.post("/uploads")
 def admin_upload(
     file: UploadFile = File(...),

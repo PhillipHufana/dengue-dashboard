@@ -144,7 +144,7 @@ dengue-dashboard
 │     ├─ wait.cpython-311.pyc
 │     ├─ __init__.cpython-311.pyc
 │     └─ __init__.cpython-313.pyc
-├─ dengue-web
+├─ 
 │  ├─ .next
 │  │  ├─ dev
 │  │  │  ├─ build
@@ -152,7 +152,7 @@ dengue-dashboard
 │  │  │  │  │  ├─ 0d002_5831d0b4._.js
 │  │  │  │  │  ├─ 0d002_5831d0b4._.js.map
 │  │  │  │  │  ├─ [root-of-the-server]__0be7f61d._.js
-│  │  │  │  │  ├─ [root-of-the-server]__0be7f61d._.js.map
+│  │  │  │  │  ├─ [root-dengue-webof-the-server]__0be7f61d._.js.map
 │  │  │  │  │  ├─ [root-of-the-server]__51225daf._.js
 │  │  │  │  │  ├─ [root-of-the-server]__51225daf._.js.map
 │  │  │  │  │  ├─ [root-of-the-server]__93900ace._.js

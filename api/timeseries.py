@@ -117,13 +117,13 @@ def get_timeseries(
 
         nm = normalize_name(name)
 
-        weekly_resp = (
-            sb.table("barangay_weekly")
-            .select("week_start, cases")
-            .eq("name", nm)
-            .order("week_start")
-            .execute()
-        )
+        # weekly_resp = (
+        #     sb.table("barangay_weekly")
+        #     .select("week_start, cases")
+        #     .eq("name", nm)
+        #     .order("week_start")
+        #     .execute()
+        # )
         weekly_rows = (
             sb.table("barangay_weekly_runs")
             .select("week_start, cases")

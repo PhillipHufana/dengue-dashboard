@@ -1,35 +1,30 @@
 # api/info.py
 from fastapi import APIRouter
 from datetime import datetime
-
+from typing import Optional
 from .supabase_client import get_supabase
+from .run_helpers import resolve_run_id
 
 router = APIRouter(tags=["meta"])
 
 @router.get("/data/info")
-def get_data_info():
+def get_data_info(run_id: Optional[str] = None):
     sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
 
-    # prefer published run
-    active = (sb.table("active_runs").select("active_run_id").eq("id", 1).limit(1).execute().data) or []
-    rid = active[0]["active_run_id"] if active and active[0].get("active_run_id") else None
+    latest = (
+        sb.table("city_weekly_runs")
+        .select("week_start")
+        .eq("run_id", rid)
+        .order("week_start", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
 
-    latest = []
-    if rid:
-        latest = (
-            sb.table("barangay_weekly_runs")
-            .select("week_start")
-            .eq("run_id", rid)
-            .order("week_start", desc=True)
-            .limit(1)
-            .execute()
-            .data
-        ) or []
-
-    # fallback legacy
     if not latest:
         latest = (
-            sb.table("barangay_weekly")
+            sb.table("city_weekly")
             .select("week_start")
             .order("week_start", desc=True)
             .limit(1)
@@ -42,4 +37,5 @@ def get_data_info():
     return {
         "last_historical_date": last_update,
         "server_date": datetime.now().strftime("%Y-%m-%d"),
+        "run_id": rid,
     }

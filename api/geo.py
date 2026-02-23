@@ -140,7 +140,8 @@ def dengue_hotspots_top(
             .data
         ) or []
     latest_ws = city[0]["week_start"] if city else None
-
+    if not latest_ws:
+        return []
     weekly = (
         sb.table("barangay_weekly_runs")
         .select("name, cases, week_start")

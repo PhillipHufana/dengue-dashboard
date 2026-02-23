@@ -76,6 +76,11 @@ export async function getSummary(
   return res.json();
 }
 
+export async function getDataInfo(): Promise<{ last_historical_date: string | null; server_date: string; run_id?: string }> {
+  const res = await fetch(`${API_BASE}/data/info`);
+  if (!res.ok) throw new Error("Failed to load data info");
+  return res.json();
+}
 
 export async function getChoropleth(
   options?: { runId?: string; modelName?: string }

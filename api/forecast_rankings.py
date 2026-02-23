@@ -110,7 +110,32 @@ def get_forecast_rankings(
     weeks_to_sum = PERIOD_WEEKS.get(period, 4)
 
     rid = resolve_run_id(sb, run_id)
-    model = resolve_model_name(sb, rid, model_name)
+    # model = resolve_model_name(sb, rid, model_name)
+    model = model_name or "preferred"
+    
+    # ✅ Fast: latest observed week from run-scoped city weekly
+    latest = (
+        sb.table("city_weekly_runs")
+        .select("week_start")
+        .eq("run_id", rid)
+        .order("week_start", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    latest_week_date = latest[0]["week_start"] if latest else None
+
+    # TEMP fallback
+    if not latest_week_date:
+        legacy = (
+            sb.table("city_weekly")
+            .select("week_start")
+            .order("week_start", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        ) or []
+        latest_week_date = legacy[0]["week_start"] if legacy else None
 
     # Load once
     history = _load_weekly_history(sb, rid)
@@ -168,7 +193,7 @@ def get_forecast_rankings(
 
 
     grouped_weekly = {}
-    latest_week_date = None
+    # latest_week_date = None
 
     for row in weekly_rows_raw:
         nm = normalize_name(row["name"])
@@ -176,17 +201,17 @@ def get_forecast_rankings(
         if len(grouped_weekly[nm]) < 2:
             grouped_weekly[nm].append(row)
 
-        ws = row.get("week_start")
-        if ws:
-            if latest_week_date is None:
-                latest_week_date = ws
-            else:
-                try:
-                    if datetime.fromisoformat(ws) > datetime.fromisoformat(latest_week_date):
-                        latest_week_date = ws
-                except Exception:
-                    if ws > latest_week_date:
-                        latest_week_date = ws
+        # ws = row.get("week_start")
+        # if ws:
+        #     if latest_week_date is None:
+        #         latest_week_date = ws
+        #     else:
+        #         try:
+        #             if datetime.fromisoformat(ws) > datetime.fromisoformat(latest_week_date):
+        #                 latest_week_date = ws
+        #         except Exception:
+        #             if ws > latest_week_date:
+        #                 latest_week_date = ws
 
     last_forecasts_q = (
         sb.table("barangay_forecasts_long")
