@@ -61,6 +61,16 @@ def set_run(sb, run_id: str, status: str, error_message: Optional[str] = None):
 def set_upload(sb, upload_id: str, status: str, error_message: Optional[str] = None):
     sb.table("upload_runs").update({"status": status, "error_message": error_message}).eq("upload_id", upload_id).execute()
 
+def get_upload_status(sb, upload_id: str) -> str | None:
+    rows = (
+        sb.table("upload_runs")
+        .select("status")
+        .eq("upload_id", upload_id)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    return rows[0]["status"] if rows else None
 
 def publish_active_run(sb, run_id: str):
     sb.table("active_runs").upsert(
@@ -196,6 +206,17 @@ def main():
             download_upload(sb, storage_path, upload_local)
 
             cfg = build_cfg_for_upload(run_id, upload_local)
+
+            # ---- preflight: stop if canceled before heavy pipeline ----
+            st = get_upload_status(sb, upload_id)
+            if st == "canceled":
+                set_run(sb, run_id, "failed", "canceled by admin")
+                set_upload(sb, upload_id, "canceled", "canceled by admin")
+                log_run(sb, run_id, "warning", "canceled", message="Canceled before pipeline start")
+                print(f"⛔ canceled upload {upload_id} before pipeline start")
+                time.sleep(0.1)
+                continue
+
             run_production(cfg)  # must export to supabase internally
 
             assert_publishable(sb, run_id)

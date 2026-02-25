@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { clearAdminToken, getAdminToken } from "@/lib/adminApi";
 import { LoginModal } from "@/components/dashboard/login-modal";
-
+import { supabaseLogout } from "@/lib/adminApi";
 type HeaderMode = "public" | "admin";
 
 export function AppHeader({
@@ -30,7 +30,7 @@ export function AppHeader({
     router.push("/"); // ✅ go back to dashboard
   };
 
-  const title = mode === "admin" ? "Admin Console" : "Dengue Surveillance";
+  const title = mode === "admin" ? "Denguard Admin Console" : "Denguard Dengue Surveillance";
   const subtitle =
     mode === "admin"
       ? "Uploads • Runs • Logs"
@@ -83,7 +83,14 @@ export function AppHeader({
           {mode === "admin" ? (
             <>
               <LoginModal />
-              <Button variant="outline" className="bg-transparent" onClick={onLogout}>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  await supabaseLogout();
+                  window.dispatchEvent(new Event("admin-auth-changed"));
+                  router.push("/"); // go back to dashboard
+                }}
+              >
                 Logout
               </Button>
             </>
@@ -123,7 +130,14 @@ export function AppHeader({
                 {mode === "admin" ? (
                   <>
                     <LoginModal variant="mobile" />
-                    <Button variant="outline" className="w-full bg-transparent" onClick={onLogout}>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        await supabaseLogout();
+                        window.dispatchEvent(new Event("admin-auth-changed"));
+                        router.push("/"); // go back to dashboard
+                      }}
+                    >
                       Logout
                     </Button>
                   </>

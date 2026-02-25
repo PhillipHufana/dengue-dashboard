@@ -1,3 +1,4 @@
+// components/dashboard/login-modal.tsx
 "use client";
 
 import type React from "react";
@@ -14,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Loader2 } from "lucide-react";
-import { adminLogin, getAdminToken, setAdminToken, clearAdminToken } from "@/lib/adminApi";
+import { supabaseLogin } from "@/lib/adminApi";
 
 interface LoginModalProps {
   variant?: "default" | "mobile";
@@ -23,24 +24,20 @@ interface LoginModalProps {
 export function LoginModal({ variant = "default" }: LoginModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [token, setToken] = useState(getAdminToken() ?? "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
     try {
-      const t = token.trim();
-      await adminLogin(t);
-      setAdminToken(t);
-      window.dispatchEvent(new Event("admin-token-changed"));
-      setError("");
+      await supabaseLogin(email.trim(), password);
+      window.dispatchEvent(new Event("admin-auth-changed"));
       setOpen(false);
     } catch (err: any) {
-      clearAdminToken();
-      setError(err?.message ?? "Invalid token");
+      setError(err?.message ?? "Login failed");
     } finally {
       setIsLoading(false);
     }
@@ -70,18 +67,31 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
             </div>
             Admin Login
           </DialogTitle>
-          <DialogDescription>Enter the admin token to access upload tools and logs.</DialogDescription>
+          <DialogDescription>Sign in with Supabase Auth (email + password).</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="token">Admin Token</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="token"
+              id="email"
+              type="email"
+              placeholder="admin@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="bg-secondary"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pw">Password</Label>
+            <Input
+              id="pw"
               type="password"
-              placeholder="Paste token here"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               className="bg-secondary"
             />
@@ -102,10 +112,6 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
               </>
             )}
           </Button>
-
-          <p className="text-xs text-center text-muted-foreground">
-            You’ll replace this with Supabase Auth later.
-          </p>
         </form>
       </DialogContent>
     </Dialog>

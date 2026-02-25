@@ -5,12 +5,13 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 import QueryProvider from "@/lib/query/provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Dengue Surveillance Dashboard",
+  title: "Denguard - Dengue Surveillance Dashboard",
   description: "Real-time dengue fever monitoring and outbreak tracking system",
   generator: "v0.app",
 }
@@ -26,6 +27,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
         <QueryProvider>
           {children} 
+          <Toaster richColors closeButton />
         </QueryProvider>
         </ThemeProvider>
         <Analytics />

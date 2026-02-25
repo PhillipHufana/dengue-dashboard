@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { adminLogin, getAdminToken } from "@/lib/adminApi";
+import { supabase } from "@/lib/supabaseClient";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<"checking" | "authed" | "unauthed">("checking");
@@ -10,35 +10,40 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
 
-    const verify = async () => {
-      const token = (getAdminToken() ?? "").trim();
-      if (!token) {
-        if (!alive) return;
+    const check = async () => {
+      setStatus("checking");
+      setMessage("");
+
+      const { data, error } = await supabase.auth.getSession();
+      const session = data.session;
+
+      if (!alive) return;
+
+      if (error || !session) {
         setStatus("unauthed");
-        setMessage("Please login with the Admin Token to use admin features.");
+        setMessage("Please login to access admin features.");
         return;
       }
 
-      try {
-        await adminLogin(token); // ✅ verifies token against FastAPI
-        if (!alive) return;
-        setStatus("authed");
-        setMessage("");
-      } catch (e: any) {
-        if (!alive) return;
-        setStatus("unauthed");
-        setMessage(e?.message ?? "Unauthorized");
-      }
+      // ✅ logged in (role enforcement comes next via backend)
+      setStatus("authed");
+      setMessage("");
     };
 
-    verify();
+    check();
 
-    const onChange = () => verify();
-    window.addEventListener("admin-token-changed", onChange);
+    const onChange = () => check();
+    window.addEventListener("admin-auth-changed", onChange);
+
+    // Supabase also emits auth state changes
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      window.dispatchEvent(new Event("admin-auth-changed"));
+    });
 
     return () => {
       alive = false;
-      window.removeEventListener("admin-token-changed", onChange);
+      window.removeEventListener("admin-auth-changed", onChange);
+      sub.subscription.unsubscribe();
     };
   }, []);
 
