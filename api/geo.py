@@ -6,22 +6,46 @@ from .supabase_client import get_supabase
 from typing import Optional, Dict, Any, List
 import json
 from .run_helpers import resolve_run_id, resolve_model_name
-from .risk import risk_from_baseline_percentiles
-from .forecast import _load_weekly_history, _load_population_map
+from .forecast import _load_population_map
+from .utils import normalize_name
+from typing import Sequence, Tuple
+from .jenks import jenks_breaks_safe, jenks_class
 
 router = APIRouter(prefix="/geo", tags=["geo"])
+
+PERIOD_WEEKS = {
+    "1w": 1,
+    "2w": 2,
+    "1m": 4,
+    "3m": 12,
+    "6m": 26,
+    "1y": 52,
+}
+
+def fetch_all(q, page_size: int = 1000):
+    out = []
+    start = 0
+    while True:
+        chunk = q.range(start, start + page_size - 1).execute().data or []
+        out.extend(chunk)
+        if len(chunk) < page_size:
+            break
+        start += page_size
+    return out
+
 
 
 @router.get("/choropleth")
 def get_choropleth(
     run_id: Optional[str] = Query(None),
     model_name: Optional[str] = Query(None),
+    period: str = Query("1w"),
 ):
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
     model = resolve_model_name(sb, rid, model_name)
+    weeks_to_sum = PERIOD_WEEKS.get(period, 1)
 
-    # 1) polygons
     brg_rows = (
         sb.table("barangays")
         .select("name, display_name, geom_json")
@@ -29,85 +53,138 @@ def get_choropleth(
         .data
     ) or []
 
-    # 2) latest forecasts (view)
-    latest_rows = (
-        sb.table("latest_barangay_forecast")
+    # Period-aware: fetch future forecast rows and sum first N weeks
+    frows_q = (
+        sb.table("barangay_forecasts_long")
         .select("name, week_start, yhat")
         .eq("run_id", rid)
         .eq("model_name", model)
         .eq("horizon_type", "future")
-        .execute()
-        .data
-    ) or []
+        .order("name")
+        .order("week_start")
+    )
 
-    forecast_map = {r["name"]: r for r in latest_rows}
+    frows = fetch_all(frows_q)
 
-    history = _load_weekly_history(sb, rid)
+    grouped: Dict[str, List[dict]] = {}
+    for r in frows:
+        nm = normalize_name(r["name"])
+        grouped.setdefault(nm, []).append(r)
+
     pop_map = _load_population_map(sb)
 
+    # ---- 1st pass: compute forecast sums + incidence per barangay
+    rows_for_features = []  # temporary store
+    case_values: List[float] = []
+    inc_values: List[float] = []
 
-    features = []
+    # ✅ city-level aggregates (public-health correct)
+    city_forecast_cases = 0.0
+    city_population = 0
     for b in brg_rows:
-        nm = b["name"]
+        nm = normalize_name(b["name"])
         geom = b.get("geom_json")
         if not geom:
             continue
 
-        fr = forecast_map.get(nm)
-        fc = float(fr["yhat"]) if fr and fr.get("yhat") is not None else None
-        wk = fr["week_start"] if fr else None
+        rows = grouped.get(nm, [])
+        slice_rows = rows[:weeks_to_sum]
+        total_fc = sum(float(x.get("yhat") or 0.0) for x in slice_rows) if slice_rows else None
+        wk0 = slice_rows[0]["week_start"] if slice_rows else None
 
-        series = history.get(nm, [])
+        if total_fc is not None:
+            case_values.append(float(total_fc))
+            city_forecast_cases += float(total_fc)
+
         pop = pop_map.get(nm)
+        if pop and pop > 0:
+            city_population += int(pop)
 
-        if fc is None:
-            risk_pack = {
-                "forecast_incidence_per_100k": None,
-                "risk_level_cases": "unknown",
-                "risk_level_incidence": None,
-            }
-        else:
-            risk_pack = risk_from_baseline_percentiles(
-                forecast_cases=float(fc),
-                history_cases=series,
-                population=pop,
-            )
+        inc = None
+        if total_fc is not None and pop and pop > 0:
+            # cumulative incidence per 100k over the selected period
+            inc = (float(total_fc) / float(pop)) * 100000.0
 
+        if inc is not None:
+            inc_values.append(inc)
+
+        rows_for_features.append((b, nm, geom, total_fc, inc, wk0, pop))
+
+    # ---- Compute Jenks breaks across incidence distribution
+    # 5 classes = 6 breakpoints
+
+    breaks = jenks_breaks_safe(inc_values, n_classes=5)
+    case_breaks = jenks_breaks_safe(case_values, n_classes=5)
+
+    # ---- 2nd pass: build GeoJSON features with Jenks class labels
+    features = []
+    for (b, nm, geom, total_fc, inc, wk0, pop) in rows_for_features:
+        inc_class = jenks_class(inc, breaks)
+        
+        cases_class = jenks_class(total_fc, case_breaks) if total_fc is not None else "unknown"
 
         properties = {
             "name": nm,
             "display_name": b.get("display_name") or nm,
-            "latest_future_week": wk,
+            "period": period,
+            "weeks_to_sum": weeks_to_sum,
+            "period_start_week": wk0,
 
-            # 🔥 REQUIRED FOR FRONTEND
-            "risk_level": risk_pack["risk_level_cases"],
-            "latest_forecast": fc,
+            "cases_class": cases_class,
+            "risk_level_cases": cases_class,   # optional: keep frontend compatibility
+            "risk_level": cases_class,         # optional legacy key
 
-            "forecast_cases": fc,
-            "forecast_incidence_per_100k": risk_pack["forecast_incidence_per_100k"],
-            "risk_level_cases": risk_pack["risk_level_cases"],
-            "risk_level_incidence": risk_pack["risk_level_incidence"],
+            # Keep forecast fields
+            "latest_forecast": total_fc,
+            "forecast_cases": total_fc,
+            "forecast_incidence_per_100k": inc,
+
+            "population": pop,
+
+            # ✅ NEW: choropleth burden classification
+            "burden_class": inc_class,  # very_low..very_high
+
+            # Keep existing keys so frontend won’t break
+            # You can map these to your existing risk keys if you want:
+            "risk_level_incidence": inc_class,
 
             "run_id": rid,
             "model_name": model,
             "horizon_type": "future",
 
-            # keep if frontend expects:
             "latest_cases": 0,
             "latest_week": None,
+
+            "jenks_breaks_incidence": breaks,
+            "jenks_breaks_cases": case_breaks,
+            
         }
 
         features.append({"type": "Feature", "geometry": geom, "properties": properties})
 
+    city_incidence_per_100k = (
+        (city_forecast_cases / float(city_population)) * 100000.0
+        if city_population > 0
+        else None
+    )
 
     return {
-    "type": "FeatureCollection",
-    "run_id": rid,
-    "model_name": model,
-    "horizon_type": "future",
-    "features": features
-    }
+        "type": "FeatureCollection",
+        "run_id": rid,
+        "model_name": model,
+        "horizon_type": "future",
+        "period": period,
+        "jenks_breaks_incidence": breaks,
+        "jenks_breaks_cases": case_breaks,
+        "weeks_to_sum": weeks_to_sum,
 
+        # ✅ public-health KPIs (city-level)
+        "city_forecast_cases": round(city_forecast_cases, 2),
+        "city_population": city_population,
+        "city_incidence_per_100k": round(city_incidence_per_100k, 2) if city_incidence_per_100k is not None else None,
+
+        "features": features,
+    }
 
 @router.get("/hotspots/top")
 def dengue_hotspots_top(

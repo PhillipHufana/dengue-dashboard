@@ -10,6 +10,8 @@ import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { clearAdminToken, getAdminToken } from "@/lib/adminApi";
 import { LoginModal } from "@/components/dashboard/login-modal";
 import { supabaseLogout } from "@/lib/adminApi";
+import { RiskMetricToggle } from "@/components/dashboard/risk-metric-toggle";
+
 type HeaderMode = "public" | "admin";
 
 export function AppHeader({
@@ -122,7 +124,8 @@ export function AppHeader({
                   </Link>
                 )}
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
+                <RiskMetricToggle compact />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   <span>Last updated: {lastUpdated ?? "—"}</span>
                 </div>

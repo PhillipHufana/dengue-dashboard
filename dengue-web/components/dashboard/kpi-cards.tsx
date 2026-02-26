@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
+import { Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
 import { useSummary } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
-// Types based on your real API
+import { useChoropleth } from "@/lib/query/hooks";
 
 type BarangayLatest = {
   name: string;
@@ -15,44 +15,64 @@ type BarangayLatest = {
   risk_level?: string;
 };
 
-
 type SummaryResponse = {
-  city_latest: {
-    week_start: string;
-    city_cases: number;
-    created_at: string;
-  } | null;
+  city_latest: { week_start: string; city_cases: number; created_at: string } | null;
   barangay_latest: BarangayLatest[];
   total_forecasted_cases: number;
 };
 
 export function KpiCards() {
-  // 🔥 Hooks MUST be at the very top
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
-  const { data, isLoading, error } = useSummary(runId, modelName);
+  const period = useDashboardStore((s) => s.period);
 
-  // Ensure we always have a usable structure to avoid conditional hook execution
+  const { data, isLoading, error } = useSummary(runId, modelName, period);
+
+  const { data: geo } = useChoropleth(runId, modelName, period);
+  const cityForecastCases = (geo as any)?.city_forecast_cases ?? null;
+  const cityIncidence = (geo as any)?.city_incidence_per_100k ?? null;
   const summary: SummaryResponse | null = data ?? null;
   const city = summary?.city_latest ?? null;
 
   const barangays: BarangayLatest[] = summary?.barangay_latest ?? [];
   const totalForecasted = summary?.total_forecasted_cases ?? 0;
 
-  const hotspotThreshold = 5;
+  const riskMetric = useDashboardStore((s) => s.riskMetric);
 
-  // 🔥 useMemo must ALWAYS run (even while loading) — use fallback []
-  const hotspotBarangays = useMemo(
-    () => barangays.filter((b) => (b.forecast ?? 0) >= hotspotThreshold),
-    [barangays]
-  );
+ 
+  const veryHighCount = useMemo(() => {
+    const feats = (geo as any)?.features ?? [];
+    const key = riskMetric === "cases" ? "cases_class" : "burden_class";
+    return feats.filter((f: any) => f?.properties?.[key] === "very_high").length;
+  }, [geo, riskMetric]);
 
-  const topBarangay = useMemo(() => {
-    if (!barangays.length) return null;
-    return [...barangays].sort((a, b) => (b.forecast ?? 0) - (a.forecast ?? 0))[0];
-  }, [barangays]);
+  const hotspot = useMemo(() => {
+    const feats = (geo as any)?.features ?? [];
+    const valueKey =
+      riskMetric === "cases" ? "forecast_cases" : "forecast_incidence_per_100k";
 
-  // Now we can render conditionally — AFTER hooks
+    let best: any = null;
+    let bestVal = -Infinity;
+
+    for (const f of feats) {
+      const v = Number(f?.properties?.[valueKey]);
+      if (Number.isFinite(v) && v > bestVal) {
+        bestVal = v;
+        best = f;
+      }
+    }
+
+    if (!best) return null;
+
+    return {
+      name: best.properties?.display_name ?? best.properties?.name ?? "—",
+      value: bestVal,
+    };
+  }, [geo, riskMetric]);
+
+
+
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
@@ -74,87 +94,85 @@ export function KpiCards() {
     );
   }
 
-  if (error || !summary) {
-    return <div className="text-sm text-destructive">Failed to load dashboard summary.</div>;
+  if (error && !geo) {
+    return <div className="text-sm text-destructive">Failed to load dashboard data.</div>;
   }
 
   return (
     <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-      {/* Card 1 — Latest city cases */}
       <Card className="bg-card border-border">
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <Activity className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">Latest</span>
+            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
           </div>
-
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {city?.city_cases?.toLocaleString() ?? "—"}
+              {cityForecastCases != null ? Number(cityForecastCases).toLocaleString() : "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              City-wide dengue cases
+              City forecast cases (next {period.toUpperCase()})
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 2 — Total forecast */}
       <Card className="bg-card border-border">
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <BarChart3 className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">Forecast</span>
+            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
           </div>
-
           <div className="mt-4">
-            <p className="text-xl font-bold">{totalForecasted.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">Total forecasted cases</p>
+            <p className="text-xl font-bold">
+              {cityIncidence != null ? Number(cityIncidence).toFixed(2) : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">City cumulative incidence (/100k)</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 3 — Hotspots */}
       <Card className="bg-card border-border">
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <span className="text-xs md:text-sm text-destructive font-medium">Hotspots</span>
+            <span className="text-xs md:text-sm text-destructive font-medium">{period.toUpperCase()}</span>
           </div>
-
           <div className="mt-4">
-            <p className="text-xl font-bold">{hotspotBarangays.length}</p>
+            <p className="text-xl font-bold">{veryHighCount}</p>
             <p className="text-xs text-muted-foreground">
-              Barangays ≥ {hotspotThreshold} forecast
+              Barangays (Very High {riskMetric === "cases" ? "cases" : "burden"})
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 4 — Top Barangay */}
       <Card className="bg-card border-border">
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <MapPin className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">Highest</span>
+            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
           </div>
-
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {topBarangay?.forecast?.toFixed(2) ?? "—"}
+              {hotspot
+                ? riskMetric === "cases"
+                  ? hotspot.value.toLocaleString()
+                  : hotspot.value.toFixed(2)
+                : "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {topBarangay?.display_name ?? topBarangay?.name ?? "—"}
+              {hotspot?.name ?? "—"}{" "}
+              {hotspot ? (riskMetric === "cases" ? "(cases)" : "(/100k)") : ""}
             </p>
-
           </div>
         </CardContent>
       </Card>

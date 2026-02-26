@@ -8,27 +8,33 @@ from .supabase_client import get_supabase
 from .utils import normalize_name
 from .run_helpers import resolve_run_id, resolve_model_name, DEFAULT_MODEL
 from .risk import risk_from_baseline_percentiles
-
+from .risk import risk_from_baseline_percentiles_windowed
+from .jenks import jenks_breaks_safe, jenks_class
 router = APIRouter()
 
 # ================================================================
 # 🔧 HELPERS — LOAD WEEKLY HISTORY + COMPUTE THRESHOLDS
 # ================================================================
+PERIOD_WEEKS = {
+    "1w": 1,
+    "2w": 2,
+    "1m": 4,
+    "3m": 12,
+    "6m": 26,
+    "1y": 52,
+}
 
 def _load_population_map(sb) -> Dict[str, int]:
-    rows = (
-        sb.table("latest_barangay_population")
-        .select("name, population")
-        .execute()
-        .data
-    ) or []
-    return {r["name"]: int(r["population"]) for r in rows if r.get("population") is not None}
+    rows = (sb.table("latest_barangay_population").select("name, population").execute().data) or []
+    out: Dict[str, int] = {}
+    for r in rows:
+        if r.get("population") is None or not r.get("name"):
+            continue
+        out[normalize_name(r["name"])] = int(r["population"])
+    return out
+
 
 def _load_weekly_history(sb, run_id: str) -> Dict[str, List[int]]:
-    """
-    Loads historical dengue cases per barangay for a single published run.
-    Fallbacks to legacy barangay_weekly if run-scoped table is not populated yet.
-    """
     resp = (
         sb.table("barangay_weekly_runs")
         .select("name, week_start, cases")
@@ -38,14 +44,8 @@ def _load_weekly_history(sb, run_id: str) -> Dict[str, List[int]]:
     )
     rows = resp.data or []
 
-    # TEMP fallback while migrating pipeline exports
     if not rows:
-        resp = (
-            sb.table("barangay_weekly")
-            .select("name, week_start, cases")
-            .order("week_start")
-            .execute()
-        )
+        resp = sb.table("barangay_weekly").select("name, week_start, cases").order("week_start").execute()
         rows = resp.data or []
 
     out: Dict[str, List[int]] = {}
@@ -260,12 +260,13 @@ def _risk_from_forecast_simple(f: float) -> str:
 def get_forecast_summary(
     run_id: Optional[str] = Query(None),
     model_name: Optional[str] = Query(None),
+    period: str = Query("1w"),
 ):
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
     model = resolve_model_name(sb, rid, model_name)
+    weeks_to_sum = PERIOD_WEEKS.get(period, 1)
 
-    # Latest city observed (for data_last_updated)
     city_rows = (
         sb.table("city_weekly_runs")
         .select("week_start, city_cases")
@@ -275,7 +276,6 @@ def get_forecast_summary(
         .execute()
         .data
     ) or []
-    
     if not city_rows:
         city_rows = (
             sb.table("city_weekly")
@@ -286,74 +286,121 @@ def get_forecast_summary(
             .data
         ) or []
     data_last_updated = city_rows[0]["week_start"] if city_rows else None
-    # Preload barangay display names (canonical -> display)
+
     brg = (sb.table("barangays").select("name, display_name").execute().data) or []
     display_map = {
-        (b["name"]): (b.get("display_name") or b["name"])
+        normalize_name(b["name"]): (b.get("display_name") or b["name"])
         for b in brg
         if b.get("name")
     }
 
-    # Thresholds for risk classification
-
     history = _load_weekly_history(sb, rid)
     pop_map = _load_population_map(sb)
 
-    # ✅ Use the view: already one latest row per barangay
-    latest_rows = (
-        sb.table("latest_barangay_forecast")
+    # Pull *future forecasts* for next N weeks for each barangay (period-aware)
+    # NOTE: this avoids relying on "latest_barangay_forecast" which is 1-week only.
+    frows = (
+        sb.table("barangay_forecasts_long")
         .select("name, week_start, yhat, yhat_lower, yhat_upper")
         .eq("run_id", rid)
         .eq("model_name", model)
         .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start")
         .execute()
         .data
     ) or []
 
+    grouped: Dict[str, List[dict]] = {}
+    for r in frows:
+        nm = normalize_name(r["name"])
+        grouped.setdefault(nm, []).append(r)
+
     barangay_latest = []
     total = 0.0
 
-    for r in latest_rows:
-        nm = r["name"]  # canonical
-        fc = float(r.get("yhat") or 0.0)
-        total += fc
+    rows_tmp = []      # store per-barangay computed values for a second pass
+    case_values = []   # for Jenks on forecast_cases over period
+    inc_values = []    # for Jenks on incidence per 100k over period
 
-        series = history.get(nm, [])
+    for nm, rows in grouped.items():
+        slice_rows = rows[:weeks_to_sum]
+
+        total_fc = sum(float(x.get("yhat") or 0.0) for x in slice_rows)
+        total += total_fc
+
+        week_start = slice_rows[0]["week_start"] if slice_rows else None
+
         pop = pop_map.get(nm)
+        inc = None
+        if pop and pop > 0:
+            inc = (float(total_fc) / float(pop)) * 100000.0
 
-        risk_pack = risk_from_baseline_percentiles(
-            forecast_cases=fc,
-            history_cases=series,
-            population=pop,
+        # bounds (optional)
+        yhat_lower = (
+            sum(float(x.get("yhat_lower") or 0.0) for x in slice_rows)
+            if any(x.get("yhat_lower") is not None for x in slice_rows)
+            else None
+        )
+        yhat_upper = (
+            sum(float(x.get("yhat_upper") or 0.0) for x in slice_rows)
+            if any(x.get("yhat_upper") is not None for x in slice_rows)
+            else None
         )
 
-        barangay_latest.append({
-            "name": nm,
-            "display_name": display_map.get(nm, nm),
-            "week_start": r["week_start"],
+        history_len = len(history.get(nm, []))
 
-            # ✅ legacy
-            "forecast": fc,
-            "risk_level": risk_pack["risk_level_cases"],
+        rows_tmp.append((nm, week_start, total_fc, inc, pop, history_len, yhat_lower, yhat_upper))
 
-            # ✅ new
-            "forecast_cases": fc,
-            "forecast_incidence_per_100k": risk_pack["forecast_incidence_per_100k"],
-            "risk_level_cases": risk_pack["risk_level_cases"],
-            "risk_level_incidence": risk_pack["risk_level_incidence"],
+        case_values.append(float(total_fc))
+        if inc is not None:
+            inc_values.append(float(inc))
 
-            "yhat_lower": r.get("yhat_lower"),
-            "yhat_upper": r.get("yhat_upper"),
-        })
+    # ✅ compute Jenks breaks AFTER we have all values
+    case_breaks = jenks_breaks_safe(case_values, n_classes=5)
+    inc_breaks = jenks_breaks_safe(inc_values, n_classes=5)
 
+    # ✅ second pass: assign classes + build response rows
+    for (nm, week_start, total_fc, inc, pop, history_len, yhat_lower, yhat_upper) in rows_tmp:
+        cases_class = jenks_class(float(total_fc), case_breaks) if total_fc is not None else "unknown"
+        burden_class = jenks_class(float(inc), inc_breaks) if inc is not None else "unknown"
 
+        barangay_latest.append(
+            {
+                "name": nm,
+                "display_name": display_map.get(nm, nm),
+                "week_start": week_start,
+                "period": period,
+                "weeks_to_sum": weeks_to_sum,
+                "history_len": history_len,
 
+                "forecast": float(total_fc),
+                "forecast_cases": float(total_fc),
+                "forecast_incidence_per_100k": inc,
+
+                # ✅ Jenks classes
+                "cases_class": cases_class,
+                "burden_class": burden_class,
+
+                # ✅ keep legacy keys (but now consistent with Jenks)
+                "risk_level": burden_class,              # burden everywhere
+                "risk_level_cases": cases_class,
+                "risk_level_incidence": burden_class,
+
+                "yhat_lower": yhat_lower,
+                "yhat_upper": yhat_upper,
+            }
+        )
     return {
         "run_id": rid,
         "model_name": model,
         "horizon_type": "future",
+        "period": period,
+        "weeks_to_sum": weeks_to_sum,
         "city_latest": city_rows[0] if city_rows else None,
         "barangay_latest": barangay_latest,
         "total_forecasted_cases": round(total, 2),
         "data_last_updated": data_last_updated,
+        "jenks_breaks_incidence": inc_breaks,
+        "jenks_breaks_cases": case_breaks,
     }

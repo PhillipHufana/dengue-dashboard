@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Activity, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBarangaySeries, useCitySeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
-
+import { Button } from "@/components/ui/button";
 import {
   LineChart,
   Line,
@@ -63,12 +63,27 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const horizonType = useDashboardStore((s) => s.horizonType);
   const freq = useDashboardStore((s) => s.freq);
   const brgyName = selectedBarangay?.clean ?? null;
+  const [view, setView] = useState<"focused" | "full">("focused");
   const q = brgyName
     ? useBarangaySeries(brgyName, freq, runId, modelName, horizonType)
     : useCitySeries(freq, runId, modelName, horizonType);
 
   const { data, isLoading, isError } = q;
   const series = data?.series ?? [];
+  const displaySeries = useMemo(() => {
+    if (view === "full") return series;
+
+    const historyCount = freq === "weekly" ? 16 : freq === "monthly" ? 12 : 10;
+
+    const idx = series.findIndex((d: any) => d.is_future);
+
+    // If no future flag found, just show recent history window
+    if (idx < 0) return series.slice(-historyCount);
+
+    // Show last N historical points + all remaining points (including future)
+    const start = Math.max(0, idx - historyCount);
+    return series.slice(start);
+  }, [series, view, freq]);
   const locationName =
     selectedBarangay?.pretty ?? "City-Wide (All 182 Barangays)";
 
@@ -79,7 +94,6 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
     monthly: "Monthly",
     yearly: "Yearly",
   }[freq];
-
 
   const forecastStartIndex = series.findIndex(
     (d: { is_future: boolean }) => d.is_future
@@ -146,9 +160,29 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
               <CardTitle className="text-base font-semibold">
                 Predictive Forecast
               </CardTitle>
+
               <Badge variant="secondary" className="text-[10px]">
                 {freqLabel}
-              </Badge> 
+              </Badge>
+
+              <div className="ml-2 flex gap-1">
+                <Button
+                  size="sm"
+                  className="h-7 text-[10px]"
+                  variant={view === "focused" ? "default" : "outline"}
+                  onClick={() => setView("focused")}
+                >
+                  Focus
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-[10px]"
+                  variant={view === "full" ? "default" : "outline"}
+                  onClick={() => setView("full")}
+                >
+                  Full
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">
@@ -178,7 +212,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
       <CardContent className="p-4 pt-0">
         <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={{ top: 10, left: -15, right: 5 }}>
+            <LineChart data={displaySeries} margin={{ top: 10, left: -15, right: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
 
               <XAxis

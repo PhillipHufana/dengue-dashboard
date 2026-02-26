@@ -17,6 +17,8 @@ import { useEffect } from "react"
 import { getDataInfo } from "@/lib/api"
 import Link from "next/link"
 import { AppHeader } from "./dashboard/AppHeader"
+import { RiskMetricToggle } from "./dashboard/risk-metric-toggle";
+
 const ChoroplethMap = dynamic(
   () =>
     import("./dashboard/choropleth-map").then((mod) => mod.ChoroplethMap),
@@ -58,17 +60,20 @@ export function DengueDashboard() {
         mode="public"
         lastUpdated={lastUpdated}
         rightSlot={
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[140px] bg-secondary">
-              <SelectValue placeholder="Time range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Last 24 hours</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <RiskMetricToggle />
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-[140px] bg-secondary">
+                <SelectValue placeholder="Time range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="24h">Last 24 hours</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         }
       />
 

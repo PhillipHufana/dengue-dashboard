@@ -6,6 +6,8 @@ import { persist } from "zustand/middleware";
 export type Frequency = "weekly" | "monthly" | "yearly";
 export type ModelName = string;
 export type RiskMetric = "cases" | "incidence";
+export type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
+
 interface DashboardState {
   // UI state
   selectedBarangay: string | null;
@@ -16,7 +18,11 @@ interface DashboardState {
   runId: string | null;
   horizonType: "test" | "future";
 
-  // time-range controls
+  // global period for syncing map/summary/rankings
+  period: TimePeriod;
+  setPeriod: (p: TimePeriod) => void;
+
+  // time-range controls (unused for API now, keep)
   rangeStart: number;
   rangeEnd: number;
 
@@ -48,17 +54,19 @@ export const useDashboardStore = create<DashboardState>()(
       freq: "weekly",
       modelName: "preferred",
 
-      riskMetric: "cases",
-      setRiskMetric: (v) => set({ riskMetric: v }),
-
-
       runId: null,
       horizonType: "future",
+
+      // ✅ default period
+      period: "1m",
+      setPeriod: (p) => set({ period: p }),
+
+      riskMetric: "cases",
+      setRiskMetric: (v) => set({ riskMetric: v }),
 
       rangeStart: 0,
       rangeEnd: 10,
       cityLength: 0,
-
 
       setSelectedBarangay: (name) => set({ selectedBarangay: name }),
       setFreq: (f) => set({ freq: f }),
