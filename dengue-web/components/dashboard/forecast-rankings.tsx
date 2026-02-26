@@ -18,22 +18,12 @@ interface ForecastRankingsProps {
   onBarangaySelect: (value: { pretty: string; clean: string } | null) => void;
 }
 
-const timePeriodLabels: Record<TimePeriod, string> = {
-  "1w": "1 Week",
-  "2w": "2 Weeks",
-  "1m": "1 Month",
-  "3m": "3 Months",
-  "6m": "6 Months",
-  "1y": "1 Year",
-};
-
 export const ForecastRankings = React.memo(function ForecastRankings({
   selectedBarangay,
   onBarangaySelect,
 }: ForecastRankingsProps) {
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const timePeriod = useDashboardStore((s) => s.period);
-  const setTimePeriod = useDashboardStore((s) => s.setPeriod);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -144,16 +134,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
             <CardTitle className="text-base md:text-lg font-semibold">Forecast Rankings</CardTitle>
           </div>
 
-          {/* ✅ GLOBAL period control */}
-          <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
-            <TabsList className="grid grid-cols-6 w-full h-8">
-              {(Object.keys(timePeriodLabels) as TimePeriod[]).map((p) => (
-                <TabsTrigger key={p} value={p} className="text-[10px] md:text-xs">
-                  {p.toUpperCase()}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          
 
           {lastUpdated && data ? (
             <div className="text-[10px] text-muted-foreground leading-tight">
@@ -182,7 +163,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                 className="text-[10px]"
                 onClick={() => setRiskFilter(r as any)}
               >
-                {r.toUpperCase()}
+                {r === "all" ? "ALL" : r.replace("_", " ").toUpperCase()}
               </Button>
             ))}
           </div>

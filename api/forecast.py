@@ -365,7 +365,7 @@ def get_forecast_summary(
         cases_class = jenks_class(float(total_fc), case_breaks) if total_fc is not None else "unknown"
         burden_class = jenks_class(float(inc), inc_breaks) if inc is not None else "unknown"
 
-        barangay_latest.append(
+        barangay_latest.append( 
             {
                 "name": nm,
                 "display_name": display_map.get(nm, nm),

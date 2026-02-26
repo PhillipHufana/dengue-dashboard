@@ -25,20 +25,19 @@ export function cleanName(name: string): string {
   return x;
 }
 
-export type RiskLevel = "low" | "medium" | "high" | "critical" | "unknown";
 export type JenksClass = "very_low" | "low" | "medium" | "high" | "very_high" | "unknown";
 
 export interface SummaryBarangayRow {
   name: string;           // canonical key
   forecast: number;
   week_start: string;
-  risk_level: RiskLevel;
+  risk_level: JenksClass;
 
     // optional richer fields from backend (safe to keep optional)
   forecast_cases?: number | null;
   forecast_incidence_per_100k?: number | null;
-  risk_level_cases?: RiskLevel;
-  risk_level_incidence?: RiskLevel | null;
+  risk_level_cases?: JenksClass;
+  risk_level_incidence?: JenksClass | null;
 
   // new sync fields
   period?: TimePeriod;
@@ -50,7 +49,7 @@ export type ChoroplethFeatureProps = {
   display_name: string;
 
   // legacy key (keep)
-  risk_level: RiskLevel;
+  risk_level: JenksClass;
   latest_cases: number;
   latest_week: string | null;
   latest_forecast: number;
@@ -59,8 +58,8 @@ export type ChoroplethFeatureProps = {
   // new richer keys (safe optional)
   forecast_cases?: number | null;
   forecast_incidence_per_100k?: number | null;
-  risk_level_cases?: RiskLevel;
-  risk_level_incidence?: RiskLevel | null;
+  risk_level_cases?: JenksClass;
+  risk_level_incidence?: JenksClass | null;
 
   // new sync fields
   period?: TimePeriod;
@@ -167,15 +166,15 @@ export interface RankingRow {
   pretty_name: string;
 
   total_forecast: number;
-  risk_level: string;
+  risk_level: JenksClass;
 
   total_forecast_cases: number;
   total_forecast_incidence_per_100k: number | null;
-  risk_level_cases: string;
-  risk_level_incidence: string | null;
+  risk_level_cases: JenksClass;
+  risk_level_incidence: JenksClass | null;
 
-  cases_class?: string;
-  burden_class?: string;
+  cases_class?: JenksClass;
+  burden_class?: JenksClass;
 
   trend: number;
   this_week: number | null;

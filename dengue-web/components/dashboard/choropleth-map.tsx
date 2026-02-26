@@ -21,16 +21,20 @@ import { useDashboardStore } from "@/lib/store/dashboard-store";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+type JenksClass = "very_low" | "low" | "medium" | "high" | "very_high" | "unknown";
 interface BarangayForecast {
   name: string;
   display_name?: string;
   week_start: string;
   forecast: number | null;
-  risk_level: "low" | "medium" | "high" | "critical" | "unknown";
+  risk_level: JenksClass;
   forecast_cases?: number | null;
   forecast_incidence_per_100k?: number | null;
-  risk_level_cases?: "low" | "medium" | "high" | "critical" | "unknown";
-  risk_level_incidence?: "low" | "medium" | "high" | "critical" | "unknown" | null;
+  risk_level_cases?: JenksClass;
+  risk_level_incidence?: JenksClass | null;
+  cases_class?: JenksClass;
+  burden_class?: JenksClass;
 }
 
 function formatRange(a: number, b: number, unit: string) {
@@ -68,7 +72,6 @@ interface ChoroplethMapProps {
 export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: ChoroplethMapProps) {
   const [selectedWeek, setSelectedWeek] = useState(11);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mapView, setMapView] = useState<"choropleth" | "hotspots">("choropleth");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const riskMetric = useDashboardStore((s) => s.riskMetric);
@@ -93,6 +96,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
 
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
+  
 
   // ✅ pass period to both
   const { data: geo, isLoading: loadingGeo } = useChoropleth(runId, modelName, period);
@@ -227,13 +231,22 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
 
     const forecastLabel = riskMetric === "cases" ? "Forecast cases" : "Forecast /100k";
 
+    const pop = feature.properties.population;
+    const popLabel = pop ? Number(pop).toLocaleString() : "—";
+
+    const forecastDisplay =
+      riskMetric === "cases"
+        ? Number(forecastValue).toLocaleString()
+        : Number(forecastValue).toFixed(2);
+
     layer.bindTooltip(
       `
         <strong>${label}</strong><br/>
         Period: <strong>${period.toUpperCase()}</strong><br/>
-        Risk: <strong>${level}</strong><br/>
-        ${forecastLabel}: <strong>${Number(forecastValue).toFixed(2)}</strong>
-        <span style="font-size:11px;color:#aaa">Click to view trend</span>
+        Population: <strong>${popLabel}</strong><br/>
+        Class: <strong>${level}</strong><br/>
+        ${forecastLabel}: <strong>${forecastDisplay}</strong>
+        <div style="font-size:11px;color:#aaa;margin-top:4px">Click to view trend</div>
       `,
       { sticky: true }
     );
@@ -261,14 +274,9 @@ return (
               </Badge>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant={riskMetric === "cases" ? "default" : "outline"} size="sm" onClick={() => setRiskMetric("cases")}>
-                Cases
-              </Button>
-              <Button variant={riskMetric === "incidence" ? "default" : "outline"} size="sm" onClick={() => setRiskMetric("incidence")}>
-              Incidence
-              </Button>
-            </div>
+            <Badge variant="secondary" className="text-xs">
+              {riskMetric === "cases" ? "Cases" : "Incidence (/100k)"}
+            </Badge>
           </div>
           {selectedBarangay && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -321,7 +329,12 @@ return (
           ) : geo ? (
             <MapContainer center={[7.1907, 125.4553]} zoom={11} scrollWheelZoom className="w-full h-full">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" opacity={0.35} />
-              <GeoJSON data={geo} style={style} onEachFeature={onEachFeature} />
+              <GeoJSON
+                key={`${riskMetric}-${period}-${(geo as any)?.run_id ?? ""}-${(geo as any)?.model_name ?? ""}`}
+                data={geo}
+                style={style}
+                onEachFeature={onEachFeature}
+              />
             </MapContainer>
           ) : (
             <div className="text-red-500 p-4">Failed to load map.</div>

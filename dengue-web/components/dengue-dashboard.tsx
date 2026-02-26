@@ -18,6 +18,8 @@ import { getDataInfo } from "@/lib/api"
 import Link from "next/link"
 import { AppHeader } from "./dashboard/AppHeader"
 import { RiskMetricToggle } from "./dashboard/risk-metric-toggle";
+import { PeriodSelect } from "./dashboard/period-select";
+
 
 const ChoroplethMap = dynamic(
   () =>
@@ -62,17 +64,7 @@ export function DengueDashboard() {
         rightSlot={
           <div className="flex items-center gap-2">
             <RiskMetricToggle />
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[140px] bg-secondary">
-                <SelectValue placeholder="Time range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="24h">Last 24 hours</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
+            <PeriodSelect />
           </div>
         }
       />

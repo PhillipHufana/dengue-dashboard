@@ -23,7 +23,7 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
         onClick={() => setRiskMetric("incidence")}
         className={compact ? "h-8 text-xs" : ""}
       >
-        Burden (/100k)
+        Incidence (/100k)
       </Button>
     </div>
   );
