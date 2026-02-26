@@ -45,6 +45,10 @@ export function useRankings(period: string, runId?: string | null, modelName?: s
         runId: runId ?? undefined,
         modelName: modelName ?? undefined,
       }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+    refetchOnWindowFocus: false,
   });
 }
 
