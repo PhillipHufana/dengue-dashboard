@@ -349,3 +349,26 @@ def delete_upload(
     ).eq("upload_id", upload_id).execute()
 
     return {"ok": True, "status": "deleted"}
+
+
+@router.post("/uploads/preflight")
+def preflight_upload(
+    file: UploadFile = File(...),
+    user_id: str = Depends(require_admin_user),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+
+    ext = _infer_ext(file.filename)
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+    # read bytes once
+    _, file_bytes = _hash_uploadfile_md5_and_bytes(file)
+
+    meta = _quick_validate_headers(file_bytes, file.filename)
+
+    return {
+        "ok": True,
+        **meta,
+    }

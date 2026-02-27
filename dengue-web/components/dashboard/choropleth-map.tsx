@@ -373,7 +373,7 @@ return (
         </div>
         </div>
 
-        {/* Slider controls remain local (week animation) */}
+        {/* Slider controls remain local (week animation)
         <div className="space-y-3">
           <div className="flex justify-between">
             <span className="text-sm font-medium">Time Period</span>
@@ -395,7 +395,7 @@ return (
               <SkipForward className="h-4 w-4" />
             </Button>
           </div>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   );

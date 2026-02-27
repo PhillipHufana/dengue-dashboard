@@ -74,9 +74,12 @@ export function DataUploadLogs() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 8000);
+
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -104,3 +104,10 @@ export async function cancelUpload(upload_id: string) {
   const res = await adminFetch(`/admin/uploads/${upload_id}/cancel`, { method: "POST" });
   return res.json();
 }
+
+export async function preflightCasesFile(file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await adminFetch(`/admin/uploads/preflight`, { method: "POST", body: fd });
+  return res.json();
+}
