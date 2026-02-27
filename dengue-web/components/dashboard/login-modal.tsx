@@ -15,8 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Loader2 } from "lucide-react";
-import { supabaseLogin } from "@/lib/adminApi";
-
+import { supabaseLogin, supabaseSignup } from "@/lib/adminApi";
+import { toast } from "sonner";
+import { set } from "date-fns";
 interface LoginModalProps {
   variant?: "default" | "mobile";
 }
@@ -28,16 +29,41 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const [mode, setMode] = useState<"login" | "signup">("login");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
+
     try {
-      await supabaseLogin(email.trim(), password);
-      window.dispatchEvent(new Event("admin-auth-changed"));
+      if (mode === "login") {
+        await supabaseLogin(email.trim(), password);
+        window.dispatchEvent(new Event("admin-auth-changed"));
+        setOpen(false);
+        return;
+      }
+
+      // signup / request access
+      await supabaseSignup(email.trim(), password);
+
+      // show confirmation
+      toast.success("Request submitted", {
+        description:
+          "Your account was created. An admin must approve access before you can use admin tools.",
+      });
+
+      // reset UI
+      setError("");
+      setMode("login");
+      setPassword("");
+      setEmail("");
       setOpen(false);
+
+      // optional: show toast instead of closing modal
+      // but simplest: close and let UI show "not authorized" if they try.
     } catch (err: any) {
-      setError(err?.message ?? "Login failed");
+      setError(err?.message ?? (mode === "login" ? "Login failed" : "Signup failed"));
     } finally {
       setIsLoading(false);
     }
@@ -65,11 +91,32 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <LogIn className="h-4 w-4 text-primary-foreground" />
             </div>
-            Admin Login
+            {mode === "login" ? "Admin Login" : "Request Admin Access"}
           </DialogTitle>
-          <DialogDescription>Sign in with Supabase Auth (email + password).</DialogDescription>
+          <DialogDescription>
+            {mode === "login"
+              ? "Sign in with Supabase Auth (email + password)."
+              : "Create an account to request admin access. An existing admin must approve you."}
+          </DialogDescription>
         </DialogHeader>
-
+        <div className="flex gap-2 mt-3">
+          <Button
+            type="button"
+            variant={mode === "login" ? "default" : "outline"}
+            className="flex-1"
+            onClick={() => { setMode("login"); setError(""); }}
+          >
+            Sign In
+          </Button>
+          <Button
+            type="button"
+            variant={mode === "signup" ? "default" : "outline"}
+            className="flex-1"
+            onClick={() => { setMode("signup"); setError(""); }}
+          >
+            Request Access
+          </Button>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -103,12 +150,12 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Signing in...
+                {mode === "login" ? "Signing in..." : "Creating account..."}
               </>
             ) : (
               <>
                 <LogIn className="h-4 w-4 mr-2" />
-                Sign In
+                {mode === "login" ? "Sign In" : "Request Access"}
               </>
             )}
           </Button>

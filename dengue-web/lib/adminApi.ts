@@ -58,6 +58,12 @@ export async function supabaseLogin(email: string, password: string) {
   return { ok: true };
 }
 
+export async function supabaseSignup(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  return { ok: true, user: data.user };
+}
+
 export async function supabaseLogout() {
   const { error } = await supabase.auth.signOut();
   if (error) throw new Error(error.message);

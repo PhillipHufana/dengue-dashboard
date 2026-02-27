@@ -34,7 +34,8 @@ def require_admin_user(authorization: str | None = Header(default=None)) -> str:
     ) or []
 
     role = rows[0].get("role") if rows else None
+    if role is None:
+        raise HTTPException(status_code=403, detail="Account not approved yet (no profile)")
     if role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-
+        raise HTTPException(status_code=403, detail="Account not approved yet")
     return user_id
