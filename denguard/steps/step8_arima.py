@@ -1,15 +1,16 @@
 # denguard/steps/step8_arima.py
 from __future__ import annotations
 
-from typing import Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple
 import warnings
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from denguard.config import Config
+from denguard.forecast_schema import arima_pred_to_city_df, ensure_city_forecast_df
 from denguard.utils import plot_and_save
-from denguard.forecast_schema import ensure_city_forecast_df, arima_pred_to_city_df
 
 
 def smape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> float:
@@ -17,6 +18,16 @@ def smape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> float:
     y_pred = np.asarray(y_pred, dtype=float)
     denom = np.abs(y_true) + np.abs(y_pred) + eps
     return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
+
+
+def _suppress_known_arima_warnings() -> None:
+    warnings.filterwarnings("ignore", message=".*force_all_finite.*", category=FutureWarning)
+    warnings.filterwarnings("ignore", message=".*ensure_all_finite.*", category=FutureWarning)
+    warnings.filterwarnings(
+        "ignore",
+        message=".*Non-invertible starting MA parameters found.*",
+        category=UserWarning,
+    )
 
 
 def fit_arima(
@@ -30,13 +41,15 @@ def fit_arima(
       returns forecast_test + metrics
     Production (test_city empty):
       returns forecast_test=None + metrics=nan (model still returned, used later for future)
+
+    ARIMA is required for the pipeline's compare-and-select methodology.
+    Fail fast here if the dependency, fit, or forecast step is unavailable.
     """
     print("\n== STEP 8: ARIMA model ==")
 
     if not {"ds", "y"}.issubset(train_city.columns):
         raise ValueError("train_city must contain columns ['ds','y'].")
 
-    # test_city may be empty in production
     if not test_city.empty and not {"ds", "y"}.issubset(test_city.columns):
         raise ValueError("test_city must contain columns ['ds','y'] when provided.")
 
@@ -51,23 +64,27 @@ def fit_arima(
     try:
         import pmdarima as pm
     except Exception as e:
-        print("⚠️ ARIMA unavailable:", e)
-        return False, None, None, {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
+        raise RuntimeError(f"ARIMA is required but pmdarima could not be imported: {e}") from e
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*force_all_finite.*", category=FutureWarning)
-        model = pm.auto_arima(
-            y_train,
-            seasonal=False,
-            m=1,
-            test="kpss",
-            start_p=0, start_q=0,
-            max_p=5, max_q=5,
-            stepwise=True,
-            trace=False,
-            error_action="raise",
-            suppress_warnings=False,
-        )
+        _suppress_known_arima_warnings()
+        try:
+            model = pm.auto_arima(
+                y_train,
+                seasonal=False,
+                m=1,
+                test="kpss",
+                start_p=0,
+                start_q=0,
+                max_p=5,
+                max_q=5,
+                stepwise=True,
+                trace=False,
+                error_action="raise",
+                suppress_warnings=False,
+            )
+        except Exception as e:
+            raise RuntimeError(f"ARIMA fit failed during auto_arima(): {e}") from e
 
     print(model.summary())
 
@@ -75,12 +92,15 @@ def fit_arima(
     if future_h <= 0:
         raise ValueError("Forecast horizon must be positive.")
 
-    # Always predict horizon steps (even in backtest we still only evaluate on test length)
-    preds, conf = model.predict(n_periods=future_h, return_conf_int=True, alpha=0.2)
-    preds = np.asarray(preds, dtype=float)
-    conf = np.asarray(conf, dtype=float)
+    with warnings.catch_warnings():
+        _suppress_known_arima_warnings()
+        try:
+            preds, conf = model.predict(n_periods=future_h, return_conf_int=True, alpha=0.2)
+            preds = np.asarray(preds, dtype=float)
+            conf = np.asarray(conf, dtype=float)
+        except Exception as e:
+            raise RuntimeError(f"ARIMA forecast generation failed: {e}") from e
 
-    # Production: no test -> return None + nan metrics
     if test_city.empty:
         try:
             resid = np.asarray(model.resid(), dtype=float)
@@ -90,12 +110,11 @@ def fit_arima(
             plt.title("ARIMA Residuals")
             plot_and_save(cfg.out / "arima_residuals.png")
         except Exception as e:
-            print("ℹ️ Skipped ARIMA residual plot:", e)
+            print("â„¹ï¸ Skipped ARIMA residual plot:", e)
 
         nan_metrics = {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
         return True, model, None, nan_metrics
 
-    # Backtest: evaluate on overlap with test
     test_city = test_city.copy()
     test_city["ds"] = pd.to_datetime(test_city["ds"], errors="raise")
     test_city["y"] = pd.to_numeric(test_city["y"], errors="coerce").fillna(0.0)
@@ -116,7 +135,8 @@ def fit_arima(
     y_eval = y_test.iloc[:eval_len].to_numpy(dtype=float)
     yhat = pred_df["yhat"].to_numpy(dtype=float)
 
-    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+
     metrics: Dict[str, float] = {
         "RMSE": float(np.sqrt(mean_squared_error(y_eval, yhat))),
         "MAE": float(mean_absolute_error(y_eval, yhat)),
@@ -132,7 +152,7 @@ def fit_arima(
         plt.title("ARIMA Residuals")
         plot_and_save(cfg.out / "arima_residuals.png")
     except Exception as e:
-        print("ℹ️ Skipped ARIMA residual plot:", e)
+        print("â„¹ï¸ Skipped ARIMA residual plot:", e)
 
     raw_city_test = arima_pred_to_city_df(pred_df)
     forecast_test = ensure_city_forecast_df(raw_city_test, model_name="arima", horizon_type="test")

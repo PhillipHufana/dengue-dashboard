@@ -12,7 +12,7 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     df = df.copy()
     df["date_onset"] = pd.to_datetime(df["DOnset"], errors="coerce")
     df = df.dropna(subset=["date_onset"])
-    df = df[df["date_onset"].between("2017-01-01", "2025-12-31")]
+    df = df[df["date_onset"] >= pd.Timestamp("2017-01-01")]
 
     # Compute week start
     df["WeekStart"] = df["date_onset"] - pd.to_timedelta(df["date_onset"].dt.weekday, unit="d")

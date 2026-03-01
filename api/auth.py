@@ -4,7 +4,7 @@ from jwt import PyJWTError
 from fastapi import Header, HTTPException
 from .supabase_client import get_supabase
 
-def require_admin_user(authorization: str | None = Header(default=None)) -> str:
+def require_user_id(authorization: str | None = Header(default=None)) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing Authorization Bearer token")
 
@@ -23,11 +23,16 @@ def require_admin_user(authorization: str | None = Header(default=None)) -> str:
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token: missing sub")
 
+    return user_id
+
+def require_admin_user(authorization: str | None = Header(default=None)) -> str:
+    user_id = require_user_id(authorization)
+
     sb = get_supabase()
     rows = (
         sb.table("profiles")
         .select("role")
-        .eq("user_id", user_id)   # ✅ matches your schema
+        .eq("user_id", user_id)
         .limit(1)
         .execute()
         .data
@@ -38,4 +43,5 @@ def require_admin_user(authorization: str | None = Header(default=None)) -> str:
         raise HTTPException(status_code=403, detail="Account not approved yet (no profile)")
     if role != "admin":
         raise HTTPException(status_code=403, detail="Account not approved yet")
+
     return user_id

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
 import pandas as pd
+
 from denguard.config import Config
-from denguard.utils import plot_and_save
 from denguard.forecast_schema import ensure_city_forecast_df, prophet_split_test_future
+from denguard.utils import plot_and_save
 
 
 def smape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> float:
@@ -27,44 +29,50 @@ def fit_prophet(
       returns forecast_test + forecast_future + metrics
     Production (test_city empty):
       returns forecast_test=None, forecast_future valid, metrics=nan
+
+    Prophet is required for the pipeline's compare-and-select methodology.
+    Fail fast here if the dependency, fit, or forecast step is unavailable.
     """
     print("\n== STEP 7: Prophet model ==")
 
     if not {"ds", "y"}.issubset(train_city.columns):
         raise ValueError("train_city must contain columns ['ds','y'].")
 
-    # test_city can be empty in production; only validate if non-empty
     if not test_city.empty and not {"ds", "y"}.issubset(test_city.columns):
         raise ValueError("test_city must contain columns ['ds','y'] when provided.")
 
     try:
         from prophet import Prophet
     except Exception as e:
-        print("⚠️ Prophet unavailable:", e)
-        nan_metrics = {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
-        return False, None, None, None, nan_metrics
+        raise RuntimeError(f"Prophet is required but could not be imported: {e}") from e
 
-    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
 
     model = Prophet(
         yearly_seasonality=True,
         weekly_seasonality=False,
         daily_seasonality=False,
-        changepoint_prior_scale=0.3,
+        changepoint_prior_scale=0.05,
         seasonality_mode="additive",
-        interval_width=0.8,
+        interval_width=0.95,
     )
-    model.fit(train_city[["ds", "y"]])
+    try:
+        model.fit(train_city[["ds", "y"]])
+    except Exception as e:
+        raise RuntimeError(f"Prophet fit failed: {e}") from e
 
     future_h = int(horizon)
     if future_h <= 0:
         raise ValueError("Forecast horizon must be positive.")
 
-    # PRODUCTION: no test period
     if test_city.empty:
         last_obs = pd.to_datetime(train_city["ds"], errors="raise").max()
-        future_full = model.make_future_dataframe(periods=future_h, freq="W-MON")
-        forecast_full = model.predict(future_full)
+        try:
+            future_full = model.make_future_dataframe(periods=future_h, freq="W-MON")
+            forecast_full = model.predict(future_full)
+        except Exception as e:
+            raise RuntimeError(f"Prophet forecast generation failed: {e}") from e
+
         fut = forecast_full[forecast_full["ds"] > last_obs].copy().sort_values("ds").iloc[:future_h]
         raw_future = fut[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
 
@@ -72,11 +80,13 @@ def fit_prophet(
         nan_metrics = {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
         return True, model, None, forecast_future, nan_metrics
 
-    # BACKTEST: has test period
     test_ds = pd.DatetimeIndex(pd.to_datetime(test_city["ds"], errors="raise")).sort_values()
 
-    full_future = model.make_future_dataframe(periods=len(test_ds) + future_h, freq="W-MON")
-    full_forecast = model.predict(full_future)
+    try:
+        full_future = model.make_future_dataframe(periods=len(test_ds) + future_h, freq="W-MON")
+        full_forecast = model.predict(full_future)
+    except Exception as e:
+        raise RuntimeError(f"Prophet forecast generation failed: {e}") from e
 
     last_obs = pd.to_datetime(pd.concat([train_city["ds"], test_city["ds"]]).max())
     future_ds = pd.date_range(last_obs + pd.Timedelta(weeks=1), periods=future_h, freq="W-MON")
@@ -101,6 +111,6 @@ def fit_prophet(
         model.plot_components(full_forecast)
         plot_and_save(cfg.out / "prophet_components.png")
     except Exception as e:
-        print("ℹ️ Skipped Prophet component plotting:", e)
+        print("â„¹ï¸ Skipped Prophet component plotting:", e)
 
     return True, model, forecast_test, forecast_future, metrics

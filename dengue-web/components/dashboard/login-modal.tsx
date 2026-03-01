@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Loader2 } from "lucide-react";
-import { supabaseLogin, supabaseSignup } from "@/lib/adminApi";
+import { supabaseLogin, supabaseSignup, requestAccessProfile } from "@/lib/adminApi";
 import { toast } from "sonner";
 import { set } from "date-fns";
 interface LoginModalProps {
@@ -28,6 +28,10 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [association, setAssociation] = useState("");
 
   const [mode, setMode] = useState<"login" | "signup">("login");
 
@@ -44,20 +48,35 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
         return;
       }
 
+      if (mode === "signup") {
+        if (!firstName.trim() || !lastName.trim()) {
+          setError("First name and last name are required.");
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // signup / request access
       await supabaseSignup(email.trim(), password);
 
-      // show confirmation
+      // store request details in profiles
+      await requestAccessProfile({
+        first_name: firstName,
+        last_name: lastName,
+        association,
+      });
+
       toast.success("Request submitted", {
-        description:
-          "Your account was created. An admin must approve access before you can use admin tools.",
+        description: "Your account was created. An admin must approve access before you can use admin tools.",
       });
 
       // reset UI
-      setError("");
       setMode("login");
       setPassword("");
       setEmail("");
+      setFirstName("");
+      setLastName("");
+      setAssociation("");
       setOpen(false);
 
       // optional: show toast instead of closing modal
@@ -130,6 +149,41 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
               className="bg-secondary"
             />
           </div>
+          {mode === "signup" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="first">First name</Label>
+                <Input
+                  id="first"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="bg-secondary"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="last">Last name</Label>
+                <Input
+                  id="last"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="bg-secondary"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="assoc">Association</Label>
+                <Input
+                  id="assoc"
+                  value={association}
+                  onChange={(e) => setAssociation(e.target.value)}
+                  className="bg-secondary"
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="pw">Password</Label>

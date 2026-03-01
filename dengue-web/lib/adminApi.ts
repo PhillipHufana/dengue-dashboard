@@ -117,3 +117,16 @@ export async function preflightCasesFile(file: File) {
   const res = await adminFetch(`/admin/uploads/preflight`, { method: "POST", body: fd });
   return res.json();
 }
+
+export async function requestAccessProfile(input: {
+  first_name: string;
+  last_name: string;
+  association?: string | null;
+}) {
+  const res = await adminFetch(`/admin/request-access`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.json();
+}

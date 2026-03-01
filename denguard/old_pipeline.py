@@ -8,7 +8,7 @@ import pandas as pd
 from denguard.config import DEFAULT_CFG, Config
 from denguard.utils import ensure_outdir
 
-from denguard.steps.step1_load_clean import load_and_clean, persist_clean
+from denguard.steps.step1_load_clean import finalize_ingestion_registry, load_and_clean, persist_clean
 from denguard.steps.step2_standardize import standardize_barangays
 from denguard.steps.step24_incremental_filter import incremental_filter
 from denguard.steps.step25_fingerprint_dedupe import fingerprint_dedupe
@@ -57,7 +57,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
     print(f"🏷️ run_id = {run_id}")
 
-    df, _ = load_and_clean(cfg)
+    df, _, pending_registry_rows = load_and_clean(cfg)
     df.to_csv(cfg.out / "dengue_cleaned_pre_fp.csv", index=False, encoding="utf-8-sig")
 
     df = standardize_barangays(df)
@@ -66,6 +66,7 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
     df = fingerprint_dedupe(df, cfg)
 
     persist_clean(df, cfg)
+    finalize_ingestion_registry(cfg, pending_registry_rows)
     validation_summary(df, cfg)
 
     weekly_full = weekly_aggregation(df, cfg)

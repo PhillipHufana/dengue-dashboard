@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import Tuple, List
+
+from typing import Any, List, Tuple
 import glob
 import hashlib
 import os
 from pathlib import Path
+
 import pandas as pd
+
 
 def _file_md5(path: str, chunk_size: int = 1024 * 1024) -> str:
     h = hashlib.md5()
@@ -13,33 +16,41 @@ def _file_md5(path: str, chunk_size: int = 1024 * 1024) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-def load_new_raw_files(incoming_folder: str, processed_registry_csv: str) -> Tuple[pd.DataFrame, List[str]]:
+
+def load_new_raw_files(
+    incoming_folder: str,
+    processed_registry_csv: str,
+) -> Tuple[pd.DataFrame, List[str], List[dict[str, Any]]]:
     """
-    Load all .xlsx in incoming folder, skipping files already processed (by md5).
+    Load all .xlsx/.csv in the incoming folder, skipping files already processed (by md5).
     Adds __source_file, __file_md5, __file_mtime_utc columns.
+
+    Returns:
+      - concatenated dataframe of new rows
+      - loaded file basenames
+      - pending registry rows to be committed only after the pipeline succeeds
     """
     files = glob.glob(os.path.join(incoming_folder, "*.xlsx")) + glob.glob(os.path.join(incoming_folder, "*.csv"))
     if not files:
-        print("✅ No new files found in incoming folder.")
-        return pd.DataFrame(), []
+        print("No new files found in incoming folder.")
+        return pd.DataFrame(), [], []
 
     registry_path = Path(processed_registry_csv)
     if registry_path.exists():
         reg = pd.read_csv(registry_path, dtype={"file_md5": "string"})
         seen = set(reg["file_md5"].dropna().astype(str))
     else:
-        reg = pd.DataFrame(columns=["file_md5", "source_file", "processed_at_utc"])
         seen = set()
 
     dfs: List[pd.DataFrame] = []
     loaded_files: List[str] = []
-    new_rows_registry = []
+    pending_registry_rows: List[dict[str, Any]] = []
 
     for f in files:
         try:
             md5 = _file_md5(f)
             if md5 in seen:
-                print(f"↩️ Skipped already-processed file: {os.path.basename(f)}")
+                print(f"Skipped already-processed file: {os.path.basename(f)}")
                 continue
 
             if f.lower().endswith(".xlsx"):
@@ -54,24 +65,40 @@ def load_new_raw_files(incoming_folder: str, processed_registry_csv: str) -> Tup
 
             dfs.append(temp)
             loaded_files.append(os.path.basename(f))
-            new_rows_registry.append({
-                "file_md5": md5,
-                "source_file": os.path.basename(f),
-                "processed_at_utc": pd.Timestamp.utcnow()
-            })
-            print(f"✅ Loaded new file: {f}")
-
+            pending_registry_rows.append(
+                {
+                    "file_md5": md5,
+                    "source_file": os.path.basename(f),
+                    "processed_at_utc": pd.Timestamp.utcnow(),
+                }
+            )
+            print(f"Loaded new file: {f}")
         except Exception as e:
-            print(f"⚠️ Failed to load {f}: {e}")
-
-    # update registry
-    if new_rows_registry:
-        reg = pd.concat([reg, pd.DataFrame(new_rows_registry)], ignore_index=True)
-        reg.to_csv(registry_path, index=False)
+            print(f"âš ï¸ Failed to load {f}: {e}")
 
     if not dfs:
-        return pd.DataFrame(), []
+        return pd.DataFrame(), [], pending_registry_rows
 
     new_data = pd.concat(dfs, ignore_index=True)
-    print(f"✅ Total new rows loaded: {len(new_data):,}")
-    return new_data, loaded_files
+    print(f"Total new rows loaded: {len(new_data):,}")
+    return new_data, loaded_files, pending_registry_rows
+
+
+def finalize_processed_registry(processed_registry_csv: str, pending_rows: List[dict[str, Any]]) -> None:
+    """
+    Persist file fingerprints only after the local pipeline run has completed successfully.
+    """
+    if not pending_rows:
+        return
+
+    registry_path = Path(processed_registry_csv)
+    if registry_path.exists():
+        reg = pd.read_csv(registry_path, dtype={"file_md5": "string"})
+    else:
+        reg = pd.DataFrame(columns=["file_md5", "source_file", "processed_at_utc"])
+
+    pending = pd.DataFrame(pending_rows)
+    reg = pd.concat([reg, pending], ignore_index=True)
+    reg["file_md5"] = reg["file_md5"].astype("string")
+    reg = reg.drop_duplicates(subset=["file_md5"], keep="last")
+    reg.to_csv(registry_path, index=False)

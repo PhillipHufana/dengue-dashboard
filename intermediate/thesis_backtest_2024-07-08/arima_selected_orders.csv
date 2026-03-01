@@ -1,0 +1,118 @@
+model_name,model_scope,unit_key,order_label,order_p,order_d,order_q,seasonal,seasonal_period,seasonal_P,seasonal_D,seasonal_Q,run_id,run_kind
+arima,city,city,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,agdao,"(1, 0, 0)",1,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,alejandra navarro,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,alfonso angliongto sr,"(1, 1, 2)",1,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,angalan,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bago aplaya,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bago gallera,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bago oshiro,"(1, 1, 2)",1,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,baguio,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,baliok,"(4, 0, 0)",4,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bangkas heights,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,baracatan,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 1 a,"(2, 0, 3)",2,0,3,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 10 a,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 15 b,"(1, 0, 2)",1,0,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 16 b,"(0, 0, 0)",0,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 18 b,"(1, 1, 2)",1,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 19 b,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 2 a,"(2, 1, 3)",2,1,3,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 20 b,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 21 c,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 22 c,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 23 c,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 24 c,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 26 c,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 27 c,"(2, 0, 0)",2,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 28 c,"(3, 0, 0)",3,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 31 d,"(3, 0, 1)",3,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 32 d,"(2, 0, 1)",2,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 33 d,"(2, 0, 2)",2,0,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 37 d,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 38 d,"(5, 0, 0)",5,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 39 d,"(3, 0, 0)",3,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 5 a,"(3, 0, 3)",3,0,3,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 7 a,"(5, 0, 1)",5,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 8 a,"(2, 0, 2)",2,0,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,barangay 9 a,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bato,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,biao guianga,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,binugao,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bucana,"(3, 0, 0)",3,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,buda,"(1, 0, 0)",1,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,buhangin,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,bunawan,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,cabantian,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,cadalian,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,calinan,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,callawa,"(2, 0, 2)",2,0,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,catalunan grande,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,catalunan pequeno,"(4, 1, 3)",4,1,3,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,centro,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,communal,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,crossing bayabas,"(2, 1, 2)",2,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,dacudao,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,daliao,"(1, 0, 5)",1,0,5,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,dumoy,"(5, 0, 0)",5,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,eden,"(5, 0, 0)",5,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,gov paciano bangoy,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,gov vicente duterte,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,gumalang,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,ilang,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,indangan,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,kap tomas monteverde sr,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,lacson,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,lamanan,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,lapu lapu,"(4, 0, 2)",4,0,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,leon garcia sr,"(2, 0, 0)",2,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,lizada,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,los amigos,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,lubogan,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,ma a,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,mahayag,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,malabog,"(4, 0, 0)",4,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,malagos,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,mandug,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,manuel guianga,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,marapangi,"(3, 0, 1)",3,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,marilog,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,matina aplaya,"(4, 0, 4)",4,0,4,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,matina crossing,"(5, 0, 0)",5,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,matina pangi,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,mintal,"(1, 1, 2)",1,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,mulig,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,pampanga,"(3, 0, 0)",3,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,panacan,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,paquibato,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,rafael castillo,"(1, 1, 2)",1,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,riverside,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,salaysay,"(0, 0, 0)",0,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,san antonio,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,santo nino,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,sasa,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,sirawan,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,sirib,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,suawan,"(1, 0, 0)",1,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,subasta,"(1, 0, 0)",1,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tacunan,"(3, 1, 2)",3,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tagakpan,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,talomo,"(3, 0, 0)",3,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,talomo river,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tamayong,"(0, 0, 0)",0,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tambobong,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tamugan,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tawan tawan,"(2, 1, 1)",2,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tibuloy,"(2, 0, 0)",2,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tibungco,"(3, 1, 4)",3,1,4,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tigatto,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,toril,"(5, 0, 0)",5,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tugbok,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,tungakalan,"(2, 0, 0)",2,0,0,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,ubalde,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,ula,"(0, 1, 1)",0,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,vicente hizon sr,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,waan,"(1, 0, 1)",1,0,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,wangan,"(2, 1, 3)",2,1,3,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,wilfredo aquino,"(1, 1, 1)",1,1,1,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+arima,local,wines,"(0, 1, 2)",0,1,2,False,1,0,0,0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest

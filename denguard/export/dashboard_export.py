@@ -1,218 +1,232 @@
 # denguard/export/dashboard_export.py
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-# Attempt optional geo support
-try:
-    import geopandas as gpd  # type: ignore
-    GEOPANDAS_OK = True
-except Exception:
-    GEOPANDAS_OK = False
-
 
 def safe_read_csv(path: Path) -> Optional[pd.DataFrame]:
     if not path.exists():
-        print(f"⚠️ Missing file: {path}")
+        print(f"âš ï¸ Missing file: {path}")
         return None
     try:
         return pd.read_csv(path)
     except Exception as e:
-        print(f"⚠️ Failed to read {path}: {e}")
+        print(f"âš ï¸ Failed to read {path}: {e}")
         return None
+
+
+def _standardize_long_forecast(
+    df: Optional[pd.DataFrame],
+    *,
+    key_candidates: tuple[str, ...] = ("Barangay_key", "name"),
+    ds_candidates: tuple[str, ...] = ("ds", "week_start"),
+) -> Optional[pd.DataFrame]:
+    if df is None:
+        return None
+
+    out = df.copy()
+    rename_map = {}
+
+    if "Barangay_key" not in out.columns:
+        for c in key_candidates:
+            if c in out.columns:
+                rename_map[c] = "Barangay_key"
+                break
+
+    if "ds" not in out.columns:
+        for c in ds_candidates:
+            if c in out.columns:
+                rename_map[c] = "ds"
+                break
+
+    if rename_map:
+        out = out.rename(columns=rename_map)
+
+    if "ds" in out.columns:
+        out["ds"] = pd.to_datetime(out["ds"], errors="coerce")
+        out = out.dropna(subset=["ds"])
+
+    if "Barangay_key" in out.columns:
+        out["Barangay_key"] = out["Barangay_key"].astype(str).str.strip().str.lower()
+
+    return out
 
 
 def produce_dashboard_forecast(cfg) -> pd.DataFrame:
     """
-    Produce a single merged CSV (dashboard_forecast.csv) containing:
-      - Barangay_key, ds (date), Final (reconciled), Forecast (hybrid),
-        local_forecast, CityForecast (city-level), ModelUsed, Tier, TotalCases, Proportion
-      - Optional geometry if geopandas and geojsons are present.
+    Produce a dashboard-friendly CSV from the current pipeline outputs.
 
-    Saves: cfg.out / "dashboard_forecast.csv"
-    Returns the merged DataFrame.
+    Preferred barangay forecasts are used as the base series. If the all-models
+    long file is present, disagg and local comparison series are merged in too.
     """
     outdir = Path(cfg.out)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # load canonical pipeline outputs (some may be absent depending on when called)
-    final_fp = outdir / "barangay_forecasts_final.csv"
-    hybrid_fp = outdir / "barangay_forecasts_hybrid.csv"
-    local_fp = outdir / "barangay_local_forecasts.csv"
-    city_fp = outdir / "city_forecasts.csv"
-    tiers_fp = outdir / "barangay_tiers.csv"
+    preferred_fp = outdir / "barangay_forecasts_preferred_future_long.csv"
+    all_models_fp = outdir / "barangay_forecasts_all_models_future_long.csv"
+    all_models_alt_fp = outdir / "barangay_forecasts_long.csv"
+    city_fp = outdir / "city_forecasts_long.csv"
+    city_future_fp = outdir / "city_forecasts_future.csv"
+    eligibility_fp = outdir / "local_eligibility.csv"
     case_counts_fp = outdir / "barangay_case_counts.csv"
 
-    final_df = safe_read_csv(final_fp)
-    hybrid_df = safe_read_csv(hybrid_fp)
-    local_df = safe_read_csv(local_fp)
+    preferred_df = _standardize_long_forecast(safe_read_csv(preferred_fp))
+    all_models_df = _standardize_long_forecast(safe_read_csv(all_models_fp))
+    if all_models_df is None:
+        all_models_df = _standardize_long_forecast(safe_read_csv(all_models_alt_fp))
+
     city_df = safe_read_csv(city_fp)
-    tiers_df = safe_read_csv(tiers_fp)
+    if city_df is None:
+        city_df = safe_read_csv(city_future_fp)
+
+    eligibility_df = safe_read_csv(eligibility_fp)
     counts_df = safe_read_csv(case_counts_fp)
 
-    # -- normalize columns & minimal schemas --
-    # final_df expected: Barangay_key, ds, Final, Forecast, local_forecast (maybe)
-    # hybrid_df expected: Barangay_key, ds, Forecast, Forecast_lower, Forecast_upper
-    # local_df expected: Barangay_key, ds, local_forecast
-    # city_df expected: ds, CityForecast, ModelUsed (maybe)
-    # tiers_df expected: Barangay, TotalCases, Tier
-    # counts_df expected: Barangay_key, CaseCount
+    if preferred_df is None and all_models_df is not None and "model_name" in all_models_df.columns:
+        preferred_df = all_models_df[all_models_df["model_name"].astype(str).str.lower() == "preferred"].copy()
 
-    # If final_df missing, try to construct a usable base from hybrid (+ local)
-    base: pd.DataFrame
-    if final_df is not None:
-        # unify dtype for date
-        final_df["ds"] = pd.to_datetime(final_df["ds"])
-        base = final_df.rename(columns={"Final": "Forecast_Final", "Forecast": "Forecast_Hybrid"})
-    elif hybrid_df is not None:
-        hybrid_df["ds"] = pd.to_datetime(hybrid_df["ds"])
-        base = hybrid_df.rename(columns={"Forecast": "Forecast_Hybrid"})
-        base["Forecast_Final"] = base["Forecast_Hybrid"]
-    else:
-        raise FileNotFoundError("Neither final nor hybrid forecast files found. Cannot produce dashboard table.")
-
-    # ensure keys
-    base["Barangay_key"] = base["Barangay_key"].astype(str).str.strip().str.lower()
-
-    # merge hybrid (if exists) to ensure Forecast_Hybrid present
-    if hybrid_df is not None and "Forecast_Hybrid" not in base.columns:
-        hybrid_df["ds"] = pd.to_datetime(hybrid_df["ds"])
-        base = base.merge(
-            hybrid_df[["Barangay_key", "ds", "Forecast"]],
-            on=["Barangay_key", "ds"],
-            how="left"
-        ).rename(columns={"Forecast": "Forecast_Hybrid"})
-
-    # merge local forecasts
-    if local_df is not None:
-        local_df["ds"] = pd.to_datetime(local_df["ds"])
-        local_df["Barangay_key"] = local_df["Barangay_key"].astype(str).str.strip().str.lower()
-        base = base.merge(
-            local_df[["Barangay_key", "ds", "local_forecast"]],
-            on=["Barangay_key", "ds"],
-            how="left",
+    if preferred_df is None or preferred_df.empty:
+        raise FileNotFoundError(
+            "No preferred barangay forecast output found. "
+            "Expected barangay_forecasts_preferred_future_long.csv or preferred rows in the all-models file."
         )
 
-    # merge city-level forecast (CityForecast) by ds
+    if "horizon_type" in preferred_df.columns:
+        preferred_df = preferred_df[preferred_df["horizon_type"].astype(str).str.lower() == "future"].copy()
+
+    base = preferred_df[["Barangay_key", "ds"]].copy()
+    base["Forecast_Final"] = pd.to_numeric(preferred_df["yhat"], errors="coerce")
+
+    if all_models_df is not None and not all_models_df.empty and "model_name" in all_models_df.columns:
+        if "horizon_type" in all_models_df.columns:
+            all_models_df = all_models_df[all_models_df["horizon_type"].astype(str).str.lower() == "future"].copy()
+
+        pivot = (
+            all_models_df.pivot_table(
+                index=["Barangay_key", "ds"],
+                columns="model_name",
+                values="yhat",
+                aggfunc="last",
+            )
+            .reset_index()
+            .rename_axis(None, axis=1)
+        )
+        pivot = pivot.rename(
+            columns={
+                "disagg": "Forecast_Hybrid",
+                "local_prophet": "LocalProphetForecast",
+                "local_arima": "LocalArimaForecast",
+                "preferred": "Forecast_Final_from_all_models",
+            }
+        )
+        base = base.merge(pivot, on=["Barangay_key", "ds"], how="left")
+
+    if "Forecast_Hybrid" not in base.columns:
+        base["Forecast_Hybrid"] = np.nan
+    if "LocalProphetForecast" not in base.columns:
+        base["LocalProphetForecast"] = np.nan
+    if "LocalArimaForecast" not in base.columns:
+        base["LocalArimaForecast"] = np.nan
+
+    base["local_forecast"] = base["LocalProphetForecast"].combine_first(base["LocalArimaForecast"])
+
     if city_df is not None:
-        city_df["ds"] = pd.to_datetime(city_df["ds"])
-        # standardize column name
+        city_df = city_df.copy()
+        if "week_start" in city_df.columns and "ds" not in city_df.columns:
+            city_df = city_df.rename(columns={"week_start": "ds"})
+        city_df["ds"] = pd.to_datetime(city_df["ds"], errors="coerce")
+        city_df = city_df.dropna(subset=["ds"])
+
+        if "horizon_type" in city_df.columns:
+            city_df = city_df[city_df["horizon_type"].astype(str).str.lower() == "future"].copy()
+
         if "CityForecast" not in city_df.columns and "yhat" in city_df.columns:
             city_df = city_df.rename(columns={"yhat": "CityForecast"})
-        city_small = city_df[["ds", "CityForecast", "ModelUsed"]].drop_duplicates(subset=["ds"])
+        if "ModelUsed" not in city_df.columns and "model_name" in city_df.columns:
+            city_df = city_df.rename(columns={"model_name": "ModelUsed"})
+
+        city_small = city_df[["ds", "CityForecast", "ModelUsed"]].drop_duplicates(subset=["ds"], keep="last")
         base = base.merge(city_small, on="ds", how="left")
     else:
         base["CityForecast"] = np.nan
         base["ModelUsed"] = None
 
-    # merge tier/totalcases
-    if tiers_df is not None:
-        tiers_df = tiers_df.rename(columns={"Barangay": "Barangay_key"})
-        tiers_df["Barangay_key"] = tiers_df["Barangay_key"].astype(str).str.strip().str.lower()
-        base = base.merge(tiers_df[["Barangay_key", "TotalCases", "Tier"]], on="Barangay_key", how="left")
-    elif counts_df is not None:
+    if counts_df is not None:
+        counts_df = counts_df.copy()
         counts_df["Barangay_key"] = counts_df["Barangay_key"].astype(str).str.strip().str.lower()
         counts_df = counts_df.rename(columns={"CaseCount": "TotalCases"})
         base = base.merge(counts_df[["Barangay_key", "TotalCases"]], on="Barangay_key", how="left")
-        base["Tier"] = None
     else:
         base["TotalCases"] = np.nan
-        base["Tier"] = None
 
-    # compute proportion within training window if TotalCases exists
-    if "TotalCases" in base.columns and base["TotalCases"].notna().any():
-        total = base[["Barangay_key", "TotalCases"]].drop_duplicates()["TotalCases"].sum()
-        if total and total > 0:
-            prop_map = (base[["Barangay_key", "TotalCases"]].drop_duplicates().set_index("Barangay_key")["TotalCases"] / total).to_dict()
+    if eligibility_df is not None:
+        eligibility_df = eligibility_df.copy()
+        eligibility_df["Barangay_key"] = eligibility_df["Barangay_key"].astype(str).str.strip().str.lower()
+
+        keep_cols = ["Barangay_key"]
+        if "eligible_local" in eligibility_df.columns:
+            keep_cols.append("eligible_local")
+        if "eligibility_reason" in eligibility_df.columns:
+            keep_cols.append("eligibility_reason")
+
+        base = base.merge(eligibility_df[keep_cols], on="Barangay_key", how="left")
+        base = base.rename(columns={"eligible_local": "LocalEligible", "eligibility_reason": "EligibilityReason"})
+    else:
+        base["LocalEligible"] = np.nan
+        base["EligibilityReason"] = None
+
+    base["Tier"] = np.nan
+
+    if base["TotalCases"].notna().any():
+        totals = base[["Barangay_key", "TotalCases"]].drop_duplicates()
+        total_cases = totals["TotalCases"].sum()
+        if total_cases and total_cases > 0:
+            prop_map = (totals.set_index("Barangay_key")["TotalCases"] / total_cases).to_dict()
             base["Proportion_train"] = base["Barangay_key"].map(prop_map).fillna(0.0)
         else:
             base["Proportion_train"] = 0.0
     else:
         base["Proportion_train"] = 0.0
 
-    # metadata columns & ordering
-    # prefer Final if available
-    if "Forecast_Final" not in base.columns:
-        base["Forecast_Final"] = base.get("local_forecast", base.get("Forecast_Hybrid", np.nan))
-
     final_cols = [
-        "Barangay_key", "ds",
-        "Forecast_Final", "Forecast_Hybrid", "local_forecast",
-        "CityForecast", "ModelUsed",
-        "TotalCases", "Tier", "Proportion_train"
+        "Barangay_key",
+        "ds",
+        "Forecast_Final",
+        "Forecast_Hybrid",
+        "local_forecast",
+        "LocalProphetForecast",
+        "LocalArimaForecast",
+        "CityForecast",
+        "ModelUsed",
+        "TotalCases",
+        "Tier",
+        "LocalEligible",
+        "EligibilityReason",
+        "Proportion_train",
     ]
+
     for c in final_cols:
         if c not in base.columns:
             base[c] = np.nan
 
-    out = base[final_cols].copy()
-    out = out.sort_values(["Barangay_key", "ds"]).reset_index(drop=True)
+    out = base[final_cols].sort_values(["Barangay_key", "ds"]).reset_index(drop=True)
 
-    # attempt geo join if geopandas present and geojson(s) exist in working directory
-    geo_added = False
-    if GEOPANDAS_OK:
-        # check typical uploaded geojson names (you provided two earlier)
-        candidates = [
-            Path("/mnt/data/DAVAO_Points_geo.geojson"),
-            Path("/mnt/data/DAVAO_Poly_geo.geojson"),
-            Path("DAVAO_Points_geo.geojson"),
-            Path("DAVAO_Poly_geo.geojson"),
-            cfg.canon_csv  # sometimes canonical CSV contains geometry? unlikely
-        ]
-        for c in candidates:
-            if c is None:
-                continue
-            if isinstance(c, Path) and c.exists():
-                try:
-                    gdf = gpd.read_file(c)
-                    # try to find common join key: canonical_name or barangay name column
-                    lower_cols = [col.lower() for col in gdf.columns]
-                    join_col = None
-                    for candidate_col in ["canonical_name", "name", "barangay", "brgy", "brgy_name"]:
-                        if candidate_col in lower_cols:
-                            join_col = gdf.columns[lower_cols.index(candidate_col)]
-                            break
-                    # if no textual join, try point centroid mapping later; otherwise skip
-                    if join_col:
-                        gdf[join_col] = gdf[join_col].astype(str).str.strip().str.lower()
-                        out = out.merge(gdf[[join_col, "geometry"]].rename(columns={join_col: "Barangay_key"}), on="Barangay_key", how="left")
-                        geo_added = True
-                        print(f"✅ Geo joined using {c} on {join_col}")
-                        break
-                except Exception as e:
-                    print(f"⚠️ Failed to read/join geo file {c}: {e}")
-    else:
-        # geopandas not available
-        pass
-
-    # write CSV (geometry will be dropped automatically by pandas if present)
     csv_path = outdir / "dashboard_forecast.csv"
-    try:
-        # if a geometry column exists, attempt to store WKT (optional)
-        if "geometry" in out.columns:
-            try:
-                out["geometry_wkt"] = out["geometry"].apply(lambda g: g.wkt if g is not None else None)
-            except Exception:
-                out = out.drop(columns=["geometry"])
-        out.to_csv(csv_path, index=False, encoding="utf-8-sig")
-        print(f"✅ Dashboard CSV written: {csv_path}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to write dashboard csv: {e}")
-
+    out.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    print(f"Dashboard CSV written: {csv_path}")
     return out
 
 
-# helper CLI-like entry
 if __name__ == "__main__":
-    # try to import local config if available
     try:
-        from denguard.config import DEFAULT_CFG as _CFG  # type: ignore
+        from denguard.config import DEFAULT_CFG as _CFG
+
         cfgobj = _CFG
     except Exception:
         raise SystemExit("Please call produce_dashboard_forecast(cfg) from your pipeline with the Config object.")
+
     produce_dashboard_forecast(cfgobj)

@@ -18,7 +18,7 @@ def hybrid_disaggregation(
     alpha_smooth: float = 1.0,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Top-down disaggregation using train-window proportions.
+    Top-down disaggregation using a rolling train-window proportion baseline.
     train_end is passed in:
       - backtest: cfg.backtest_end_date
       - production: last observed week in data
@@ -26,7 +26,11 @@ def hybrid_disaggregation(
     print("\n== STEP 10: Hybrid top-down disaggregation (standardized) ==")
 
     train_end = pd.to_datetime(train_end)
-    recent_start = pd.to_datetime(cfg.recent_weight_start)
+    window_weeks = int(getattr(cfg, "disagg_weight_weeks", 52))
+    if window_weeks <= 0:
+        raise ValueError(f"disagg_weight_weeks must be positive, got {window_weeks}")
+
+    recent_start = train_end - pd.Timedelta(weeks=window_weeks - 1)
 
     recent = weekly_full[(weekly_full["WeekStart"] >= recent_start) & (weekly_full["WeekStart"] <= train_end)].copy()
     if recent.empty:

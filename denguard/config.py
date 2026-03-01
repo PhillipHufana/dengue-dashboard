@@ -30,8 +30,9 @@ class Config:
     # --- Production fallback model if no test exists ---
     production_city_model: Literal["prophet", "arima"] = "prophet"
 
-    # --- Weighting window for disaggregation ---
-    recent_weight_start: str = "2022-01-01"
+    # --- Rolling weighting window for top-down disaggregation ---
+    disagg_weight_weeks: int = 52
+    recent_weight_start: str = "2022-01-01"  # legacy field retained for backward compatibility
     calibration_threshold: int = 200
 
     # --- Choice A: local only if it beats disagg on test (sMAPE) ---
@@ -67,6 +68,7 @@ DEFAULT_CFG = Config(
     backtest_end_date="2022-12-26",
     production_horizon_weeks=12,
     production_city_model="prophet",
+    disagg_weight_weeks=52,
     recent_weight_start="2022-01-01",
     calibration_threshold=200,
     incoming_folder=r"C:\Users\Phillip\Downloads\comsci\thesis\dengue-dashboard\dengue_incoming",

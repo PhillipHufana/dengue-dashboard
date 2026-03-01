@@ -1,0 +1,3 @@
+run_id,run_started_at_utc,run_kind,backtest_end_date,incoming_mode,forecast_weeks_override
+02da1e5c-0c32-4dc8-b155-91454ec76a99,2026-03-01T04:24:04.667400+00:00,backtest,2024-07-08,full_refresh,
+369df0eb-a246-456e-a1ec-fcd93062499f,2026-03-01T06:13:14.898364+00:00,backtest,2024-07-08,full_refresh,

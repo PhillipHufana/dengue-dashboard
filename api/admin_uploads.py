@@ -12,7 +12,10 @@ from uuid import uuid4
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 from .supabase_client import get_supabase
-from .auth import require_admin_user
+from .auth import require_admin_user, require_user_id
+
+from pydantic import BaseModel
+
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -372,3 +375,37 @@ def preflight_upload(
         "ok": True,
         **meta,
     }
+
+class RequestAccessBody(BaseModel):
+    first_name: str
+    last_name: str
+    association: str | None = None
+
+@router.post("/request-access")
+def request_access(
+    body: RequestAccessBody,
+    user_id: str = Depends(require_user_id),
+):
+    sb = get_supabase()
+
+    # basic sanity (keep it simple)
+    first = body.first_name.strip()
+    last = body.last_name.strip()
+    assoc = (body.association or "").strip() or None
+
+    if not first or not last:
+        raise HTTPException(status_code=400, detail="First name and last name are required")
+
+    # Upsert into profiles. Your trigger already creates role='user'
+    sb.table("profiles").upsert(
+        {
+            "user_id": user_id,
+            "first_name": first,
+            "last_name": last,
+            "association": assoc,
+            # do NOT set role here
+        },
+        on_conflict="user_id",
+    ).execute()
+
+    return {"ok": True}
