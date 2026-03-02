@@ -1,5 +1,5 @@
 model_scope,model_name,attempted_units,successful_units,failed_units,failure_rate,run_id,run_kind
-city,prophet,1,1,0,0.0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
-city,arima,1,1,0,0.0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
-local,local_prophet,116,116,0,0.0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
-local,local_arima,116,116,0,0.0,369df0eb-a246-456e-a1ec-fcd93062499f,backtest
+city,prophet,1,1,0,0.0,91af16bc-bfd8-48b5-9bb1-22fd6fb13f86,backtest
+city,arima,1,1,0,0.0,91af16bc-bfd8-48b5-9bb1-22fd6fb13f86,backtest
+local,local_prophet,0,0,0,0.0,91af16bc-bfd8-48b5-9bb1-22fd6fb13f86,backtest
+local,local_arima,0,0,0,0.0,91af16bc-bfd8-48b5-9bb1-22fd6fb13f86,backtest

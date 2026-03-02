@@ -1,2 +1,2 @@
 model_name,n_barangays,n_rows,coverage_rows,RMSE,MAE,sMAPE,chosen_disagg_barangays,chosen_local_prophet_barangays,chosen_local_arima_barangays,run_id
-preferred_selected,182,9464,9464,1.2202062852560358,0.6932880001763843,1.5528782157158822,138,29,15,369df0eb-a246-456e-a1ec-fcd93062499f
+preferred_selected,182,9464,9464,1.297623668962657,0.7383973638041849,1.6173328383735364,182,0,0,91af16bc-bfd8-48b5-9bb1-22fd6fb13f86

@@ -168,7 +168,15 @@ def _grid_fill_future_models(
     if all_ds.duplicated().any():
         raise ValueError("city_future ds contains duplicates.")
 
-    model_list = ["disagg", "local_prophet", "local_arima", "preferred"]
+    model_list = ["disagg"]
+    if loc_future_df is not None and not loc_future_df.empty and "model_name" in loc_future_df.columns:
+        local_models = [
+            m
+            for m in ["local_prophet", "local_arima"]
+            if m in set(loc_future_df["model_name"].astype(str))
+        ]
+        model_list.extend(local_models)
+    model_list.append("preferred")
 
     grid = (
         pd.MultiIndex.from_product([all_keys, all_ds, model_list], names=["Barangay_key", "ds", "model_name"])

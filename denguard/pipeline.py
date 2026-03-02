@@ -21,9 +21,7 @@ from denguard.steps.step12_plot_sample import plot_sample_barangays
 from denguard.steps.step13_errors import barangay_error_ranking
 from denguard.steps.step15_prophet_cv import prophet_cross_validation
 from denguard.steps.step16_health import model_health_report
-from denguard.steps.step17_tiers import local_eligibility
-from denguard.steps.step18_local_models import local_models_tierA, save_local_metrics_tables
-from denguard.steps.step18_local_models_production import local_models_production
+from denguard.steps.step18_local_models import save_local_metrics_tables
 from denguard.steps.step19_reconcile import reconcile_forecasts
 from denguard.steps.step1_load_clean import finalize_ingestion_registry, load_and_clean, persist_clean
 from denguard.steps.step24_incremental_filter import incremental_filter
@@ -172,6 +170,81 @@ def _save_arima_selected_orders(
     return out
 
 
+def _build_disagg_only_policy(cfg: Config, barangay_keys: list[str]) -> pd.DataFrame:
+    rows = []
+    for key in sorted(map(str, barangay_keys)):
+        rows.append(
+            {
+                "Barangay_key": key,
+                "RMSE_local_prophet": float("nan"),
+                "MAE_local_prophet": float("nan"),
+                "RMSE_local_arima": float("nan"),
+                "MAE_local_arima": float("nan"),
+                "RMSE_disagg_test": float("nan"),
+                "MAE_disagg_test": float("nan"),
+                "sMAPE_local_prophet_test": float("nan"),
+                "sMAPE_local_arima_test": float("nan"),
+                "sMAPE_disagg_test": float("nan"),
+                "sMAPE_best_local_test": float("nan"),
+                "delta_disagg_minus_local": float("nan"),
+                "best_local_model": None,
+                "Chosen": "disagg",
+                "decision_reason": "local_models_disabled",
+                "status": "disabled",
+                "err_prophet": None,
+                "err_arima": None,
+            }
+        )
+
+    policy_df = pd.DataFrame(rows)
+    policy_df["run_id"] = cfg.run_id
+    policy_df.to_csv(cfg.out / "local_model_performance.csv", index=False)
+
+    eligibility_df = pd.DataFrame(
+        {
+            "Barangay_key": [str(k) for k in sorted(map(str, barangay_keys))],
+            "train_weeks": np.nan,
+            "nonzero_weeks": np.nan,
+            "total_cases": np.nan,
+            "eligible_local": False,
+            "eligibility_reason": "local_models_disabled",
+            "run_id": cfg.run_id,
+        }
+    )
+    eligibility_df.to_csv(cfg.out / "local_eligibility.csv", index=False)
+    return policy_df
+
+
+def _empty_local_forecasts(cfg: Config) -> pd.DataFrame:
+    cols = ["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type", "run_id"]
+    empty_df = pd.DataFrame(columns=cols)
+    empty_df.to_csv(cfg.out / "barangay_local_forecasts_long.csv", index=False)
+    return empty_df
+
+
+def _disabled_local_failure_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "model_scope": "local",
+                "model_name": "local_prophet",
+                "attempted_units": 0,
+                "successful_units": 0,
+                "failed_units": 0,
+                "failure_rate": 0.0,
+            },
+            {
+                "model_scope": "local",
+                "model_name": "local_arima",
+                "attempted_units": 0,
+                "successful_units": 0,
+                "failed_units": 0,
+                "failure_rate": 0.0,
+            },
+        ]
+    )
+
+
 def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
     cfg = replace(cfg, run_kind="backtest")
     cfg = _init_run(cfg)
@@ -253,26 +326,11 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
     prophet_cross_validation(PROPHET_OK, model_prophet, cfg)
     model_health_report(df, weekly_full, metrics_prophet, metrics_arima, avg_smape, diff=float("nan"))
 
-    _require_backtest(cfg, "Step17/18/19 (tiers/local/reconcile)")
-
-    elig_df, eligible_keys = local_eligibility(weekly_full, cfg, train_end=train_end)
-    _ = elig_df
-
+    _require_backtest(cfg, "Step19 (reconcile)")
     all_barangays = sorted(weekly_full["Barangay_key"].unique().tolist())
-
-    local_perf_df, local_long_df, local_arima_orders_df = local_models_tierA(
-        barangay_keys=all_barangays,
-        eligible_keys=eligible_keys,
-        weekly_full=weekly_full,
-        test_city=test_city,
-        train_end=train_end,
-        horizon=future_horizon,
-        PROPHET_OK=PROPHET_OK,
-        cfg=cfg,
-        disagg_test_df=bg_disagg_test,
-    )
-
-    local_metrics_df, preferred_metrics_df = save_local_metrics_tables(
+    local_perf_df = _build_disagg_only_policy(cfg, all_barangays)
+    local_long_df = _empty_local_forecasts(cfg)
+    raw_local_metrics_df, preferred_metrics_df = save_local_metrics_tables(
         weekly_full=weekly_full,
         test_city=test_city,
         disagg_test_df=bg_disagg_test,
@@ -280,48 +338,20 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         local_perf=local_perf_df,
         cfg=cfg,
     )
-
-    eligible_count = len(set(eligible_keys))
-    backtest_local_failure_summary = pd.DataFrame(
-        [
-            {
-                "model_scope": "local",
-                "model_name": "local_prophet",
-                "attempted_units": eligible_count,
-                "successful_units": int(
-                    np.isfinite(pd.to_numeric(local_perf_df["RMSE_local_prophet"], errors="coerce")).sum()
-                ),
-            },
-            {
-                "model_scope": "local",
-                "model_name": "local_arima",
-                "attempted_units": eligible_count,
-                "successful_units": int(
-                    np.isfinite(pd.to_numeric(local_perf_df["RMSE_local_arima"], errors="coerce")).sum()
-                ),
-            },
-        ]
-    )
-    backtest_local_failure_summary["failed_units"] = (
-        backtest_local_failure_summary["attempted_units"] - backtest_local_failure_summary["successful_units"]
-    ).clip(lower=0)
-    backtest_local_failure_summary["failure_rate"] = np.where(
-        backtest_local_failure_summary["attempted_units"] > 0,
-        backtest_local_failure_summary["failed_units"] / backtest_local_failure_summary["attempted_units"],
-        0.0,
-    )
+    local_metrics_df = raw_local_metrics_df[raw_local_metrics_df["model_name"] == "disagg"].copy()
+    local_metrics_df.to_csv(cfg.out / "local_model_metrics.csv", index=False)
 
     failure_summary_df = _save_model_failure_summary(
         cfg,
         run_kind="backtest",
         prophet_ok=PROPHET_OK,
         arima_ok=ARIMA_OK,
-        local_summary_df=backtest_local_failure_summary,
+        local_summary_df=_disabled_local_failure_summary(),
     )
     arima_orders_df = _save_arima_selected_orders(
         cfg,
         city_model_arima=model_arima,
-        local_orders_df=local_arima_orders_df,
+        local_orders_df=pd.DataFrame(),
         run_kind="backtest",
     )
 
@@ -414,16 +444,9 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     )
     _ = bg_disagg_test
 
-    elig_df, eligible_keys = local_eligibility(weekly_full, cfg, train_end=prod_train_end)
-    _ = elig_df
     all_barangays = sorted(weekly_full["Barangay_key"].unique().tolist())
 
-    if getattr(cfg, "production_enable_local_overrides", True):
-        if not cfg.policy_local_perf_csv:
-            raise RuntimeError("policy_local_perf_csv is empty but production_enable_local_overrides=True")
-        policy = pd.read_csv(cfg.policy_local_perf_csv)
-    else:
-        policy = pd.DataFrame({"Barangay_key": all_barangays, "Chosen": ["disagg"] * len(all_barangays)})
+    policy = _build_disagg_only_policy(cfg, all_barangays)
 
     if "Barangay_key" not in policy.columns or "Chosen" not in policy.columns:
         raise RuntimeError("Policy file must contain columns: Barangay_key, Chosen")
@@ -439,15 +462,9 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     if extra_in_policy:
         print("âš ï¸ Extra in policy (sample):", extra_in_policy)
 
-    local_long_future, production_local_failure_summary, local_arima_orders_df = local_models_production(
-        barangay_keys=all_barangays,
-        eligible_keys=eligible_keys,
-        weekly_full=weekly_full,
-        train_end=prod_train_end,
-        horizon=horizon,
-        PROPHET_OK=PROPHET_OK,
-        cfg=cfg,
-    )
+    local_long_future = _empty_local_forecasts(cfg)
+    production_local_failure_summary = _disabled_local_failure_summary()
+    local_arima_orders_df = pd.DataFrame()
 
     failure_summary_df = _save_model_failure_summary(
         cfg,
@@ -481,7 +498,7 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     print("model_name counts:\n", vc)
 
     expected = len(all_barangays) * horizon
-    for m in ["disagg", "local_prophet", "local_arima", "preferred"]:
+    for m in ["disagg", "preferred"]:
         if vc.get(m, 0) != expected:
             print(f"âš ï¸ Unexpected count for {m}: got {vc.get(m, 0)} expected {expected}")
 
