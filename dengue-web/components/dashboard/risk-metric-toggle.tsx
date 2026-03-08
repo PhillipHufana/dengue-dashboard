@@ -16,7 +16,7 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
         onClick={() => setRiskMetric("cases")}
         className={
           compact
-            ? "h-9 px-3 text-sm font-medium flex-1 min-w-0 rounded-r-none"
+            ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none"
             : "h-9 px-4 text-sm font-medium rounded-r-none"
         }
         title="Use absolute forecasted case counts for ranking and map colors."
@@ -29,7 +29,7 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
         onClick={() => setRiskMetric("incidence")}
         className={
           compact
-            ? "h-9 px-3 text-sm font-medium flex-1 min-w-0 rounded-l-none border-l-0"
+            ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
             : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
         }
         title="Use forecasted incidence per 100k population. Recommended for fair cross-barangay comparison."

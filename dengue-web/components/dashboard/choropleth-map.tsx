@@ -350,20 +350,20 @@ return (
               {riskMetric === "incidence" ? "/100k" : "cases"}
             </div>
           </div>
-          <div className="absolute bottom-2 left-2 max-w-[70vw] md:max-w-[360px] bg-background/95 border p-3 rounded-lg backdrop-blur-sm z-50">
-          <div className="text-xs font-medium mb-2 text-muted-foreground">
+          <div className="absolute bottom-2 left-2 max-w-[56vw] md:max-w-[360px] bg-background/95 border p-1.5 md:p-3 rounded-lg backdrop-blur-sm z-50">
+          <div className="text-[9px] md:text-xs font-medium mb-1 md:mb-2 text-muted-foreground">
             {riskMetric === "incidence" ? "Incidence classes" : "Cases classes"}
           </div>
 
           {legend ? (
-            <div className="space-y-1">
+            <div className="space-y-0.5 md:space-y-1">
               {legend.map((row) => (
-                <div key={row.cls} className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded" style={{ backgroundColor: getColor(row.cls) }} />
-                    <span>{row.label}</span>
+                <div key={row.cls} className="flex items-center justify-between gap-1.5 md:gap-2 text-[9px] md:text-xs">
+                  <div className="flex items-center gap-1 md:gap-2 min-w-0">
+                    <div className="h-2 w-2 md:h-3 md:w-3 rounded" style={{ backgroundColor: getColor(row.cls) }} />
+                    <span className="truncate">{row.label}</span>
                   </div>
-                  <span className="text-muted-foreground tabular-nums">{row.range}</span>
+                  <span className="text-muted-foreground tabular-nums text-[8px] md:text-xs">{row.range}</span>
                 </div>
               ))}
             </div>

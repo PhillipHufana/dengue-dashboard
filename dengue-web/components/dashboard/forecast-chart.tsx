@@ -86,7 +86,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
     return series.slice(start);
   }, [series, view, freq]);
   const locationName =
-    selectedBarangay?.pretty ?? "City-Wide (All 182 Barangays)";
+    selectedBarangay?.pretty ?? "City-Wide";
 
   const isBarangay = selectedBarangay !== null;
 
@@ -129,7 +129,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
 
         <CardContent className="p-4 pt-0">
           {/* Chart area skeleton */}
-          <div className="h-[240px] w-full ">
+          <div className="h-60 w-full ">
             <Skeleton className="w-full h-full" />
           </div>
 
@@ -156,37 +156,11 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
     <Card className="bg-card border-border">
       <CardHeader className="p-4 pb-2">
         <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-semibold">
-                Predictive Forecast
-              </CardTitle>
-
-              <Badge variant="secondary" className="text-[10px]">
-                {freqLabel}
-              </Badge>
-
-              <ButtonGroup className="ml-2">
-                <Button
-                  size="sm"
-                  className="h-8 px-3 text-xs font-medium rounded-r-none"
-                  variant={view === "focused" ? "default" : "outline"}
-                  onClick={() => setView("focused")}
-                >
-                  Focused
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 px-3 text-xs font-medium rounded-l-none border-l-0"
-                  variant={view === "full" ? "default" : "outline"}
-                  onClick={() => setView("full")}
-                >
-                  Full
-                </Button>
-              </ButtonGroup>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="secondary" className="text-[10px]">
+              {freqLabel}
+            </Badge>
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-secondary/50 border max-w-[62%]">
               <MapPin
                 className={`h-3 w-3 ${
                   isBarangay ? "text-primary" : "text-muted-foreground"
@@ -202,6 +176,31 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
             </div>
           </div>
 
+          <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+            <CardTitle className="text-base font-semibold">
+              Predictive Forecast
+            </CardTitle>
+
+            <ButtonGroup className="w-fit">
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs font-medium rounded-r-none"
+                variant={view === "focused" ? "default" : "outline"}
+                onClick={() => setView("focused")}
+              >
+                Focused
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs font-medium rounded-l-none border-l-0"
+                variant={view === "full" ? "default" : "outline"}
+                onClick={() => setView("full")}
+              >
+                Full
+              </Button>
+            </ButtonGroup>
+          </div>
+
           {!isBarangay && (
             <p className="text-[10px] text-muted-foreground">
               Tap a barangay on the map to view its forecast
@@ -211,7 +210,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
       </CardHeader>
 
       <CardContent className="p-4 pt-0">
-        <div className="h-[240px] w-full">
+        <div className="h-60 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displaySeries} margin={{ top: 10, left: -15, right: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />

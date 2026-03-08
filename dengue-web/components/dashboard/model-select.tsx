@@ -55,8 +55,8 @@ export function ModelSelect({ compact = false }: { compact?: boolean }) {
       <SelectTrigger
         className={
           compact
-            ? "w-full h-9 text-xs border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
-            : "w-[190px] h-9 border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
+            ? "w-full h-8 text-[11px] border-secondary bg-secondary text-secondary-foreground! hover:bg-secondary/90 hover:border-secondary/90 data-[state=open]:bg-secondary/90 [&_svg]:text-secondary-foreground!"
+            : "w-[190px] h-9 border-secondary bg-secondary text-secondary-foreground! hover:bg-secondary/90 hover:border-secondary/90 data-[state=open]:bg-secondary/90 [&_svg]:text-secondary-foreground!"
         }
         title={MODEL_TOOLTIP[safeModel] ?? "Select forecast model"}
       >

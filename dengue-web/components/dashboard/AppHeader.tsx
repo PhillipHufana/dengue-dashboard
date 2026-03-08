@@ -24,6 +24,16 @@ function displayName(profile: AdminProfile | null): string {
   return full || "Profile";
 }
 
+function profileInitials(profile: AdminProfile | null): string {
+  if (!profile) return "P";
+  const first = (profile.first_name || "").trim();
+  const last = (profile.last_name || "").trim();
+  const a = first ? first[0] : "";
+  const b = last ? last[0] : "";
+  const out = `${a}${b}`.toUpperCase();
+  return out || "P";
+}
+
 function ProfileMenu({
   profile,
   email,
@@ -46,7 +56,7 @@ function ProfileMenu({
         >
           <UserCircle className="h-4 w-4 mr-1" />
           <span className={compact ? "max-w-[88px] truncate" : "max-w-[140px] truncate"}>
-            {displayName(profile)}
+            {compact ? profileInitials(profile) : displayName(profile)}
           </span>
         </Button>
       </PopoverTrigger>
@@ -151,7 +161,7 @@ export function AppHeader({
   }, [isAuthed, profile, email]);
 
   return (
-    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background opacity-100 px-4 py-3 md:px-6 md:py-4">
+    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background opacity-100 px-3 py-2 md:px-6 md:py-4">
       <LoginModal
         open={loginOpen}
         onOpenChange={setLoginOpen}
@@ -159,9 +169,9 @@ export function AppHeader({
         redirectToAdminOnLogin
       />
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
-          <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg bg-primary shrink-0">
+          <div className="flex h-7 w-7 md:h-10 md:w-10 items-center justify-center rounded-md md:rounded-lg bg-primary shrink-0">
             {mode === "admin" ? (
               <Shield className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
             ) : (
@@ -169,7 +179,10 @@ export function AppHeader({
             )}
           </div>
           <div className="min-w-0">
-            <h1 className="text-base md:text-xl font-semibold text-foreground truncate">{title}</h1>
+            <h1 className="text-sm md:text-xl font-semibold text-foreground truncate">
+              <span className="md:hidden">Denguard</span>
+              <span className="hidden md:inline">{title}</span>
+            </h1>
             <p className="hidden sm:block text-xs md:text-sm text-muted-foreground truncate">{subtitle}</p>
           </div>
         </div>
@@ -235,13 +248,17 @@ export function AppHeader({
         </div>
       </div>
 
-      <div className="mt-3 md:hidden space-y-2">
-        {mode === "public" ? <ModelSelect compact /> : null}
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
-          <RiskMetricToggle compact />
-          <PeriodSelect compact />
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mt-2 md:hidden space-y-1.5">
+        {mode === "public" ? (
+          <>
+            <div className="grid grid-cols-2 gap-1.5">
+              <ModelSelect compact />
+              <PeriodSelect compact />
+            </div>
+            <RiskMetricToggle compact />
+          </>
+        ) : null}
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />
           <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
         </div>
