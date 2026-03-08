@@ -1,0 +1,4 @@
+run_id,run_started_at_utc,run_kind,backtest_end_date,incoming_mode,forecast_weeks_override
+c28b721c-4679-4978-bec4-682126f2c50e,2026-03-08T15:41:17.910845+00:00,production,2022-12-26,full_refresh,
+0e04f28a-6811-4037-babf-4f80dcdfa14c,2026-03-08T15:56:00.239151+00:00,production,2022-12-26,full_refresh,
+21b2c126-b7ef-41d0-9399-8f12776cffcc,2026-03-08T16:36:21.015097+00:00,production,2022-12-26,full_refresh,

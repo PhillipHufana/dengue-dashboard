@@ -76,19 +76,25 @@ def reconcile_forecasts(
 
 
 
-    # Merge disagg + chosen local (local overrides disagg where present)
-    base = disagg.merge(
-        chosen_local[["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper"]].rename(
-            columns={"yhat": "local_yhat", "yhat_lower": "local_yhat_lower", "yhat_upper": "local_yhat_upper"}
-        ),
-        on=["Barangay_key", "ds"],
-        how="left",
-    )
+    if chosen_local.empty:
+        base = disagg.copy()
+        base["yhat_pref"] = base["yhat"]
+        base["yhat_lower_pref"] = base["yhat_lower"]
+        base["yhat_upper_pref"] = base["yhat_upper"]
+    else:
+        # Merge disagg + chosen local (local overrides disagg where present)
+        base = disagg.merge(
+            chosen_local[["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper"]].rename(
+                columns={"yhat": "local_yhat", "yhat_lower": "local_yhat_lower", "yhat_upper": "local_yhat_upper"}
+            ),
+            on=["Barangay_key", "ds"],
+            how="left",
+        )
 
-    # Preferred = local if present else disagg
-    base["yhat_pref"] = base["local_yhat"].combine_first(base["yhat"])
-    base["yhat_lower_pref"] = base["local_yhat_lower"].combine_first(base["yhat_lower"])
-    base["yhat_upper_pref"] = base["local_yhat_upper"].combine_first(base["yhat_upper"])
+        # Preferred = local if present else disagg
+        base["yhat_pref"] = base["local_yhat"].combine_first(base["yhat"])
+        base["yhat_lower_pref"] = base["local_yhat_lower"].combine_first(base["yhat_lower"])
+        base["yhat_upper_pref"] = base["local_yhat_upper"].combine_first(base["yhat_upper"])
 
     for c in ["yhat_pref", "yhat_lower_pref", "yhat_upper_pref"]:
         base[c] = pd.to_numeric(base[c], errors="coerce").fillna(0.0).clip(lower=0)
@@ -220,7 +226,11 @@ def _grid_fill_future_models(
 
     pref["ds"] = pd.to_datetime(pref["ds"], errors="raise")
 
-    combined = pd.concat([dis, loc, pref], ignore_index=True)
+    frames = [dis]
+    if not loc.empty:
+        frames.append(loc)
+    frames.append(pref)
+    combined = pd.concat(frames, ignore_index=True)
 
     out = grid.merge(
         combined,

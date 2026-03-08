@@ -52,6 +52,19 @@ def hybrid_disaggregation(
         raise ValueError("Cannot compute weights: total smoothed cases <= 0")
 
     weights["p"] = weights["Cases_smoothed"] / total
+    window_start = pd.to_datetime(recent["WeekStart"], errors="coerce").min()
+    window_end = pd.to_datetime(recent["WeekStart"], errors="coerce").max()
+
+    weights_out = weights.rename(
+        columns={"Barangay_key": "barangay", "Cases": "cases_in_window", "p": "weight"}
+    ).copy()
+    weights_out["window_start"] = window_start
+    weights_out["window_end"] = window_end
+    weights_out["alpha_smooth"] = float(alpha_smooth)
+    weights_out["run_id"] = cfg.run_id
+    weights_out = weights_out[["barangay", "weight", "cases_in_window", "window_start", "window_end", "alpha_smooth", "run_id"]]
+    weights_out.to_csv(cfg.out / "disagg_weights.csv", index=False)
+
     weights = weights[["Barangay_key", "p"]]
 
     def _disagg(city_df: pd.DataFrame, horizon_type: str) -> pd.DataFrame:

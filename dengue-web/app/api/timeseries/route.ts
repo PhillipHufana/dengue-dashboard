@@ -8,12 +8,16 @@ export async function GET(req: Request) {
     const level = searchParams.get("level") ?? "city";    // REQUIRED
     const name = searchParams.get("name") ?? undefined;
     const freq = (searchParams.get("freq") as any) ?? "weekly";
-    const model = (searchParams.get("model") as any) ?? "preferred";
+    const model = (searchParams.get("model_name") ?? searchParams.get("model") ?? "preferred") as string;
+    const runId = searchParams.get("run_id") ?? undefined;
+    const horizonType = (searchParams.get("horizon_type") as "test" | "future" | null) ?? "future";
 
     const data = await getTimeseries(level as "city" | "barangay", {
       name,
       freq,
-      model,
+      runId,
+      modelName: model,
+      horizonType,
     });
 
     return NextResponse.json(data);

@@ -111,6 +111,6 @@ def fit_prophet(
         model.plot_components(full_forecast)
         plot_and_save(cfg.out / "prophet_components.png")
     except Exception as e:
-        print("â„¹ï¸ Skipped Prophet component plotting:", e)
+        print("Skipped Prophet component plotting:", e)
 
     return True, model, forecast_test, forecast_future, metrics

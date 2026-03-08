@@ -1,0 +1,2 @@
+CASE ID,Type,Disease,Sex,DOB,AgeYears,District,(Current Address) Barangay,Admitted,DAdmit,DOnset,Case Classification,outcome,DateDied,Year,MW,__source_row,__source_file,__file_md5,__file_mtime_utc,__batch,Barangay_clean
+162527,,,M,2010-05-23,9.0,,,Noo,2019-12-18,2019-12-17 00:00:00,S,A,,2019,51,39742,DATA REQUEST 2025-2017.xlsx,3bed584dbe92f952edac5bb51efdbc58,2025-07-24 04:44:10.516543627+00:00,incoming,

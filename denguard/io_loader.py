@@ -74,7 +74,7 @@ def load_new_raw_files(
             )
             print(f"Loaded new file: {f}")
         except Exception as e:
-            print(f"âš ï¸ Failed to load {f}: {e}")
+            print(f"Failed to load {f}: {e}")
 
     if not dfs:
         return pd.DataFrame(), [], pending_registry_rows

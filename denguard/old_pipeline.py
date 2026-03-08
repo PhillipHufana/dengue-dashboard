@@ -243,9 +243,9 @@ def run_pipeline(cfg: Config = DEFAULT_CFG) -> None:
 
     try:
         upload_to_supabase(cfg)
-        print("✅ Supabase export completed.")
+        print("Supabase export completed.")
     except Exception as e:
-        print(f"ℹ️ Supabase export skipped: {e}")
+        print(f"Supabase export skipped: {e}")
 
 
 if __name__ == "__main__":

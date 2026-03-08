@@ -49,7 +49,7 @@ def _load_supabase() -> Client:
 
 def _upsert_df(sb: Client, table: str, df: pd.DataFrame, conflict: str, chunk_size: int = 500) -> None:
     if df.empty:
-        print(f"ℹ️ Skipped {table}: empty dataframe.")
+        print(f"Skipped {table}: empty dataframe.")
         return
 
     records = df.to_dict(orient="records")
@@ -266,7 +266,7 @@ def upload_to_supabase(cfg) -> None:
 
             upsert_city_forecasts_long(sb, city_long)
         else:
-            print("ℹ️ Skipped city_forecasts_long: city_forecasts_long.csv not found.")
+            print("Skipped city_forecasts_long: city_forecasts_long.csv not found.")
 
         # ---------------------------------------------------------
         # 4) BARANGAY FORECASTS LONG
@@ -292,7 +292,7 @@ def upload_to_supabase(cfg) -> None:
 
             upsert_barangay_forecasts_long(sb, bg_long)
         else:
-            print("ℹ️ Skipped barangay_forecasts_long: no long CSV found.")
+            print("Skipped barangay_forecasts_long: no long CSV found.")
 
         # ---------------------------------------------------------
         # 5) CITY WEEKLY
@@ -306,7 +306,7 @@ def upload_to_supabase(cfg) -> None:
             df_city_weekly["week_start"] = pd.to_datetime(df_city_weekly["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
             upsert_city_weekly(sb, df_city_weekly)
         else:
-            print("ℹ️ Skipped city_weekly: city_weekly.csv not found.")
+            print("Skipped city_weekly: city_weekly.csv not found.")
 
         # ---------------------------------------------------------
         # 6) BARANGAY WEEKLY
@@ -374,10 +374,10 @@ def upload_to_supabase(cfg) -> None:
                 
 
         except Exception as e:
-            print(f"ℹ️ Skipped legacy barangay_forecasts export: {e}")
+            print(f"Skipped legacy barangay_forecasts export: {e}")
             
         mark_run(sb, run_id, "succeeded")
-        print("✅ Supabase export: COMPLETE")
+        print("Supabase export: COMPLETE")
 
     except Exception as e:
         mark_run(sb, run_id, "failed", error_message=str(e)[:1000])

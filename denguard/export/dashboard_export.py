@@ -10,12 +10,12 @@ import pandas as pd
 
 def safe_read_csv(path: Path) -> Optional[pd.DataFrame]:
     if not path.exists():
-        print(f"âš ï¸ Missing file: {path}")
+        print(f"Missing file: {path}")
         return None
     try:
         return pd.read_csv(path)
     except Exception as e:
-        print(f"âš ï¸ Failed to read {path}: {e}")
+        print(f"Failed to read {path}: {e}")
         return None
 
 

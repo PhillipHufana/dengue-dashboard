@@ -1,0 +1,5 @@
+model_scope,model_name,attempted_units,successful_units,failed_units,failure_rate,run_id,run_kind
+city,prophet,1,1,0,0.0,19956bd7-9ef5-449c-bcef-a498082c348c,production
+city,arima,1,1,0,0.0,19956bd7-9ef5-449c-bcef-a498082c348c,production
+local,local_prophet,0,0,0,0.0,19956bd7-9ef5-449c-bcef-a498082c348c,production
+local,local_arima,0,0,0,0.0,19956bd7-9ef5-449c-bcef-a498082c348c,production

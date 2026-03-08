@@ -135,7 +135,7 @@ def load_and_clean(cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame, list[dict[s
         print("CASE ID counts max:", int(vc.max()) if len(vc) else 0)
         vc.head(50).to_csv(cfg.out / "top_repeated_caseids.csv", index=True)
     else:
-        print("âš ï¸ No CASE ID column found (continuing).")
+        print("No CASE ID column found (continuing).")
 
     if "(Current Address) Barangay" not in df.columns:
         raise KeyError("Missing column '(Current Address) Barangay'")

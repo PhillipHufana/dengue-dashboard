@@ -1,0 +1,13 @@
+model_scope,model_name,attempted_units,successful_units,failed_units,failure_rate,run_id,run_kind
+city,prophet,1,1,0,0.0,c28b721c-4679-4978-bec4-682126f2c50e,production
+city,arima,1,1,0,0.0,c28b721c-4679-4978-bec4-682126f2c50e,production
+local,local_prophet,0,0,0,0.0,c28b721c-4679-4978-bec4-682126f2c50e,production
+local,local_arima,0,0,0,0.0,c28b721c-4679-4978-bec4-682126f2c50e,production
+city,prophet,1,1,0,0.0,0e04f28a-6811-4037-babf-4f80dcdfa14c,production
+city,arima,1,1,0,0.0,0e04f28a-6811-4037-babf-4f80dcdfa14c,production
+local,local_prophet,0,0,0,0.0,0e04f28a-6811-4037-babf-4f80dcdfa14c,production
+local,local_arima,0,0,0,0.0,0e04f28a-6811-4037-babf-4f80dcdfa14c,production
+city,prophet,1,1,0,0.0,21b2c126-b7ef-41d0-9399-8f12776cffcc,production
+city,arima,1,1,0,0.0,21b2c126-b7ef-41d0-9399-8f12776cffcc,production
+local,local_prophet,0,0,0,0.0,21b2c126-b7ef-41d0-9399-8f12776cffcc,production
+local,local_arima,0,0,0,0.0,21b2c126-b7ef-41d0-9399-8f12776cffcc,production

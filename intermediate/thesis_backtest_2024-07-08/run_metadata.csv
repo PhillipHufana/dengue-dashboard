@@ -1,0 +1,2 @@
+run_id,run_kind,data_cutoff_date,train_start,train_end,test_start,test_end,test_length_weeks,forecast_horizon_weeks,disagg_weight_weeks,alpha_smooth,selected_primary_model,incoming_mode,backtest_end_date
+2cd7614b-e5c7-484d-aa9d-9feb031411e2,backtest,2025-07-07,2016-12-26,2024-07-08,2024-07-15,2025-07-07,52,52,52,1.0,prophet,full_refresh,2024-07-08

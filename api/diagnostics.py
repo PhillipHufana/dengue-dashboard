@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from typing import Optional
 from .supabase_client import get_supabase
 from .run_helpers import resolve_run_id, resolve_model_name
+from .utils import normalize_name
 
 router = APIRouter(prefix="/diag", tags=["diag"])
 
@@ -60,15 +61,18 @@ def pipeline_diag(
     unique_forecast_barangays = len({r["name"] for r in names if r.get("name")})
 
     # 4) latest view rows
-    latest_view = (
-        sb.table("latest_barangay_forecast")
-        .select("name", count="exact")
+    latest_fc = (
+        sb.table("barangay_forecasts_long")
+        .select("name")
         .eq("run_id", rid)
         .eq("model_name", model)
         .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start")
         .execute()
-    )
-    latest_view_rows = latest_view.count or 0
+        .data
+    ) or []
+    latest_view_rows = len({normalize_name(r["name"]) for r in latest_fc if r.get("name")})
 
     return {
         "resolved": {"run_id": rid, "model_name": model},

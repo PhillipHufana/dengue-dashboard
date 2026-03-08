@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Literal
 from datetime import date
 from .supabase_client import get_supabase
 from .utils import normalize_name
-from .run_helpers import resolve_run_id, resolve_model_name, DEFAULT_MODEL
+from .run_helpers import resolve_run_id, resolve_model_name, DEFAULT_MODEL, available_models_for_run
 from .risk import risk_from_baseline_percentiles
 from .risk import risk_from_baseline_percentiles_windowed
 from .jenks import jenks_breaks_safe, jenks_class
@@ -56,6 +56,38 @@ def _load_weekly_history(sb, run_id: str) -> Dict[str, List[int]]:
     return out
 
 
+def _latest_future_per_barangay(sb, run_id: str, model: str) -> List[Dict[str, object]]:
+    rows = (
+        sb.table("barangay_forecasts_long")
+        .select("name, week_start, yhat, yhat_lower, yhat_upper")
+        .eq("run_id", run_id)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start")
+        .execute()
+        .data
+    ) or []
+
+    latest_by_name: Dict[str, Dict[str, object]] = {}
+    for row in rows:
+        nm = normalize_name(row["name"])
+        if nm in latest_by_name:
+            continue
+        latest_by_name[nm] = {
+            "name": nm,
+            "week_start": row["week_start"],
+            "yhat": row.get("yhat"),
+            "yhat_lower": row.get("yhat_lower"),
+            "yhat_upper": row.get("yhat_upper"),
+        }
+
+    if not latest_by_name:
+        return []
+
+    return [latest_by_name[k] for k in sorted(latest_by_name.keys())]
+
+
 @router.get("/runs")
 def list_runs(limit: int = 50):
     sb = get_supabase()
@@ -74,18 +106,53 @@ def list_runs(limit: int = 50):
 def list_models(run_id: Optional[str] = Query(None)):
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
-
-    # Use city_forecasts_long to avoid scanning huge barangay_forecasts_long
-    rows = (
-        sb.table("city_forecasts_long")
-        .select("model_name")
-        .eq("run_id", rid)
-        .execute()
-        .data
-    ) or []
-    models = sorted({r["model_name"] for r in rows if r.get("model_name")})
+    models = available_models_for_run(sb, rid)
     default = DEFAULT_MODEL if DEFAULT_MODEL in models else (models[0] if models else None)
-    return {"run_id": rid, "models": models, "default_model": default}
+
+    def _fetch_all(table: str) -> list[dict]:
+        out = []
+        start = 0
+        page_size = 1000
+        while True:
+            chunk = (
+                sb.table(table)
+                .select("model_name")
+                .eq("run_id", rid)
+                .eq("horizon_type", "future")
+                .range(start, start + page_size - 1)
+                .execute()
+                .data
+            ) or []
+            out.extend(chunk)
+            if len(chunk) < page_size:
+                break
+            start += page_size
+        return out
+
+    city_rows = _fetch_all("city_forecasts_long")
+    brgy_rows = _fetch_all("barangay_forecasts_long")
+
+    city_counts: Dict[str, int] = {}
+    for r in city_rows:
+        m = str(r.get("model_name") or "").strip()
+        if not m:
+            continue
+        city_counts[m] = city_counts.get(m, 0) + 1
+
+    barangay_counts: Dict[str, int] = {}
+    for r in brgy_rows:
+        m = str(r.get("model_name") or "").strip()
+        if not m:
+            continue
+        barangay_counts[m] = barangay_counts.get(m, 0) + 1
+
+    return {
+        "run_id": rid,
+        "models": models,
+        "default_model": default,
+        "city_model_counts": city_counts,
+        "barangay_model_counts": barangay_counts,
+    }
 
 # ================================================================
 # 🟦 1. Barangay-level FORECAST TIMESERIES (unchanged)
@@ -199,16 +266,7 @@ def get_latest_future_forecast_for_all_barangays(
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
     model = resolve_model_name(sb, rid, model_name)
-
-    rows = (
-        sb.table("latest_barangay_forecast")
-        .select("name, week_start, yhat, yhat_lower, yhat_upper")
-        .eq("run_id", rid)
-        .eq("model_name", model)
-        .eq("horizon_type", "future")
-        .execute()
-        .data
-    ) or []
+    rows = _latest_future_per_barangay(sb, rid, model)
     return {"run_id": rid, "model_name": model, "horizon_type": "future", "latest": rows}
 
 

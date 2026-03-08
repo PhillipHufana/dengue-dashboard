@@ -41,19 +41,23 @@ export function DengueDashboard() {
     clean: string;
   } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const setRunId = useDashboardStore((s) => s.setRunId)
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const info = await getDataInfo();
-        if (alive) setLastUpdated(info.last_historical_date);
+        if (alive) {
+          setLastUpdated(info.last_historical_date);
+          setRunId(info.run_id ?? null);
+        }
       } catch {
         if (alive) setLastUpdated(null);
       }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [setRunId]);
 
 
   return (

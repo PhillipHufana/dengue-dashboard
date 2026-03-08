@@ -12,6 +12,7 @@ import { LoginModal } from "@/components/dashboard/login-modal";
 import { supabaseLogout } from "@/lib/adminApi";
 import { RiskMetricToggle } from "@/components/dashboard/risk-metric-toggle";
 import { PeriodSelect } from "@/components/dashboard/period-select";
+import { ModelSelect } from "@/components/dashboard/model-select";
 type HeaderMode = "public" | "admin";
 
 export function AppHeader({
@@ -64,6 +65,7 @@ export function AppHeader({
           </div>
 
           {rightSlot ?? null}
+          {mode === "public" ? <ModelSelect /> : null}
 
           {mode === "public" ? (
             <Link href="/admin">
@@ -126,6 +128,7 @@ export function AppHeader({
 
                 <RiskMetricToggle compact />
                 <PeriodSelect compact />
+                {mode === "public" ? <ModelSelect compact /> : null}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   <span>Last updated: {lastUpdated ?? "—"}</span>

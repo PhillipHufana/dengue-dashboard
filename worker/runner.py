@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
+from httpx import ReadTimeout
 from supabase import create_client
 
 from denguard.config import DEFAULT_CFG, Config
@@ -26,6 +27,13 @@ EXPECTED_BARANGAYS = int(os.environ.get("EXPECTED_BARANGAYS", "182"))
 TMP_DIR = Path(os.environ.get("WORKER_TMP_DIR", "./.worker_tmp")).resolve()
 OUT_BASE = Path(os.environ.get("WORKER_OUT_BASE", "intermediate")).resolve()
 UPLOAD_BUCKET = os.environ.get("UPLOAD_BUCKET", "dengue-uploads")
+REQUIRED_FORECAST_MODELS = tuple(
+    m.strip().lower()
+    for m in os.environ.get("WORKER_REQUIRED_FORECAST_MODELS", "preferred,prophet,arima").split(",")
+    if m.strip()
+)
+DOWNLOAD_RETRIES = int(os.environ.get("WORKER_DOWNLOAD_RETRIES", "5"))
+DOWNLOAD_RETRY_BACKOFF_SECONDS = float(os.environ.get("WORKER_DOWNLOAD_RETRY_BACKOFF_SECONDS", "2.0"))
 
 
 def _utc_now_iso() -> str:
@@ -81,16 +89,39 @@ def publish_active_run(sb, run_id: str):
 
 def download_upload(sb, storage_path: str, out_path: Path):
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    res = sb.storage.from_(UPLOAD_BUCKET).download(storage_path)
+    last_err: Exception | None = None
+    for attempt in range(1, max(1, DOWNLOAD_RETRIES) + 1):
+        try:
+            res = sb.storage.from_(UPLOAD_BUCKET).download(storage_path)
 
-    if isinstance(res, (bytes, bytearray)):
-        out_path.write_bytes(res)
-        return
-    if hasattr(res, "data") and isinstance(res.data, (bytes, bytearray)):
-        out_path.write_bytes(res.data)
-        return
+            if isinstance(res, (bytes, bytearray)):
+                out_path.write_bytes(res)
+                return
+            if hasattr(res, "data") and isinstance(res.data, (bytes, bytearray)):
+                out_path.write_bytes(res.data)
+                return
 
-    raise RuntimeError(f"Unexpected storage download response: {type(res)}")
+            raise RuntimeError(f"Unexpected storage download response: {type(res)}")
+        except ReadTimeout as e:
+            last_err = e
+        except Exception as e:
+            msg = str(e).lower()
+            if "timed out" in msg or "timeout" in msg:
+                last_err = e
+            else:
+                raise
+
+        if attempt < max(1, DOWNLOAD_RETRIES):
+            sleep_seconds = DOWNLOAD_RETRY_BACKOFF_SECONDS * attempt
+            print(
+                f"download timeout for {storage_path} "
+                f"(attempt {attempt}/{DOWNLOAD_RETRIES}); retrying in {sleep_seconds:.1f}s"
+            )
+            time.sleep(sleep_seconds)
+
+    raise RuntimeError(
+        f"Failed to download upload after {DOWNLOAD_RETRIES} attempts: {storage_path} | {type(last_err).__name__}: {last_err}"
+    )
 
 
 def build_cfg_for_upload(run_id: str, upload_path: Path) -> Config:
@@ -132,18 +163,25 @@ def assert_publishable(sb, run_id: str) -> None:
     if brgy_n < expected_min:
         raise RuntimeError(f"publishability failed: barangay_weekly_runs rows={brgy_n} < expected_min={expected_min}")
 
-    # preferred future forecasts
-    fc = (
+    # Future forecasts must exist for required model set.
+    model_rows = (
         sb.table("barangay_forecasts_long")
-        .select("run_id", count="exact")
+        .select("model_name")
         .eq("run_id", run_id)
-        .eq("model_name", "preferred")
         .eq("horizon_type", "future")
         .execute()
-    )
-    fc_n = int(getattr(fc, "count", 0) or 0)
-    if fc_n <= 0:
-        raise RuntimeError("publishability failed: preferred future forecasts missing")
+        .data
+    ) or []
+    available_models = {str(r.get("model_name") or "").strip().lower() for r in model_rows if r.get("model_name")}
+    if not available_models:
+        raise RuntimeError("publishability failed: no barangay future forecasts found")
+
+    missing_models = sorted([m for m in REQUIRED_FORECAST_MODELS if m not in available_models])
+    if missing_models:
+        raise RuntimeError(
+            "publishability failed: missing required forecast model_name values in barangay_forecasts_long: "
+            + ", ".join(missing_models)
+        )
 
 
 def claim_one(sb) -> Optional[Dict[str, Any]]:
@@ -217,9 +255,19 @@ def main():
                 time.sleep(0.1)
                 continue
 
+            log_run(sb, run_id, "info", "pipeline_started", payload={"upload_id": upload_id})
             run_production(cfg)  # must export to supabase internally
+            log_run(sb, run_id, "info", "pipeline_finished", payload={"upload_id": upload_id})
 
+            log_run(sb, run_id, "info", "publishability_check_started")
             assert_publishable(sb, run_id)
+            log_run(
+                sb,
+                run_id,
+                "info",
+                "publishability_check_passed",
+                payload={"required_models": list(REQUIRED_FORECAST_MODELS)},
+            )
             publish_active_run(sb, run_id)
 
             set_run(sb, run_id, "succeeded", None)

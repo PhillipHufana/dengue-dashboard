@@ -34,6 +34,27 @@ def fetch_all(q, page_size: int = 1000):
     return out
 
 
+def _latest_future_per_barangay_from_long(sb, run_id: str, model: str) -> Dict[str, float]:
+    frows = (
+        sb.table("barangay_forecasts_long")
+        .select("name, yhat")
+        .eq("run_id", run_id)
+        .eq("model_name", model)
+        .eq("horizon_type", "future")
+        .order("name")
+        .order("week_start")
+        .execute()
+        .data
+    ) or []
+
+    latest = {}
+    for row in frows:
+        nm = normalize_name(row["name"])
+        if nm not in latest:
+            latest[nm] = float(row.get("yhat") or 0.0)
+    return latest
+
+
 
 @router.get("/choropleth")
 def get_choropleth(
@@ -238,16 +259,7 @@ def dengue_hotspots_top(
         ) or []
     latest_cases = {r["name"]: int(r.get("cases") or 0) for r in weekly}
 
-    frows = (
-        sb.table("latest_barangay_forecast")
-        .select("name, week_start, yhat")
-        .eq("run_id", rid)
-        .eq("model_name", model)
-        .eq("horizon_type", "future")
-        .execute()
-        .data
-    ) or []
-    latest_fc = {r["name"]: float(r.get("yhat") or 0.0) for r in frows}
+    latest_fc = _latest_future_per_barangay_from_long(sb, rid, model)
 
     all_brgy = set(latest_cases) | set(latest_fc)
     hotspots = []

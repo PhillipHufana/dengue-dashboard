@@ -110,7 +110,7 @@ def fit_arima(
             plt.title("ARIMA Residuals")
             plot_and_save(cfg.out / "arima_residuals.png")
         except Exception as e:
-            print("â„¹ï¸ Skipped ARIMA residual plot:", e)
+            print("Skipped ARIMA residual plot:", e)
 
         nan_metrics = {"RMSE": np.nan, "MAE": np.nan, "sMAPE": np.nan}
         return True, model, None, nan_metrics
@@ -152,7 +152,7 @@ def fit_arima(
         plt.title("ARIMA Residuals")
         plot_and_save(cfg.out / "arima_residuals.png")
     except Exception as e:
-        print("â„¹ï¸ Skipped ARIMA residual plot:", e)
+        print("Skipped ARIMA residual plot:", e)
 
     raw_city_test = arima_pred_to_city_df(pred_df)
     forecast_test = ensure_city_forecast_df(raw_city_test, model_name="arima", horizon_type="test")

@@ -45,6 +45,13 @@ def _upsert_df(sb: Client, table: str, df: pd.DataFrame, conflict: str, chunk_si
     print(f"Upserted {total} rows into {table}")
 
 
+def _model_names_from_df(df: pd.DataFrame) -> set[str]:
+    col = "model_name" if "model_name" in df.columns else ("method" if "method" in df.columns else None)
+    if not col:
+        return set()
+    return {str(x).strip().lower() for x in df[col].dropna().tolist()}
+
+
 def mark_run(sb: Client, run_id: str, status: str, error_message: str | None = None) -> None:
     payload: dict[str, object] = {"status": status}
 
@@ -207,6 +214,10 @@ def upload_to_supabase(cfg) -> None:
             city_long = pd.read_csv(city_long_path)
             if "run_id" not in city_long.columns:
                 city_long["run_id"] = run_id
+            if "model_name" not in city_long.columns and "method" in city_long.columns:
+                city_long = city_long.rename(columns={"method": "model_name"})
+            if "week_start" not in city_long.columns and "ds" in city_long.columns:
+                city_long = city_long.rename(columns={"ds": "week_start"})
             city_long["week_start"] = pd.to_datetime(city_long["week_start"], errors="raise").dt.strftime("%Y-%m-%d")
             if "model_name" not in city_long.columns:
                 city_long["model_name"] = "preferred"
@@ -218,14 +229,30 @@ def upload_to_supabase(cfg) -> None:
 
         bg_long_path = outdir / "barangay_forecasts_long.csv"
         future_only_path = outdir / "barangay_forecasts_all_models_future_long.csv"
-        chosen_bg_path = bg_long_path if bg_long_path.exists() else future_only_path
 
-        if chosen_bg_path.exists():
-            bg_long = pd.read_csv(chosen_bg_path)
+        bg_candidates: list[tuple[str, pd.DataFrame]] = []
+        if bg_long_path.exists():
+            bg_candidates.append(("barangay_forecasts_long.csv", pd.read_csv(bg_long_path)))
+        if future_only_path.exists():
+            bg_candidates.append(("barangay_forecasts_all_models_future_long.csv", pd.read_csv(future_only_path)))
+
+        if bg_candidates:
+            preferred_models = {"prophet", "arima", "preferred"}
+
+            def _score(item: tuple[str, pd.DataFrame]) -> tuple[int, int]:
+                _, df = item
+                names = _model_names_from_df(df)
+                preferred_count = len(names & preferred_models)
+                return (preferred_count, len(names))
+
+            chosen_name, bg_long = max(bg_candidates, key=_score)
+            print(f"Using {chosen_name} for barangay_forecasts_long export")
             if "Barangay_key" in bg_long.columns:
                 bg_long = bg_long.rename(columns={"Barangay_key": "name"})
             if "ds" in bg_long.columns:
                 bg_long = bg_long.rename(columns={"ds": "week_start"})
+            if "model_name" not in bg_long.columns and "method" in bg_long.columns:
+                bg_long = bg_long.rename(columns={"method": "model_name"})
 
             bg_long["run_id"] = run_id
             bg_long["name"] = bg_long["name"].apply(normalize_barangay_name)
