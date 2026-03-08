@@ -53,15 +53,25 @@ async function adminFetch(path: string, init: RequestInit = {}) {
 
 // ✅ New: Supabase login
 export async function supabaseLogin(email: string, password: string) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
-  return { ok: true };
+  return { ok: true, session: data.session, user: data.user };
 }
 
-export async function supabaseSignup(email: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+export async function supabaseSignup(
+  email: string,
+  password: string,
+  profile?: { first_name?: string; last_name?: string; association?: string | null }
+) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: profile ?? {},
+    },
+  });
   if (error) throw new Error(error.message);
-  return { ok: true, user: data.user };
+  return { ok: true, user: data.user, session: data.session };
 }
 
 export async function supabaseLogout() {
@@ -69,6 +79,20 @@ export async function supabaseLogout() {
   if (error) throw new Error(error.message);
   return { ok: true };
 }
+
+export type AdminProfile = {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  association: string | null;
+  role: string | null;
+};
+
+export async function fetchMyProfile(): Promise<AdminProfile> {
+  const res = await adminFetch(`/admin/me`);
+  return res.json();
+}
+
 export type UploadRunRow = {
   upload_id: string;
   created_at: string;

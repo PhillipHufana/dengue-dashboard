@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBarangaySeries, useCitySeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   LineChart,
   Line,
@@ -165,24 +166,24 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
                 {freqLabel}
               </Badge>
 
-              <div className="ml-2 flex gap-1">
+              <ButtonGroup className="ml-2">
                 <Button
                   size="sm"
-                  className="h-7 text-[10px]"
+                  className="h-8 px-3 text-xs font-medium rounded-r-none"
                   variant={view === "focused" ? "default" : "outline"}
                   onClick={() => setView("focused")}
                 >
-                  Focus
+                  Focused
                 </Button>
                 <Button
                   size="sm"
-                  className="h-7 text-[10px]"
+                  className="h-8 px-3 text-xs font-medium rounded-l-none border-l-0"
                   variant={view === "full" ? "default" : "outline"}
                   onClick={() => setView("full")}
                 >
                   Full
                 </Button>
-              </div>
+              </ButtonGroup>
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">

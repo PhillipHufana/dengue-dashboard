@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List
+import warnings
 import pandas as pd
 import numpy as np
 from denguard.config import Config
@@ -45,7 +46,6 @@ def local_models_production(
     # --- Minimal: call your existing local_models_tierA is NOT possible because it requires test_city + disagg_test_df.
     # So production must have its own loop (copy Prophet/ARIMA fitting sections from step18, minus test parts).
     import pmdarima as pm
-    import warnings
 
     long_parts = []
     failure_rows = []

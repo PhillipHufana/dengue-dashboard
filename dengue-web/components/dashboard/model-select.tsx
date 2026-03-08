@@ -7,6 +7,16 @@ import { getModels } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 
 const PREFERRED_ORDER = ["preferred", "prophet", "arima"] as const;
+const MODEL_LABEL: Record<string, string> = {
+  preferred: "Preferred (Default)",
+  prophet: "PROPHET",
+  arima: "ARIMA",
+};
+const MODEL_TOOLTIP: Record<string, string> = {
+  preferred: "Auto-selected best model for the current run.",
+  prophet: "Prophet forecast stream.",
+  arima: "ARIMA forecast stream.",
+};
 
 export function ModelSelect({ compact = false }: { compact?: boolean }) {
   const runId = useDashboardStore((s) => s.runId);
@@ -42,13 +52,20 @@ export function ModelSelect({ compact = false }: { compact?: boolean }) {
 
   return (
     <Select value={safeModel} onValueChange={(v) => setModelName(v)}>
-      <SelectTrigger className={compact ? "w-full h-8 text-xs bg-secondary" : "w-[150px] bg-secondary"}>
+      <SelectTrigger
+        className={
+          compact
+            ? "w-full h-9 text-xs border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
+            : "w-[190px] h-9 border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
+        }
+        title={MODEL_TOOLTIP[safeModel] ?? "Select forecast model"}
+      >
         <SelectValue placeholder="Model" />
       </SelectTrigger>
       <SelectContent>
         {models.map((m) => (
-          <SelectItem key={m} value={m}>
-            {m.toUpperCase()}
+          <SelectItem key={m} value={m} title={MODEL_TOOLTIP[m] ?? undefined}>
+            {MODEL_LABEL[m] ?? m.toUpperCase()}
           </SelectItem>
         ))}
       </SelectContent>

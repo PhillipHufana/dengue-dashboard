@@ -2,18 +2,74 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
-import { Bug, Calendar, Menu, Shield } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bug, Calendar, LogIn, Shield, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
-import { clearAdminToken, getAdminToken } from "@/lib/adminApi";
 import { LoginModal } from "@/components/dashboard/login-modal";
-import { supabaseLogout } from "@/lib/adminApi";
+import { supabase } from "@/lib/supabaseClient";
+import { fetchMyProfile, supabaseLogout, type AdminProfile } from "@/lib/adminApi";
 import { RiskMetricToggle } from "@/components/dashboard/risk-metric-toggle";
 import { PeriodSelect } from "@/components/dashboard/period-select";
 import { ModelSelect } from "@/components/dashboard/model-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 type HeaderMode = "public" | "admin";
+
+function displayName(profile: AdminProfile | null): string {
+  if (!profile) return "Profile";
+  const first = (profile.first_name || "").trim();
+  const last = (profile.last_name || "").trim();
+  const full = `${first} ${last}`.trim();
+  return full || "Profile";
+}
+
+function ProfileMenu({
+  profile,
+  email,
+  onLogout,
+  compact = false,
+}: {
+  profile: AdminProfile | null;
+  email: string | null;
+  onLogout: () => Promise<void>;
+  compact?: boolean;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size={compact ? "sm" : "default"}
+          className={compact ? "h-8 px-2" : "bg-transparent"}
+          title="Open profile and logout"
+        >
+          <UserCircle className="h-4 w-4 mr-1" />
+          <span className={compact ? "max-w-[88px] truncate" : "max-w-[140px] truncate"}>
+            {displayName(profile)}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72" align="end">
+        <div className="space-y-2">
+          <div className="text-sm font-semibold">{displayName(profile)}</div>
+          <div className="text-xs text-muted-foreground">
+            Email: {email || "—"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Association: {profile?.association || "—"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Role: {profile?.role || "user"}
+          </div>
+          <Button className="w-full mt-2" variant="outline" onClick={onLogout}>
+            Logout
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function AppHeader({
   mode,
@@ -22,42 +78,102 @@ export function AppHeader({
 }: {
   mode: HeaderMode;
   lastUpdated?: string | null;
-  rightSlot?: React.ReactNode; // optional extra controls (like time range) on desktop
+  rightSlot?: React.ReactNode;
 }) {
   const router = useRouter();
-  const hasAdminToken = useMemo(() => !!getAdminToken(), []);
+  const [isAuthed, setIsAuthed] = useState(false);
+  const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const autoOpenedLoginRef = useRef(false);
 
-  const onLogout = () => {
-    clearAdminToken();
-    window.dispatchEvent(new Event("admin-token-changed"));
-    router.push("/"); // ✅ go back to dashboard
+  useEffect(() => {
+    let alive = true;
+
+    const refresh = async () => {
+      const { data } = await supabase.auth.getSession();
+      const authed = !!data.session;
+      if (!alive) return;
+      setIsAuthed(authed);
+      setEmail(data.session?.user?.email ?? null);
+      setAuthChecked(true);
+
+      if (!authed) {
+        setProfile(null);
+        setEmail(null);
+        return;
+      }
+      try {
+        const p = await fetchMyProfile();
+        if (alive) setProfile(p);
+      } catch {
+        if (alive) setProfile(null);
+      }
+    };
+
+    refresh();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      window.dispatchEvent(new Event("admin-auth-changed"));
+      refresh();
+    });
+
+    const onAuthChanged = () => refresh();
+    window.addEventListener("admin-auth-changed", onAuthChanged);
+
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+      window.removeEventListener("admin-auth-changed", onAuthChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mode === "admin" && authChecked && !isAuthed && !autoOpenedLoginRef.current) {
+      setLoginOpen(true);
+      autoOpenedLoginRef.current = true;
+    }
+  }, [mode, authChecked, isAuthed]);
+
+  const onLogout = async () => {
+    await supabaseLogout();
+    window.dispatchEvent(new Event("admin-auth-changed"));
+    setLoginOpen(false);
+    router.push("/");
   };
 
   const title = mode === "admin" ? "Denguard Admin Console" : "Denguard Dengue Surveillance";
-  const subtitle =
-    mode === "admin"
-      ? "Uploads • Runs • Logs"
-      : "Predictive outbreak monitoring - 182 Barangays";
+  const subtitle = mode === "admin" ? "Uploads - Runs - Logs" : "Predictive outbreak monitoring - 182 Barangays";
+
+  const adminActionDesktop = useMemo(() => {
+    if (!isAuthed) return null;
+    return <ProfileMenu profile={profile} email={email} onLogout={onLogout} />;
+  }, [isAuthed, profile, email]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-4 py-3 md:px-6 md:py-4">
+    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background opacity-100 px-4 py-3 md:px-6 md:py-4">
+      <LoginModal
+        open={loginOpen}
+        onOpenChange={setLoginOpen}
+        showTrigger={false}
+        redirectToAdminOnLogin
+      />
+
       <div className="flex items-center justify-between gap-3">
-        {/* Logo and Title */}
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg bg-primary">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg bg-primary shrink-0">
             {mode === "admin" ? (
               <Shield className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
             ) : (
               <Bug className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
             )}
           </div>
-          <div>
-            <h1 className="text-base md:text-xl font-semibold text-foreground">{title}</h1>
-            <p className="hidden sm:block text-xs md:text-sm text-muted-foreground">{subtitle}</p>
+          <div className="min-w-0">
+            <h1 className="text-base md:text-xl font-semibold text-foreground truncate">{title}</h1>
+            <p className="hidden sm:block text-xs md:text-sm text-muted-foreground truncate">{subtitle}</p>
           </div>
         </div>
 
-        {/* Desktop Controls */}
         <div className="hidden md:flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
@@ -68,90 +184,66 @@ export function AppHeader({
           {mode === "public" ? <ModelSelect /> : null}
 
           {mode === "public" ? (
+            isAuthed ? (
+              <Link href="/admin">
+                <Button variant="outline" className="bg-transparent">Admin</Button>
+              </Link>
+            ) : (
+              <Button variant="outline" className="bg-transparent" onClick={() => setLoginOpen(true)}>
+                <LogIn className="h-4 w-4 mr-1" />
+                Admin Login
+              </Button>
+            )
+          ) : null}
+
+          {mode === "admin" ? (
+            <Link href="/">
+              <Button variant="outline" className="bg-transparent">Dashboard</Button>
+            </Link>
+          ) : null}
+
+          <ThemeToggle />
+          {adminActionDesktop}
+        </div>
+
+        <div className="flex md:hidden items-center gap-2 shrink-0">
+          <ThemeToggle />
+          {mode === "admin" ? (
+            <Link href="/">
+              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">
+                Dashboard
+              </Button>
+            </Link>
+          ) : isAuthed ? (
             <Link href="/admin">
-              <Button variant="outline" className="bg-transparent">
+              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">
                 Admin
               </Button>
             </Link>
           ) : (
-            <Link href="/">
-              <Button variant="outline" className="bg-transparent">
-                Dashboard
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 bg-transparent"
+              onClick={() => setLoginOpen(true)}
+              title="Sign in to access admin"
+            >
+              Admin Login
+            </Button>
           )}
-
-          <ThemeToggle />
-
-          {/* Token auth (temporary) */}
-          {mode === "admin" ? (
-            <>
-              <LoginModal />
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  await supabaseLogout();
-                  window.dispatchEvent(new Event("admin-auth-changed"));
-                  router.push("/"); // go back to dashboard
-                }}
-              >
-                Logout
-              </Button>
-            </>
-          ) : null}
+          {isAuthed ? <ProfileMenu profile={profile} email={email} onLogout={onLogout} compact /> : null}
         </div>
+      </div>
 
-        {/* Mobile Menu */}
-        <div className="flex md:hidden items-center gap-2">
-          <ThemeToggle />
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8 bg-transparent">
-                <Menu className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[280px]">
-              <div className="flex flex-col gap-3">
-                {mode === "public" ? (
-                  <Link href="/admin">
-                    <Button variant="outline" className="w-full bg-transparent">
-                      Admin
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/">
-                    <Button variant="outline" className="w-full bg-transparent">
-                      Dashboard
-                    </Button>
-                  </Link>
-                )}
-
-                <RiskMetricToggle compact />
-                <PeriodSelect compact />
-                {mode === "public" ? <ModelSelect compact /> : null}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>Last updated: {lastUpdated ?? "—"}</span>
-                </div>
-
-                {mode === "admin" ? (
-                  <>
-                    <LoginModal variant="mobile" />
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        await supabaseLogout();
-                        window.dispatchEvent(new Event("admin-auth-changed"));
-                        router.push("/"); // go back to dashboard
-                      }}
-                    >
-                      Logout
-                    </Button>
-                  </>
-                ) : null}
-              </div>
-            </SheetContent>
-          </Sheet>
+      <div className="mt-3 md:hidden space-y-2">
+        {mode === "public" ? <ModelSelect compact /> : null}
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
+          <RiskMetricToggle compact />
+          <PeriodSelect compact />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5" />
+          <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
         </div>
       </div>
     </header>

@@ -1144,7 +1144,7 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     print("model_name counts:\n", vc)
 
     expected = len(all_barangays) * horizon
-    for m in ["disagg", "preferred"]:
+    for m in ["prophet", "arima", "preferred"]:
         if vc.get(m, 0) != expected:
             print(f"Unexpected count for {m}: got {vc.get(m, 0)} expected {expected}")
 

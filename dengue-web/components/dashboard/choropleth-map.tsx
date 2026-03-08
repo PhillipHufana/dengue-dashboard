@@ -279,9 +279,9 @@ return (
             </Badge>
           </div>
           {selectedBarangay && (
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 min-w-0">
               <span className="text-primary text-sm">Selected:</span>
-              <Badge>{selectedBarangay.pretty}</Badge>
+              <Badge className="max-w-[52vw] md:max-w-none truncate">{selectedBarangay.pretty}</Badge>
               <Button size="sm" variant="ghost" className="ml-auto h-6" onClick={() => onBarangaySelect(null)}>
                 Clear
               </Button>
@@ -289,7 +289,7 @@ return (
           )}
 
           {!loadingSummary && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {(
                 riskMetric === "incidence"
                   ? [
@@ -311,10 +311,10 @@ return (
               ).map((item) => (
                 <div
                   key={item.label}
-                  className="shrink-0 bg-secondary/50 rounded-lg p-2 min-w-[60px] text-center"
+                  className="bg-secondary/50 rounded-lg p-2 min-w-0 text-center"
                 >
-                  <div className={`text-lg font-bold ${item.color ?? ""}`}>{item.value}</div>
-                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                  <div className={`text-base md:text-lg font-bold ${item.color ?? ""}`}>{item.value}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">{item.label}</div>
                 </div>
               ))}
             </div>
@@ -340,9 +340,9 @@ return (
             <div className="text-red-500 p-4">Failed to load map.</div>
           )}
 
-          <div className="absolute top-2 right-2 bg-red-500/10 border border-red-500/40 p-2 rounded-lg backdrop-blur-sm z-50">
+          <div className="absolute top-2 right-2 max-w-[52vw] md:max-w-[280px] bg-red-500/10 border border-red-500/40 p-2 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[10px] text-red-500 font-medium">HOTSPOT</div>
-            <div className="text-sm font-bold text-red-500">
+            <div className="text-sm font-bold text-red-500 truncate" title={nameToLabel.get(stats.hottestName ?? "") ?? stats.hottestName ?? "N/A"}>
               {nameToLabel.get(stats.hottestName ?? "") ?? stats.hottestName ?? "—"}
             </div>
             <div className="text-xs text-red-500/70">
@@ -350,7 +350,7 @@ return (
               {riskMetric === "incidence" ? "/100k" : "cases"}
             </div>
           </div>
-          <div className="absolute bottom-2 left-2 bg-background/95 border p-3 rounded-lg backdrop-blur-sm z-50">
+          <div className="absolute bottom-2 left-2 max-w-[70vw] md:max-w-[360px] bg-background/95 border p-3 rounded-lg backdrop-blur-sm z-50">
           <div className="text-xs font-medium mb-2 text-muted-foreground">
             {riskMetric === "incidence" ? "Incidence classes" : "Cases classes"}
           </div>

@@ -409,3 +409,25 @@ def request_access(
     ).execute()
 
     return {"ok": True}
+
+
+@router.get("/me")
+def get_my_profile(user_id: str = Depends(require_user_id)):
+    sb = get_supabase()
+    rows = (
+        sb.table("profiles")
+        .select("first_name,last_name,association,role")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+
+    profile = rows[0] if rows else {}
+    return {
+        "user_id": user_id,
+        "first_name": profile.get("first_name"),
+        "last_name": profile.get("last_name"),
+        "association": profile.get("association"),
+        "role": profile.get("role"),
+    }

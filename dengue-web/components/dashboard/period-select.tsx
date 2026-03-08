@@ -23,7 +23,13 @@ export function PeriodSelect({ compact = false }: { compact?: boolean }) {
 
   return (
     <Select value={safePeriod} onValueChange={(v) => setPeriod(v as TimePeriod)}>
-      <SelectTrigger className={compact ? "w-full h-8 text-xs bg-secondary" : "w-[150px] bg-secondary"}>
+      <SelectTrigger
+        className={
+          compact
+            ? "w-full h-9 text-xs border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
+            : "w-[150px] h-9 border-primary bg-primary text-primary-foreground! hover:bg-primary/90 hover:border-primary/90 data-[state=open]:bg-primary/90 [&_svg]:text-primary-foreground!"
+        }
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

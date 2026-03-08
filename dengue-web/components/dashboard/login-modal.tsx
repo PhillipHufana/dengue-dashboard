@@ -3,6 +3,7 @@
 
 import type React from "react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,13 +18,47 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Loader2 } from "lucide-react";
 import { supabaseLogin, supabaseSignup, requestAccessProfile } from "@/lib/adminApi";
 import { toast } from "sonner";
-import { set } from "date-fns";
 interface LoginModalProps {
   variant?: "default" | "mobile";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+  redirectToAdminOnLogin?: boolean;
 }
 
-export function LoginModal({ variant = "default" }: LoginModalProps) {
-  const [open, setOpen] = useState(false);
+const PENDING_PROFILE_KEY_PREFIX = "pending_access_profile:";
+
+function pendingKey(email: string): string {
+  return `${PENDING_PROFILE_KEY_PREFIX}${email.trim().toLowerCase()}`;
+}
+
+function stashPendingProfile(email: string, payload: { first_name: string; last_name: string; association?: string | null }) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(pendingKey(email), JSON.stringify(payload));
+}
+
+function popPendingProfile(email: string): { first_name: string; last_name: string; association?: string | null } | null {
+  if (typeof window === "undefined") return null;
+  const key = pendingKey(email);
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  localStorage.removeItem(key);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function LoginModal({
+  variant = "default",
+  open,
+  onOpenChange,
+  showTrigger = true,
+  redirectToAdminOnLogin = false,
+}: LoginModalProps) {
+  const router = useRouter();
+  const [localOpen, setLocalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,6 +70,12 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
 
   const [mode, setMode] = useState<"login" | "signup">("login");
 
+  const resolvedOpen = open ?? localOpen;
+  const setResolvedOpen = (next: boolean) => {
+    if (open === undefined) setLocalOpen(next);
+    onOpenChange?.(next);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -42,9 +83,35 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
 
     try {
       if (mode === "login") {
-        await supabaseLogin(email.trim(), password);
+        const loginRes = await supabaseLogin(email.trim(), password);
+
+        // Best-effort profile persistence after login:
+        // 1) pending profile from prior signup attempt, else
+        // 2) user metadata saved during signup
+        let profilePayload = popPendingProfile(email.trim());
+        if (!profilePayload) {
+          const meta: any = loginRes?.user?.user_metadata ?? {};
+          const first = String(meta.first_name ?? meta.firstName ?? "").trim();
+          const last = String(meta.last_name ?? meta.lastName ?? "").trim();
+          const assocRaw = String(meta.association ?? "").trim();
+          const assoc = assocRaw.length ? assocRaw : null;
+          if (first && last) {
+            profilePayload = { first_name: first, last_name: last, association: assoc };
+          }
+        }
+
+        if (profilePayload) {
+          try {
+            await requestAccessProfile(profilePayload);
+          } catch {
+            // Do not block login if profile upsert fails transiently.
+          }
+        }
         window.dispatchEvent(new Event("admin-auth-changed"));
-        setOpen(false);
+        setResolvedOpen(false);
+        if (redirectToAdminOnLogin) {
+          router.push("/admin");
+        }
         return;
       }
 
@@ -56,19 +123,34 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
         }
       }
 
-      // signup / request access
-      await supabaseSignup(email.trim(), password);
-
-      // store request details in profiles
-      await requestAccessProfile({
+      const profilePayload = {
         first_name: firstName,
         last_name: lastName,
         association,
-      });
+      };
+      stashPendingProfile(email.trim(), profilePayload);
+
+      // signup
+      await supabaseSignup(email.trim(), password, profilePayload);
+
+      // try immediate sign-in so request-access can persist profile fields
+      try {
+        await supabaseLogin(email.trim(), password);
+      } catch (signInErr: any) {
+        setError(
+          "Account created. Please verify your email first, then sign in once to finish your access request profile."
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      await requestAccessProfile(profilePayload);
+      popPendingProfile(email.trim());
 
       toast.success("Request submitted", {
         description: "Your account was created. An admin must approve access before you can use admin tools.",
       });
+      window.dispatchEvent(new Event("admin-auth-changed"));
 
       // reset UI
       setMode("login");
@@ -77,7 +159,10 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
       setFirstName("");
       setLastName("");
       setAssociation("");
-      setOpen(false);
+      setResolvedOpen(false);
+      if (redirectToAdminOnLogin) {
+        router.push("/admin");
+      }
 
       // optional: show toast instead of closing modal
       // but simplest: close and let UI show "not authorized" if they try.
@@ -89,20 +174,22 @@ export function LoginModal({ variant = "default" }: LoginModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {variant === "mobile" ? (
-          <Button variant="outline" className="gap-2 justify-start bg-transparent w-full">
-            <LogIn className="h-4 w-4" />
-            Admin Login
-          </Button>
-        ) : (
-          <Button variant="outline" className="gap-2 bg-transparent">
-            <LogIn className="h-4 w-4" />
-            Admin Login
-          </Button>
-        )}
-      </DialogTrigger>
+    <Dialog open={resolvedOpen} onOpenChange={setResolvedOpen}>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          {variant === "mobile" ? (
+            <Button variant="outline" className="gap-2 justify-start bg-transparent w-full">
+              <LogIn className="h-4 w-4" />
+              Admin Login
+            </Button>
+          ) : (
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <LogIn className="h-4 w-4" />
+              Admin Login
+            </Button>
+          )}
+        </DialogTrigger>
+      ) : null}
 
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
