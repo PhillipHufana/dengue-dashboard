@@ -268,9 +268,18 @@ return (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <CardTitle className="text-lg font-semibold">Choropleth Map</CardTitle>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="hidden text-xs">
+                {period.toUpperCase()} • As of {(summary as any)?.model_current_date ?? "—"}
+              </Badge>
+              <Badge variant="outline" className="hidden text-xs">
                 {/* ✅ show selected global period */}
                 {period.toUpperCase()} • Week of {weeks[selectedWeek]}
+              </Badge>
+              <Badge variant="outline" className="hidden text-xs">
+                {period.toUpperCase()} • As of {((summary as any)?.model_current_date ?? (summary as any)?.data_last_updated ?? (summary as any)?.city_latest?.week_start ?? "—")}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {period.toUpperCase()} • As of {new Date(((summary as any)?.model_current_date ?? (summary as any)?.data_last_updated ?? (summary as any)?.city_latest?.week_start ?? Date.now())).toLocaleDateString([], { year: "numeric", month: "short", day: "2-digit" })}
               </Badge>
             </div>
 

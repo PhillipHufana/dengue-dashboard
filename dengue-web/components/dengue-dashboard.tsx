@@ -27,6 +27,17 @@ const ChoroplethMap = dynamic(
   }
 );
 
+function formatReadableDate(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+}
+
 export function DengueDashboard() {
   const [selectedBarangay, setSelectedBarangay] = useState<{
     pretty: string;
@@ -56,7 +67,7 @@ export function DengueDashboard() {
     <div className="min-h-screen bg-background">
       <AppHeader
         mode="public"
-        lastUpdated={lastUpdated}
+        lastUpdated={formatReadableDate(lastUpdated)}
         rightSlot={
           <div className="flex items-center gap-2">
             <RiskMetricToggle />

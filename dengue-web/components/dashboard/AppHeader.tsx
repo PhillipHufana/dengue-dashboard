@@ -34,6 +34,29 @@ function profileInitials(profile: AdminProfile | null): string {
   return out || "P";
 }
 
+function formatReadableDate(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const hasTime = /T|\d{1,2}:\d{2}/.test(value);
+  return d.toLocaleString(
+    [],
+    hasTime
+      ? {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      : {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        },
+  );
+}
+
 function ProfileMenu({
   profile,
   email,
