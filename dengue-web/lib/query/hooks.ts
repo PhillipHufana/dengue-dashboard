@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSummary, getChoropleth, getTimeseries, getForecastRankings } from "@/lib/api";
 
-import type { Frequency, TimePeriod } from "@/lib/store/dashboard-store";
+import type { Frequency, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
 import type { ChoroplethFC, SummaryResponse, RankingResponse } from "@/lib/api";
 
 export function useSummary(
@@ -37,13 +37,19 @@ export function useChoropleth(
   });
 }
 
-export function useRankings(period: string, runId?: string | null, modelName?: string | null) {
+export function useRankings(
+  period: string,
+  runId?: string | null,
+  modelName?: string | null,
+  rankingBasis?: RiskMetric | null
+) {
   return useQuery<RankingResponse>({
-    queryKey: ["rankings", period, runId ?? null, modelName ?? null],
+    queryKey: ["rankings", period, runId ?? null, modelName ?? null, rankingBasis ?? null],
     queryFn: () =>
       getForecastRankings(period, {
         runId: runId ?? undefined,
         modelName: modelName ?? undefined,
+        rankingBasis: rankingBasis ?? undefined,
       }),
     staleTime: 60_000,
     gcTime: 5 * 60_000,

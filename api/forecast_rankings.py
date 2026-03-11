@@ -20,6 +20,11 @@ PERIOD_WEEKS = {
     "1y": 52,
 }
 
+RANKING_BASIS_SET = {"incidence", "cases", "surge"}
+SURGE_FORECAST_WEEKS = 4
+SURGE_HISTORY_WEEKS = 8
+SURGE_EPSILON = 1.0
+
 _rankings_cache = TTLCache(maxsize=64, ttl=300)  # 5 minute cache for rankings
 
 def fetch_all(q, page_size: int = 1000):
@@ -78,13 +83,17 @@ def get_forecast_rankings(
     period: str = Query("1m"),
     run_id: Optional[str] = Query(None),
     model_name: Optional[str] = Query(None),
+    ranking_basis: str = Query("incidence"),
 ):
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
     model = resolve_model_name(sb, rid, model_name)
     weeks_to_sum = PERIOD_WEEKS.get(period, 4)
+    basis = str(ranking_basis or "incidence").strip().lower()
+    if basis not in RANKING_BASIS_SET:
+        basis = "incidence"
 
-    cache_key = (rid, model, period)
+    cache_key = (rid, model, period, basis)
     if cache_key in _rankings_cache:
         return _rankings_cache[cache_key]
 
@@ -120,7 +129,7 @@ def get_forecast_rankings(
         .select("week_start")
         .eq("run_id", rid)
         .order("week_start", desc=True)
-        .limit(2)
+        .limit(max(2, SURGE_HISTORY_WEEKS))
         .execute()
         .data
     ) or []
@@ -130,7 +139,7 @@ def get_forecast_rankings(
             sb.table("city_weekly")
             .select("week_start")
             .order("week_start", desc=True)
-            .limit(2)
+            .limit(max(2, SURGE_HISTORY_WEEKS))
             .execute()
             .data
         ) or []
@@ -139,24 +148,26 @@ def get_forecast_rankings(
     prev_week_date = city_weeks[1]["week_start"] if len(city_weeks) >= 2 else None
 
     weeks_for_trend = [w for w in [latest_week_date, prev_week_date] if w is not None]
+    weeks_for_surge = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
+    weeks_for_weekly = list(dict.fromkeys(weeks_for_trend + weeks_for_surge))
 
-    # --- Fetch only barangay rows for those two weeks
+    # --- Fetch only barangay rows for trend + surge windows
     weekly_rows_raw = []
-    if weeks_for_trend:
+    if weeks_for_weekly:
         weekly_rows_raw = (
             sb.table("barangay_weekly_runs")
             .select("name, cases, week_start")
             .eq("run_id", rid)
-            .in_("week_start", weeks_for_trend)
+            .in_("week_start", weeks_for_weekly)
             .execute()
             .data
         ) or []
 
-    if not weekly_rows_raw and weeks_for_trend:
+    if not weekly_rows_raw and weeks_for_weekly:
         weekly_rows_raw = (
             sb.table("barangay_weekly")
             .select("name, cases, week_start")
-            .in_("week_start", weeks_for_trend)
+            .in_("week_start", weeks_for_weekly)
             .execute()
             .data
         ) or []
@@ -169,7 +180,6 @@ def get_forecast_rankings(
 
     for nm in grouped_weekly:
         grouped_weekly[nm].sort(key=lambda r: r["week_start"], reverse=True)
-        grouped_weekly[nm] = grouped_weekly[nm][:2]
 
     rows_tmp, case_values, inc_values = [], [], []
 
@@ -177,13 +187,36 @@ def get_forecast_rankings(
         total_forecast = sum(float(r.get("yhat") or 0.0) for r in future_rows[:weeks_to_sum])
 
         weekly = grouped_weekly.get(name, [])
+        weekly_recent2 = weekly[:2]
+        weekly_recent8 = weekly[:SURGE_HISTORY_WEEKS]
         last2_fore = [{"forecast": float(r.get("yhat") or 0.0)} for r in future_rows[-2:]] if len(future_rows) >= 2 else []
-        trend, last_week, this_week, trend_source, trend_message = compute_hybrid_trend(weekly, last2_fore)
+        trend, last_week, this_week, trend_source, trend_message = compute_hybrid_trend(weekly_recent2, last2_fore)
 
         pop = pop_map.get(name)
         inc = (float(total_forecast) / float(pop) * 100000.0) if pop and pop > 0 else None
+        forecast_4w_cases = sum(float(r.get("yhat") or 0.0) for r in future_rows[:SURGE_FORECAST_WEEKS])
+        past_8w_avg_cases = (
+            sum(float(r.get("cases") or 0.0) for r in weekly_recent8) / float(SURGE_HISTORY_WEEKS)
+            if weekly_recent8
+            else 0.0
+        )
+        surge_score = forecast_4w_cases / (past_8w_avg_cases + SURGE_EPSILON)
 
-        rows_tmp.append((name, total_forecast, inc, trend, last_week, this_week, trend_source, trend_message))
+        rows_tmp.append(
+            (
+                name,
+                total_forecast,
+                inc,
+                trend,
+                last_week,
+                this_week,
+                trend_source,
+                trend_message,
+                forecast_4w_cases,
+                past_8w_avg_cases,
+                surge_score,
+            )
+        )
         case_values.append(float(total_forecast))
         if inc is not None:
             inc_values.append(float(inc))
@@ -192,7 +225,19 @@ def get_forecast_rankings(
     inc_breaks = jenks_breaks_safe(inc_values, n_classes=5)
 
     results = []
-    for (name, total_forecast, inc, trend, last_week, this_week, trend_source, trend_message) in rows_tmp:
+    for (
+        name,
+        total_forecast,
+        inc,
+        trend,
+        last_week,
+        this_week,
+        trend_source,
+        trend_message,
+        forecast_4w_cases,
+        past_8w_avg_cases,
+        surge_score,
+    ) in rows_tmp:
         cases_class = jenks_class(float(total_forecast), case_breaks) if total_forecast is not None else "unknown"
         burden_class = jenks_class(float(inc), inc_breaks) if inc is not None else "unknown"
 
@@ -213,14 +258,23 @@ def get_forecast_rankings(
                 "last_week": last_week,
                 "this_week": this_week,
                 "trend_message": trend_message,
+                "forecast_4w_cases": round(float(forecast_4w_cases), 4),
+                "past_8w_avg_cases": round(float(past_8w_avg_cases), 4),
+                "surge_score": round(float(surge_score), 6),
             }
         )
 
-    results.sort(key=lambda x: (x["total_forecast_incidence_per_100k"] or 0.0), reverse=True)
+    if basis == "surge":
+        results.sort(key=lambda x: float(x.get("surge_score") or 0.0), reverse=True)
+    elif basis == "cases":
+        results.sort(key=lambda x: float(x.get("total_forecast_cases") or 0.0), reverse=True)
+    else:
+        results.sort(key=lambda x: float(x.get("total_forecast_incidence_per_100k") or 0.0), reverse=True)
 
     resp = {
         "period": period,
         "weeks_to_sum": weeks_to_sum,
+        "ranking_basis": basis,
         "data_last_updated": latest_week_date,
         "model_current_date": latest_week_date,
         "user_current_date": str(date.today()),

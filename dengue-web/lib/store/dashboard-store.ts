@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 export type Frequency = "weekly" | "monthly" | "yearly";
 export type ModelName = string;
-export type RiskMetric = "cases" | "incidence";
+export type RiskMetric = "cases" | "incidence" | "surge";
 export type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
 
 interface DashboardState {

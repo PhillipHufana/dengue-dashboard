@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import math
 import os
+import json
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -65,6 +66,15 @@ def mark_run(sb: Client, run_id: str, status: str, error_message: str | None = N
         payload["error_message"] = error_message or None
 
     sb.table("runs").update(payload).eq("run_id", run_id).execute()
+
+
+def publish_active_run(sb: Client, run_id: str) -> None:
+    payload = {
+        "id": 1,
+        "active_run_id": run_id,
+        "updated_at": _utc_now_iso(),
+    }
+    sb.table("active_runs").upsert(payload, on_conflict="id").execute()
 
 
 def upsert_runs(sb: Client, df: pd.DataFrame) -> None:
@@ -158,6 +168,19 @@ def upload_to_supabase(cfg) -> None:
         raise RuntimeError("cfg.run_id is missing")
 
     run_kind = getattr(cfg, "run_kind", "production")
+    disagg_scheme_payload = None
+    run_meta_path = outdir / "run_metadata.csv"
+    if run_meta_path.exists():
+        try:
+            rm = pd.read_csv(run_meta_path)
+            if not rm.empty and "disagg_scheme" in rm.columns:
+                v = str(rm.iloc[0]["disagg_scheme"]).strip().lower()
+                if v:
+                    disagg_scheme_payload = v
+        except Exception:
+            disagg_scheme_payload = None
+    if not disagg_scheme_payload:
+        disagg_scheme_payload = str(getattr(cfg, "disagg_scheme_production", "rolling")).strip().lower()
 
     horizon_weeks = 0
     future_candidates = [
@@ -187,7 +210,7 @@ def upload_to_supabase(cfg) -> None:
                 "mode": cfg.incoming_mode,
                 "train_end": train_end_value,
                 "horizon_weeks": horizon_weeks,
-                "data_version": None,
+                "data_version": json.dumps({"disagg_scheme": disagg_scheme_payload}),
                 "code_version": None,
                 "run_kind": run_kind,
                 "status": "running",
@@ -281,6 +304,7 @@ def upload_to_supabase(cfg) -> None:
         upsert_barangay_weekly_runs(sb, df_bg_weekly)
 
         mark_run(sb, run_id, "succeeded")
+        publish_active_run(sb, run_id)
         print("Supabase export complete.")
     except Exception as e:
         mark_run(sb, run_id, "failed", error_message=str(e))

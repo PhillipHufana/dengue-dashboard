@@ -33,11 +33,16 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
 
-  const { data, isLoading } = useRankings(timePeriod, runId, modelName);
+  const { data, isLoading } = useRankings(timePeriod, runId, modelName, riskMetric);
   const barangays: RankingRow[] = useMemo(() => {
     const list = (data?.rankings ?? []).slice();
 
     list.sort((a, b) => {
+      if (riskMetric === "surge") {
+        const av = Number(a.surge_score ?? 0);
+        const bv = Number(b.surge_score ?? 0);
+        return bv - av;
+      }
       if (riskMetric === "cases") {
         const av = Number(a.total_forecast_cases ?? a.total_forecast ?? 0);
         const bv = Number(b.total_forecast_cases ?? b.total_forecast ?? 0);
@@ -57,7 +62,9 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
     if (riskFilter !== "all") {
       list = list.filter((b) => {
-        const cls =
+        const cls = riskMetric === "surge"
+          ? (b.cases_class ?? "unknown")
+          :
           riskMetric === "cases"
             ? (b.cases_class ?? "unknown")
             : (b.burden_class ?? "unknown");
@@ -178,11 +185,17 @@ export const ForecastRankings = React.memo(function ForecastRankings({
               const isSelected = selectedBarangay?.clean === b.name;
 
               const cls =
+                riskMetric === "surge"
+                  ? (b.cases_class ?? b.risk_level_cases ?? b.risk_level ?? "unknown")
+                  :
                 riskMetric === "cases"
                   ? (b.cases_class ?? b.risk_level_cases ?? b.risk_level ?? "unknown")
                   : (b.burden_class ?? b.risk_level_incidence ?? "unknown");
 
               const value =
+                riskMetric === "surge"
+                  ? Number(b.surge_score ?? 0)
+                  :
                 riskMetric === "cases"
                   ? Number(b.total_forecast_cases ?? b.total_forecast ?? 0)
                   : Number(b.total_forecast_incidence_per_100k ?? 0);
@@ -220,7 +233,9 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
                   <div className="text-right">
                     <p className="font-bold text-sm">
-                      {riskMetric === "cases"
+                      {riskMetric === "surge"
+                        ? value.toFixed(2)
+                        : riskMetric === "cases"
                         ? value.toLocaleString()
                         : value.toFixed(2)}
                     </p>

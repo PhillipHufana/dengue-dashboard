@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
@@ -106,6 +107,7 @@ def _save_run_metadata(
     test_city: pd.DataFrame,
     forecast_horizon_weeks: int,
     selected_primary_model: str,
+    selected_disagg_scheme: str,
     alpha_smooth: float,
 ) -> pd.DataFrame:
     city_date_col = "ds" if "ds" in city_weekly.columns else "WeekStart"
@@ -126,6 +128,7 @@ def _save_run_metadata(
                 "test_length_weeks": int(len(test_city)),
                 "forecast_horizon_weeks": int(forecast_horizon_weeks),
                 "disagg_weight_weeks": int(getattr(cfg, "disagg_weight_weeks", 52)),
+                "disagg_scheme": str(selected_disagg_scheme),
                 "alpha_smooth": float(alpha_smooth),
                 "selected_primary_model": str(selected_primary_model),
                 "incoming_mode": cfg.incoming_mode,
@@ -329,6 +332,163 @@ def _smape(y_true: pd.Series, yhat: pd.Series) -> float:
     if not mask.any():
         return 0.0
     return float((2.0 * (yt[mask] - yp[mask]).abs() / denom[mask]).mean())
+
+
+def _rank_series_desc(values: pd.Series) -> pd.Series:
+    return pd.to_numeric(values, errors="coerce").fillna(0.0).rank(method="average", ascending=False)
+
+
+def _disagg_rank_diagnostics(per_ds_df: pd.DataFrame) -> tuple[float, float, float]:
+    if per_ds_df.empty:
+        return float("nan"), float("nan"), float("nan")
+
+    merged = per_ds_df.copy()
+    merged["ds"] = pd.to_datetime(merged["ds"], errors="coerce")
+    merged = merged.dropna(subset=["ds"])
+    if merged.empty:
+        return float("nan"), float("nan"), float("nan")
+
+    week_rows = []
+    for ds, grp in merged.groupby("ds", dropna=False):
+        g = grp.copy()
+        g["rank_true"] = _rank_series_desc(g["y_true"])
+        g["rank_pred"] = _rank_series_desc(g["yhat"])
+        rho = float(g["rank_true"].corr(g["rank_pred"], method="spearman")) if len(g) > 1 else float("nan")
+        top10 = set(g.nsmallest(10, "rank_pred")["barangay"].astype(str))
+        week_rows.append({"ds": ds, "rho_true_vs_pred": rho, "top10": top10, "ranks": g.set_index("barangay")["rank_pred"]})
+
+    w = pd.DataFrame([{"ds": r["ds"], "rho_true_vs_pred": r["rho_true_vs_pred"]} for r in week_rows]).sort_values("ds")
+    rho_mean = float(pd.to_numeric(w["rho_true_vs_pred"], errors="coerce").dropna().mean()) if not w.empty else float("nan")
+
+    week_rows = sorted(week_rows, key=lambda x: x["ds"])
+    rho_w2w = []
+    churn = []
+    for i in range(1, len(week_rows)):
+        p = week_rows[i - 1]
+        c = week_rows[i]
+        rp = p["ranks"]
+        rc = c["ranks"]
+        idx = rp.index.intersection(rc.index)
+        if len(idx) > 1:
+            rho = float(rp.loc[idx].corr(rc.loc[idx], method="spearman"))
+            rho_w2w.append(rho)
+        inter = len(p["top10"] & c["top10"])
+        churn.append(1.0 - (inter / 10.0))
+
+    rho_w2w_mean = float(np.nanmean(rho_w2w)) if len(rho_w2w) else float("nan")
+    churn_mean = float(np.nanmean(churn)) if len(churn) else float("nan")
+    return rho_mean, rho_w2w_mean, churn_mean
+
+
+def _evaluate_disagg_ablation(
+    cfg: Config,
+    *,
+    city_test: pd.DataFrame,
+    city_future: pd.DataFrame,
+    weekly_full: pd.DataFrame,
+    test_city: pd.DataFrame,
+    train_end: pd.Timestamp,
+    alpha_smooth: float,
+    city_model_name: str,
+) -> tuple[pd.DataFrame, str]:
+    schemes = tuple(str(s).lower().strip() for s in getattr(cfg, "disagg_ablation_schemes", ("static", "rolling", "seasonal")))
+    rows = []
+    test_dates = pd.to_datetime(test_city["ds"], errors="coerce").dropna()
+    actuals = weekly_full.copy()
+    actuals["ds"] = pd.to_datetime(actuals["WeekStart"], errors="coerce")
+    actuals = actuals[actuals["ds"].isin(test_dates)].rename(columns={"Barangay_key": "barangay", "Cases": "y_true"})
+    actuals = actuals[["barangay", "ds", "y_true"]]
+
+    for scheme in schemes:
+        bg_test, _ = hybrid_disaggregation(
+            city_test=city_test,
+            city_future=city_future,
+            weekly_full=weekly_full,
+            cfg=cfg,
+            train_end=train_end,
+            alpha_smooth=alpha_smooth,
+            scheme=scheme,
+            write_weights_csv=False,
+        )
+        preds = bg_test.rename(columns={"Barangay_key": "barangay"})[["barangay", "ds", "yhat"]]
+        merged = actuals.merge(preds, on=["barangay", "ds"], how="inner")
+        merged["y_true"] = pd.to_numeric(merged["y_true"], errors="coerce").fillna(0.0)
+        merged["yhat"] = pd.to_numeric(merged["yhat"], errors="coerce").fillna(0.0)
+        err = merged["y_true"] - merged["yhat"]
+        rmse = float(np.sqrt((err**2).mean())) if len(merged) else float("nan")
+        mae = float(err.abs().mean()) if len(merged) else float("nan")
+        smape = _smape(merged["y_true"], merged["yhat"]) if len(merged) else float("nan")
+        rho_mean, rho_w2w_mean, churn_mean = _disagg_rank_diagnostics(merged)
+        rows.append(
+            {
+                "run_id": cfg.run_id,
+                "city_model_name": city_model_name,
+                "disagg_scheme": scheme,
+                "n_rows": int(len(merged)),
+                "RMSE": rmse,
+                "MAE": mae,
+                "sMAPE": smape,
+                "rank_spearman_mean": rho_mean,
+                "rank_week_to_week_spearman_mean": rho_w2w_mean,
+                "top10_churn_mean": churn_mean,
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    out.to_csv(cfg.out / "disagg_ablation_metrics.csv", index=False)
+    if out.empty:
+        return out, str(getattr(cfg, "disagg_scheme_production", "rolling"))
+    winner = (
+        out.sort_values(["MAE", "RMSE", "sMAPE"], ascending=[True, True, True])
+        .iloc[0]["disagg_scheme"]
+    )
+    return out, str(winner)
+
+
+def _resolve_production_disagg_scheme(cfg: Config, chosen_city_model: str) -> str:
+    configured = str(getattr(cfg, "disagg_scheme_production", "rolling")).lower().strip()
+    if not bool(getattr(cfg, "production_use_latest_disagg_ablation", True)):
+        return configured
+
+    candidates: list[Path] = []
+    out_path = Path(cfg.out)
+    if out_path.exists():
+        candidates.extend(out_path.rglob("disagg_ablation_metrics.csv"))
+
+    # Common project-level fallback search area
+    project_intermediate = Path("intermediate")
+    if project_intermediate.exists():
+        candidates.extend(project_intermediate.rglob("disagg_ablation_metrics.csv"))
+
+    if not candidates:
+        print(f"No disagg_ablation_metrics.csv found; using configured production scheme='{configured}'.")
+        return configured
+
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    try:
+        df = pd.read_csv(latest)
+        if df.empty or "disagg_scheme" not in df.columns:
+            print(f"Ablation file '{latest}' is empty/invalid; using configured production scheme='{configured}'.")
+            return configured
+
+        if "city_model_name" in df.columns:
+            scoped = df[df["city_model_name"].astype(str).str.lower() == str(chosen_city_model).lower()].copy()
+            if not scoped.empty:
+                df = scoped
+
+        for c in ["MAE", "RMSE", "sMAPE"]:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+        ranked = df.sort_values(["MAE", "RMSE", "sMAPE"], ascending=[True, True, True])
+        winner = str(ranked.iloc[0]["disagg_scheme"]).lower().strip()
+        if winner not in {"static", "rolling", "seasonal", "hybrid"}:
+            print(f"Ablation winner '{winner}' unsupported; using configured production scheme='{configured}'.")
+            return configured
+        print(f"Using latest ablation winner '{winner}' from {latest}.")
+        return winner
+    except Exception as e:
+        print(f"Failed reading ablation file '{latest}': {e}; using configured production scheme='{configured}'.")
+        return configured
 
 
 def _save_barangay_metric_distribution(
@@ -832,7 +992,17 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
     )
     city_long.to_csv(cfg.out / "city_forecasts_long.csv", index=False)
 
-    alpha_smooth = 1.0
+    alpha_smooth = float(getattr(cfg, "disagg_alpha_smooth", 1.0))
+    _, selected_disagg_scheme = _evaluate_disagg_ablation(
+        cfg,
+        city_test=city_test,
+        city_future=city_future,
+        weekly_full=weekly_full,
+        test_city=test_city,
+        train_end=train_end,
+        alpha_smooth=alpha_smooth,
+        city_model_name=chosen_city_model,
+    )
     bg_prophet_test_raw, bg_prophet_future_raw = hybrid_disaggregation(
         city_test=city_prophet_test,
         city_future=city_prophet_future,
@@ -840,6 +1010,9 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         train_end=train_end,
         alpha_smooth=alpha_smooth,
+        scheme=selected_disagg_scheme,
+        weights_csv_name="disagg_weights.csv",
+        write_weights_csv=True,
     )
     bg_arima_test_raw, bg_arima_future_raw = hybrid_disaggregation(
         city_test=city_arima_test,
@@ -848,6 +1021,8 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         train_end=train_end,
         alpha_smooth=alpha_smooth,
+        scheme=selected_disagg_scheme,
+        write_weights_csv=False,
     )
     bg_prophet_test = _tag_barangay_method(bg_prophet_test_raw, "prophet")
     bg_prophet_future = _tag_barangay_method(bg_prophet_future_raw, "prophet")
@@ -865,6 +1040,7 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         test_city=test_city,
         forecast_horizon_weeks=future_horizon,
         selected_primary_model=chosen_city_model,
+        selected_disagg_scheme=selected_disagg_scheme,
         alpha_smooth=alpha_smooth,
     )
     barangay_backtest_df = _save_barangay_backtest_predictions(
@@ -1038,7 +1214,8 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     city_long.to_csv(cfg.out / "city_forecasts_long.csv", index=False)
 
     empty_city_test = pd.DataFrame(columns=city_future.columns)
-    alpha_smooth = 1.0
+    alpha_smooth = float(getattr(cfg, "disagg_alpha_smooth", 1.0))
+    selected_disagg_scheme = _resolve_production_disagg_scheme(cfg, chosen_city_model)
     bg_prophet_test_raw, bg_prophet_future_raw = hybrid_disaggregation(
         city_test=empty_city_test,
         city_future=city_prophet_future,
@@ -1046,6 +1223,9 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         train_end=prod_train_end,
         alpha_smooth=alpha_smooth,
+        scheme=selected_disagg_scheme,
+        weights_csv_name="disagg_weights.csv",
+        write_weights_csv=True,
     )
     bg_arima_test_raw, bg_arima_future_raw = hybrid_disaggregation(
         city_test=empty_city_test,
@@ -1054,6 +1234,8 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         cfg=cfg,
         train_end=prod_train_end,
         alpha_smooth=alpha_smooth,
+        scheme=selected_disagg_scheme,
+        write_weights_csv=False,
     )
     _ = (bg_prophet_test_raw, bg_arima_test_raw)
     bg_prophet_future = _tag_barangay_method(bg_prophet_future_raw, "prophet")
@@ -1067,6 +1249,7 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         test_city=test_city,
         forecast_horizon_weeks=horizon,
         selected_primary_model=chosen_city_model,
+        selected_disagg_scheme=selected_disagg_scheme,
         alpha_smooth=alpha_smooth,
     )
     coherence_future_df = _save_multi_method_coherence(

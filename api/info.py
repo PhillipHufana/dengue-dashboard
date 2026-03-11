@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from datetime import datetime
 from typing import Optional
 from .supabase_client import get_supabase
-from .run_helpers import resolve_run_id
+from .run_helpers import resolve_run_id, resolve_disagg_scheme_for_run
 
 router = APIRouter(tags=["meta"])
 
@@ -38,4 +38,5 @@ def get_data_info(run_id: Optional[str] = None):
         "last_historical_date": last_update,
         "server_date": datetime.now().strftime("%Y-%m-%d"),
         "run_id": rid,
+        "disagg_scheme": resolve_disagg_scheme_for_run(sb, rid),
     }

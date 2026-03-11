@@ -1,7 +1,7 @@
 // lib/api.ts
 const API_BASE = "http://127.0.0.1:8000";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { TimePeriod } from "@/lib/store/dashboard-store";
+import type { RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
 export function cleanName(name: string): string {
   if (!name) return "";
 
@@ -110,6 +110,7 @@ export async function getDataInfo(): Promise<{
   last_historical_date: string | null;
   server_date: string;
   run_id?: string;
+  disagg_scheme?: string | null;
 }> {
   const res = await fetch(`${API_BASE}/data/info`);
   if (!res.ok) throw new Error("Failed to load data info");
@@ -181,10 +182,14 @@ export interface RankingRow {
   last_week: number | null;
   trend_source: string;
   trend_message: string;
+  forecast_4w_cases?: number;
+  past_8w_avg_cases?: number;
+  surge_score?: number;
 }
 
 export interface RankingResponse {
   period: string;
+  ranking_basis?: RiskMetric;
   model_current_date: string | null;
   user_current_date: string;
   data_last_updated: string | null;
@@ -196,12 +201,13 @@ export interface RankingResponse {
 
 export async function getForecastRankings(
   period: string,
-  options?: { runId?: string; modelName?: string }
+  options?: { runId?: string; modelName?: string; rankingBasis?: RiskMetric }
 ): Promise<RankingResponse> {
   const params = new URLSearchParams();
   params.set("period", period);
   if (options?.runId) params.set("run_id", options.runId);
   if (options?.modelName) params.set("model_name", options.modelName);
+  if (options?.rankingBasis) params.set("ranking_basis", options.rankingBasis);
 
   const res = await fetch(`${API_BASE}/forecast/rankings?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load rankings");

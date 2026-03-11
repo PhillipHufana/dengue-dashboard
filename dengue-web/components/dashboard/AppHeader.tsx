@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bug, Calendar, LogIn, Shield, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { LoginModal } from "@/components/dashboard/login-modal";
 import { supabase } from "@/lib/supabaseClient";
@@ -107,10 +108,12 @@ function ProfileMenu({
 export function AppHeader({
   mode,
   lastUpdated,
+  disaggScheme,
   rightSlot,
 }: {
   mode: HeaderMode;
   lastUpdated?: string | null;
+  disaggScheme?: string | null;
   rightSlot?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -217,6 +220,11 @@ export function AppHeader({
           </div>
 
           {rightSlot ?? null}
+          {disaggScheme ? (
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+              Disagg: {disaggScheme}
+            </Badge>
+          ) : null}
           {mode === "public" ? <ModelSelect /> : null}
 
           {mode === "public" ? (
@@ -284,7 +292,21 @@ export function AppHeader({
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />
           <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
+          {disaggScheme ? (
+            <Badge variant="secondary" className="text-[9px] uppercase tracking-wide ml-1">
+              {disaggScheme}
+            </Badge>
+          ) : null}
         </div>
+      </div>
+
+      <div className="mt-1 flex md:hidden items-center gap-2 text-[11px] text-muted-foreground">
+        <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
+        {disaggScheme ? (
+          <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
+            Disagg: {disaggScheme}
+          </Badge>
+        ) : null}
       </div>
     </header>
   );

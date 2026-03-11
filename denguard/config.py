@@ -32,6 +32,11 @@ class Config:
 
     # --- Rolling weighting window for top-down disaggregation ---
     disagg_weight_weeks: int = 52
+    disagg_scheme_production: Literal["static", "rolling", "seasonal", "hybrid"] = "rolling"
+    disagg_ablation_schemes: tuple[str, ...] = ("static", "rolling", "seasonal")
+    production_use_latest_disagg_ablation: bool = True
+    disagg_hybrid_lambda: float = 0.5
+    disagg_alpha_smooth: float = 1.0
     recent_weight_start: str = "2022-01-01"  # legacy field retained for backward compatibility
     calibration_threshold: int = 200
 
@@ -69,6 +74,11 @@ DEFAULT_CFG = Config(
     production_horizon_weeks=12,
     production_city_model="prophet",
     disagg_weight_weeks=52,
+    disagg_scheme_production="rolling",
+    disagg_ablation_schemes=("static", "rolling", "seasonal"),
+    production_use_latest_disagg_ablation=True,
+    disagg_hybrid_lambda=0.5,
+    disagg_alpha_smooth=1.0,
     recent_weight_start="2022-01-01",
     calibration_threshold=200,
     incoming_folder=r"C:\Users\Phillip\Downloads\comsci\thesis\dengue-dashboard\dengue_incoming",

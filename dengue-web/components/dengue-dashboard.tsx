@@ -44,6 +44,7 @@ export function DengueDashboard() {
     clean: string;
   } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [disaggScheme, setDisaggScheme] = useState<string | null>(null)
   const setRunId = useDashboardStore((s) => s.setRunId)
 
   useEffect(() => {
@@ -54,9 +55,13 @@ export function DengueDashboard() {
         if (alive) {
           setLastUpdated(info.last_historical_date);
           setRunId(info.run_id ?? null);
+          setDisaggScheme(info.disagg_scheme ?? null);
         }
       } catch {
-        if (alive) setLastUpdated(null);
+        if (alive) {
+          setLastUpdated(null);
+          setDisaggScheme(null);
+        }
       }
     })();
     return () => { alive = false; };
@@ -68,6 +73,7 @@ export function DengueDashboard() {
       <AppHeader
         mode="public"
         lastUpdated={formatReadableDate(lastUpdated)}
+        disaggScheme={disaggScheme}
         rightSlot={
           <div className="flex items-center gap-2">
             <RiskMetricToggle />

@@ -39,3 +39,15 @@ city,prophet,1,1,0,0.0,2cd7614b-e5c7-484d-aa9d-9feb031411e2,backtest
 city,arima,1,1,0,0.0,2cd7614b-e5c7-484d-aa9d-9feb031411e2,backtest
 local,local_prophet,0,0,0,0.0,2cd7614b-e5c7-484d-aa9d-9feb031411e2,backtest
 local,local_arima,0,0,0,0.0,2cd7614b-e5c7-484d-aa9d-9feb031411e2,backtest
+city,prophet,1,1,0,0.0,f4ef633f-5a84-49ea-be7d-e1edf5783c0d,backtest
+city,arima,1,1,0,0.0,f4ef633f-5a84-49ea-be7d-e1edf5783c0d,backtest
+local,local_prophet,0,0,0,0.0,f4ef633f-5a84-49ea-be7d-e1edf5783c0d,backtest
+local,local_arima,0,0,0,0.0,f4ef633f-5a84-49ea-be7d-e1edf5783c0d,backtest
+city,prophet,1,1,0,0.0,68b58ca5-e135-41df-a6ff-c2cb8122745d,backtest
+city,arima,1,1,0,0.0,68b58ca5-e135-41df-a6ff-c2cb8122745d,backtest
+local,local_prophet,0,0,0,0.0,68b58ca5-e135-41df-a6ff-c2cb8122745d,backtest
+local,local_arima,0,0,0,0.0,68b58ca5-e135-41df-a6ff-c2cb8122745d,backtest
+city,prophet,1,1,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
+city,arima,1,1,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
+local,local_prophet,0,0,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
+local,local_arima,0,0,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest

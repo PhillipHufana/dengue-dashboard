@@ -1,2 +1,2 @@
-run_id,run_kind,data_cutoff_date,train_start,train_end,test_start,test_end,test_length_weeks,forecast_horizon_weeks,disagg_weight_weeks,alpha_smooth,selected_primary_model,incoming_mode,backtest_end_date
-896f0ade-aea9-45d6-baec-be08e2831006,production,2025-07-07,2016-12-26,2025-07-07,,,0,12,52,1.0,prophet,full_refresh,2022-12-26
+run_id,run_kind,data_cutoff_date,train_start,train_end,test_start,test_end,test_length_weeks,forecast_horizon_weeks,disagg_weight_weeks,disagg_scheme,alpha_smooth,selected_primary_model,incoming_mode,backtest_end_date
+ecfa42d8-fc87-405e-98d0-cd031dc6794c,production,2025-07-07,2016-12-26,2025-07-07,,,0,12,52,rolling,1.0,prophet,full_refresh,2022-12-26

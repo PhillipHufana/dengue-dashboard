@@ -3,6 +3,8 @@
 # PATCH: resolve run_id from active_runs first, then fallback
 # ============================================================
 from __future__ import annotations
+import json
+import re
 from typing import Optional, List
 
 DEFAULT_MODEL = "preferred"
@@ -123,3 +125,36 @@ def resolve_model_name(sb, run_id: str, model_name: Optional[str]) -> str:
 
     # If requested model is missing, gracefully fall back to available default.
     return DEFAULT_MODEL if DEFAULT_MODEL in models else models[0]
+
+
+def resolve_disagg_scheme_for_run(sb, run_id: str) -> Optional[str]:
+    rows = (
+        sb.table("runs")
+        .select("data_version")
+        .eq("run_id", run_id)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    if not rows:
+        return None
+    dv = rows[0].get("data_version")
+    if dv is None:
+        return None
+    if isinstance(dv, dict):
+        v = dv.get("disagg_scheme")
+        return str(v).lower().strip() if v else None
+    s = str(dv).strip()
+    if not s:
+        return None
+    if s.startswith("{") and s.endswith("}"):
+        try:
+            obj = json.loads(s)
+            v = obj.get("disagg_scheme")
+            return str(v).lower().strip() if v else None
+        except Exception:
+            pass
+    m = re.search(r"disagg_scheme\s*[:=]\s*([a-zA-Z_]+)", s)
+    if m:
+        return m.group(1).lower().strip()
+    return None

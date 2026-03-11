@@ -36,6 +36,19 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
       >
         Incidence (/100k)
       </Button>
+      <Button
+        size={compact ? "sm" : "default"}
+        variant={riskMetric === "surge" ? "default" : "outline"}
+        onClick={() => setRiskMetric("surge")}
+        className={
+          compact
+            ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
+            : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
+        }
+        title="Surge ranking: next 4 weeks forecast divided by past 8 weeks average actual + 1.0."
+      >
+        Surge
+      </Button>
     </ButtonGroup>
   );
 }

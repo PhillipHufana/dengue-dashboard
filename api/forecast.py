@@ -6,7 +6,13 @@ from typing import Dict, List, Optional, Literal
 from datetime import date
 from .supabase_client import get_supabase
 from .utils import normalize_name
-from .run_helpers import resolve_run_id, resolve_model_name, DEFAULT_MODEL, available_models_for_run
+from .run_helpers import (
+    resolve_run_id,
+    resolve_model_name,
+    DEFAULT_MODEL,
+    available_models_for_run,
+    resolve_disagg_scheme_for_run,
+)
 from .risk import risk_from_baseline_percentiles
 from .risk import risk_from_baseline_percentiles_windowed
 from .jenks import jenks_breaks_safe, jenks_class
@@ -453,6 +459,7 @@ def get_forecast_summary(
         "run_id": rid,
         "model_name": model,
         "horizon_type": "future",
+        "disagg_scheme": resolve_disagg_scheme_for_run(sb, rid),
         "period": period,
         "weeks_to_sum": weeks_to_sum,
         "city_latest": city_rows[0] if city_rows else None,
