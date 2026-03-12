@@ -246,6 +246,23 @@ export interface RankingResponse {
   horizon_type: "future";
 }
 
+export interface ActionPriorityResponse {
+  run_id: string;
+  model_name: string;
+  view_mode: DataMode;
+  queue_type: "respond_now" | "prepare_next";
+  period: string;
+  weeks_to_sum: number;
+  baseline_weeks: number;
+  surge_epsilon: number;
+  surge_min_forecast_cases: number;
+  ranking_formula_version: string;
+  data_last_updated: string | null;
+  model_current_date: string | null;
+  user_current_date: string;
+  rows: RankingRow[];
+}
+
 export async function getForecastRankings(
   period: string,
   options?: { runId?: string; modelName?: string; rankingBasis?: RiskMetric; dataMode?: DataMode }
@@ -259,6 +276,20 @@ export async function getForecastRankings(
 
   const res = await fetch(`${API_BASE}/forecast/rankings?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load rankings");
+  return res.json();
+}
+
+export async function getActionPriority(
+  period: string,
+  options?: { runId?: string; modelName?: string; viewMode?: DataMode }
+): Promise<ActionPriorityResponse> {
+  const params = new URLSearchParams();
+  params.set("period", period);
+  if (options?.runId) params.set("run_id", options.runId);
+  if (options?.modelName) params.set("model_name", options.modelName);
+  if (options?.viewMode) params.set("view_mode", options.viewMode);
+  const res = await fetch(`${API_BASE}/forecast/action-priority?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to load action priority");
   return res.json();
 }
 

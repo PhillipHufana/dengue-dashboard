@@ -24,6 +24,8 @@ export function KpiCards() {
   const period = useDashboardStore((s) => s.period);
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const dataMode = useDashboardStore((s) => s.dataMode);
+  const effectiveMetric =
+    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
 
   const { data: geo, isLoading, error } = useChoropleth(runId, modelName, period, dataMode);
   const { data: cityCompare } = useCityCompareSeries(runId, dataMode === "forecast");
@@ -48,15 +50,15 @@ export function KpiCards() {
   }, [cityCompare, period]);
 
   const veryHighCount = useMemo(() => {
-    const key: MetricClass = riskMetric === "cases" ? "cases_class" : riskMetric === "incidence" ? "burden_class" : "surge_class";
+    const key: MetricClass = effectiveMetric === "cases" ? "cases_class" : effectiveMetric === "incidence" ? "burden_class" : "surge_class";
     return geoFeatures.filter((f) => (f?.properties as Record<string, string | undefined>)?.[key] === "very_high").length;
-  }, [geoFeatures, riskMetric]);
+  }, [geoFeatures, effectiveMetric]);
 
   const hotspot = useMemo(() => {
     const valueKey =
-      riskMetric === "cases"
+      effectiveMetric === "cases"
         ? (dataMode === "observed" ? "observed_cases" : "forecast_cases")
-        : riskMetric === "incidence"
+        : effectiveMetric === "incidence"
         ? (dataMode === "observed" ? "observed_incidence_per_100k" : "forecast_incidence_per_100k")
         : "forecast_surge_ratio";
 
@@ -76,7 +78,7 @@ export function KpiCards() {
       name: String(props?.display_name ?? props?.name ?? "-"),
       value: bestVal,
     };
-  }, [geoFeatures, riskMetric, dataMode]);
+  }, [geoFeatures, effectiveMetric, dataMode]);
 
   if (isLoading) {
     return (
@@ -141,7 +143,7 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {riskMetric === "surge"
+              {effectiveMetric === "surge"
                 ? citySurgeRatio != null
                   ? Number(citySurgeRatio).toFixed(2)
                   : "-"
@@ -150,7 +152,7 @@ export function KpiCards() {
                 : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {riskMetric === "surge"
+              {effectiveMetric === "surge"
                 ? `City surge ratio (${period.toUpperCase()} vs past 8W)`
                 : dataMode === "observed"
                 ? "City observed incidence (/100k)"
@@ -171,7 +173,7 @@ export function KpiCards() {
           <div className="mt-4">
             <p className="text-xl font-bold">{veryHighCount}</p>
             <p className="text-xs text-muted-foreground">
-              Barangays (Very High {riskMetric === "cases" ? "cases" : riskMetric === "incidence" ? "burden" : "surge"})
+              Barangays (Very High {effectiveMetric === "cases" ? "cases" : effectiveMetric === "incidence" ? "burden" : "surge"})
             </p>
           </div>
         </CardContent>
@@ -188,7 +190,7 @@ export function KpiCards() {
           <div className="mt-4">
             <p className="text-xl font-bold">
               {hotspot
-                ? riskMetric === "cases"
+                ? effectiveMetric === "cases"
                   ? hotspot.value.toLocaleString()
                   : hotspot.value.toFixed(2)
                 : "-"}
@@ -196,9 +198,9 @@ export function KpiCards() {
             <p className="text-xs text-muted-foreground">
               {hotspot?.name ?? "-"}{" "}
               {hotspot
-                ? riskMetric === "cases"
+                ? effectiveMetric === "cases"
                   ? "(cases)"
-                  : riskMetric === "incidence"
+                  : effectiveMetric === "incidence"
                   ? "(/100k)"
                   : "(surge ratio)"
                 : ""}

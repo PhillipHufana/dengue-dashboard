@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getSummary, getChoropleth, getTimeseries, getForecastRankings, getCityCompareSeries } from "@/lib/api";
+import { getSummary, getChoropleth, getTimeseries, getForecastRankings, getCityCompareSeries, getActionPriority } from "@/lib/api";
 
 import type { DataMode, Frequency, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
-import type { ChoroplethFC, SummaryResponse, RankingResponse } from "@/lib/api";
+import type { ChoroplethFC, SummaryResponse, RankingResponse, ActionPriorityResponse } from "@/lib/api";
 
 export function useSummary(
   runId?: string | null,
@@ -56,6 +56,28 @@ export function useRankings(
         modelName: modelName ?? undefined,
         rankingBasis: rankingBasis ?? undefined,
         dataMode: dataMode ?? undefined,
+      }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useActionPriority(
+  period: string,
+  runId?: string | null,
+  modelName?: string | null,
+  viewMode?: DataMode | null,
+  enabled = true
+) {
+  return useQuery<ActionPriorityResponse>({
+    queryKey: ["action-priority", period, runId ?? null, modelName ?? null, viewMode ?? null],
+    enabled,
+    queryFn: () =>
+      getActionPriority(period, {
+        runId: runId ?? undefined,
+        modelName: modelName ?? undefined,
+        viewMode: viewMode ?? undefined,
       }),
     staleTime: 60_000,
     gcTime: 5 * 60_000,

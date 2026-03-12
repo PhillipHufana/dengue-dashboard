@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query
 from datetime import datetime, date
 from .supabase_client import get_supabase
 from .utils import normalize_name
-from typing import Optional
+from typing import Optional, Any
 from .run_helpers import resolve_run_id, resolve_model_name
 from .forecast import _load_population_map
 from .jenks import jenks_breaks_safe, jenks_class
@@ -23,11 +23,14 @@ PERIOD_WEEKS = {
 RANKING_BASIS_SET = {"incidence", "cases", "surge"}
 DATA_MODE_SET = {"forecast", "observed"}
 SURGE_HISTORY_WEEKS = 8
+SURGE_FALLBACK_BASELINE_WEEKS = 26
+SURGE_MIN_NONZERO_FOR_SHORT_BASELINE = 4
 SURGE_EPSILON = 1.0
 SURGE_MIN_FORECAST_CASES = 2.0
-RANKING_FORMULA_VERSION = "v2_forecastW_over_baselineW"
+RANKING_FORMULA_VERSION = "v3_adaptive_baseline_8w_or_26w"
 
 _rankings_cache = TTLCache(maxsize=64, ttl=300)  # 5 minute cache for rankings
+_action_priority_cache = TTLCache(maxsize=64, ttl=300)
 
 def fetch_all(q, page_size: int = 1000):
     out = []
@@ -80,6 +83,98 @@ def compute_hybrid_trend(weekly_rows, forecast_rows):
     else:
         msg = "Trend unavailable."
     return 0, None, None, "none", msg
+
+
+def _build_action_priority_rows(rows: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
+    items = [dict(r) for r in rows]
+    if mode == "observed":
+        items.sort(
+            key=lambda x: (
+                float(x.get("total_forecast_cases") or 0.0),
+                float(x.get("total_forecast_incidence_per_100k") or 0.0),
+                str(x.get("name") or ""),
+            ),
+            reverse=True,
+        )
+        for i, r in enumerate(items, start=1):
+            r["rank"] = int(i)
+            r["queue_type"] = "respond_now"
+            r["rank_reason"] = f"High recent observed burden (past W: {float(r.get('total_forecast_cases') or 0.0):.2f})"
+    else:
+        items.sort(
+            key=lambda x: (
+                1 if bool(x.get("surge_eligible")) else 0,
+                float(x.get("surge_score") or 0.0),
+                float(x.get("forecast_w_cases") or 0.0),
+                str(x.get("name") or ""),
+            ),
+            reverse=True,
+        )
+        for i, r in enumerate(items, start=1):
+            r["rank"] = int(i)
+            r["queue_type"] = "prepare_next"
+            r["rank_reason"] = (
+                f"Surge {float(r.get('surge_score') or 0.0):.2f}x vs baseline; "
+                f"forecast W: {float(r.get('forecast_w_cases') or 0.0):.2f}"
+            )
+    return items
+
+
+@router.get("/action-priority")
+def get_action_priority(
+    period: str = Query("1m"),
+    run_id: Optional[str] = Query(None),
+    model_name: Optional[str] = Query(None),
+    view_mode: str = Query("forecast"),
+):
+    mode = str(view_mode or "forecast").strip().lower()
+    if mode not in DATA_MODE_SET:
+        mode = "forecast"
+
+    cache_key = (run_id, model_name, period, mode)
+    if cache_key in _action_priority_cache:
+        return _action_priority_cache[cache_key]
+
+    if mode == "observed":
+        base = get_forecast_rankings(
+            period=period,
+            run_id=run_id,
+            model_name=model_name,
+            ranking_basis="cases",
+            data_mode="observed",
+        )
+    else:
+        base = get_forecast_rankings(
+            period=period,
+            run_id=run_id,
+            model_name=model_name,
+            ranking_basis="surge",
+            data_mode="forecast",
+        )
+
+    ranked = _build_action_priority_rows(list(base.get("rankings") or []), mode)
+    resp = {
+        "run_id": base.get("run_id"),
+        "model_name": base.get("model_name"),
+        "view_mode": mode,
+        "queue_type": "respond_now" if mode == "observed" else "prepare_next",
+        "period": base.get("period"),
+        "weeks_to_sum": base.get("weeks_to_sum"),
+        "baseline_weeks": base.get("baseline_weeks"),
+        "baseline_fallback_weeks": base.get("baseline_fallback_weeks"),
+        "baseline_min_nonzero_8w": base.get("baseline_min_nonzero_8w"),
+        "surge_epsilon": base.get("surge_epsilon"),
+        "surge_min_forecast_cases": base.get("surge_min_forecast_cases"),
+        "ranking_formula_version": "v1_action_priority_observed_cases__forecast_surge",
+        "data_last_updated": base.get("data_last_updated"),
+        "model_current_date": base.get("model_current_date"),
+        "user_current_date": base.get("user_current_date"),
+        "rows": ranked,
+    }
+    _action_priority_cache[cache_key] = resp
+    return resp
+
+
 @router.get("/rankings")
 def get_forecast_rankings(
     period: str = Query("1m"),
@@ -157,7 +252,7 @@ def get_forecast_rankings(
         .select("week_start")
         .eq("run_id", rid)
         .order("week_start", desc=True)
-        .limit(max(2, SURGE_HISTORY_WEEKS, weeks_to_sum))
+        .limit(max(2, SURGE_HISTORY_WEEKS, SURGE_FALLBACK_BASELINE_WEEKS, weeks_to_sum))
         .execute()
         .data
     ) or []
@@ -167,7 +262,7 @@ def get_forecast_rankings(
             sb.table("city_weekly")
             .select("week_start")
             .order("week_start", desc=True)
-            .limit(max(2, SURGE_HISTORY_WEEKS, weeks_to_sum))
+            .limit(max(2, SURGE_HISTORY_WEEKS, SURGE_FALLBACK_BASELINE_WEEKS, weeks_to_sum))
             .execute()
             .data
         ) or []
@@ -176,9 +271,10 @@ def get_forecast_rankings(
     prev_week_date = city_weeks[1]["week_start"] if len(city_weeks) >= 2 else None
 
     weeks_for_trend = [w for w in [latest_week_date, prev_week_date] if w is not None]
-    weeks_for_surge = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
+    weeks_for_surge_short = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
+    weeks_for_surge_long = [x.get("week_start") for x in city_weeks[:SURGE_FALLBACK_BASELINE_WEEKS] if x.get("week_start") is not None]
     weeks_for_observed = [x.get("week_start") for x in city_weeks[:weeks_to_sum] if x.get("week_start") is not None]
-    weeks_for_weekly = list(dict.fromkeys(weeks_for_trend + weeks_for_surge + weeks_for_observed))
+    weeks_for_weekly = list(dict.fromkeys(weeks_for_trend + weeks_for_surge_long + weeks_for_observed))
 
     # --- Fetch only barangay rows for trend + surge windows
     weekly_rows_raw = []
@@ -220,7 +316,6 @@ def get_forecast_rankings(
 
         weekly = grouped_weekly.get(name, [])
         weekly_recent2 = weekly[:2]
-        weekly_recent8 = weekly[:SURGE_HISTORY_WEEKS]
         series = weekly_lookup.get(name, {})
         last2_fore = [{"forecast": float(r.get("yhat") or 0.0)} for r in future_rows[-2:]] if len(future_rows) >= 2 else []
         trend, last_week, this_week, trend_source, trend_message = compute_hybrid_trend(weekly_recent2, last2_fore)
@@ -236,14 +331,24 @@ def get_forecast_rankings(
         prophet_forecast_w = sum(float(r.get("yhat") or 0.0) for r in grouped_by_model["prophet"].get(name, [])[:weeks_to_sum])
         arima_forecast_w = sum(float(r.get("yhat") or 0.0) for r in grouped_by_model["arima"].get(name, [])[:weeks_to_sum])
         forecast_w_cases = sum(float(r.get("yhat") or 0.0) for r in future_rows[:weeks_to_sum])
-        past_8w_avg_cases = (
-            sum(float(r.get("cases") or 0.0) for r in weekly_recent8) / float(SURGE_HISTORY_WEEKS)
-            if weekly_recent8
-            else 0.0
-        )
+        # Adaptive baseline:
+        # use 8W only when recent signal is sufficiently stable, else fallback to 26W.
+        short_vals = [float(series.get(str(ws), 0.0)) for ws in weeks_for_surge_short] if weeks_for_surge_short else []
+        long_vals = [float(series.get(str(ws), 0.0)) for ws in weeks_for_surge_long] if weeks_for_surge_long else []
+        nonzero_8w = int(sum(1 for v in short_vals if v > 0.0))
+        if nonzero_8w >= int(SURGE_MIN_NONZERO_FOR_SHORT_BASELINE):
+            baseline_window_vals = short_vals
+            baseline_weeks_used = int(SURGE_HISTORY_WEEKS)
+        else:
+            baseline_window_vals = long_vals
+            baseline_weeks_used = int(SURGE_FALLBACK_BASELINE_WEEKS)
+        denom = float(len(baseline_window_vals)) if len(baseline_window_vals) else 1.0
+        past_8w_avg_cases = float(sum(baseline_window_vals)) / denom
         baseline_expected_w = float(past_8w_avg_cases) * float(weeks_to_sum)
         surge_score = float(forecast_w_cases) / (float(baseline_expected_w) + SURGE_EPSILON)
         surge_eligible = float(forecast_w_cases) >= float(SURGE_MIN_FORECAST_CASES)
+        baseline_eligible = float(baseline_expected_w) >= 1.0
+        priority_eligible = bool(surge_eligible and baseline_eligible)
         display_cases = observed_w_cases if mode == "observed" else total_forecast
         display_incidence = observed_w_incidence if mode == "observed" else inc
 
@@ -268,6 +373,10 @@ def get_forecast_rankings(
                 baseline_expected_w,
                 surge_score,
                 surge_eligible,
+                baseline_eligible,
+                priority_eligible,
+                baseline_weeks_used,
+                nonzero_8w,
             )
         )
         case_values.append(float(display_cases))
@@ -300,6 +409,10 @@ def get_forecast_rankings(
         baseline_expected_w,
         surge_score,
         surge_eligible,
+        baseline_eligible,
+        priority_eligible,
+        baseline_weeks_used,
+        nonzero_8w,
     ) in rows_tmp:
         cases_class = jenks_class(float(display_cases), case_breaks) if display_cases is not None else "unknown"
         burden_class = jenks_class(float(display_incidence), inc_breaks) if display_incidence is not None else "unknown"
@@ -328,6 +441,10 @@ def get_forecast_rankings(
                 "surge_score": round(float(surge_score), 6),
                 "surge_class": surge_class,
                 "surge_eligible": bool(surge_eligible),
+                "baseline_eligible": bool(baseline_eligible),
+                "priority_eligible": bool(priority_eligible),
+                "baseline_weeks_used": int(baseline_weeks_used),
+                "nonzero_weeks_8w": int(nonzero_8w),
                 "observed_cases_w": round(float(observed_w_cases), 4),
                 "observed_incidence_w": observed_w_incidence,
                 "prophet_forecast_w": round(float(prophet_forecast_w), 4),
@@ -355,6 +472,8 @@ def get_forecast_rankings(
         "data_mode": mode,
         "ranking_basis": basis,
         "baseline_weeks": SURGE_HISTORY_WEEKS,
+        "baseline_fallback_weeks": SURGE_FALLBACK_BASELINE_WEEKS,
+        "baseline_min_nonzero_8w": SURGE_MIN_NONZERO_FOR_SHORT_BASELINE,
         "surge_epsilon": SURGE_EPSILON,
         "surge_min_forecast_cases": SURGE_MIN_FORECAST_CASES,
         "ranking_formula_version": RANKING_FORMULA_VERSION,

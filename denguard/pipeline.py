@@ -633,6 +633,166 @@ def _save_barangay_risk_scores(
     return out
 
 
+def _save_action_priority_artifacts(
+    cfg: Config,
+    *,
+    weekly_full: pd.DataFrame,
+    barangay_future_long: pd.DataFrame,
+    weeks_to_sum: int = 4,
+    baseline_weeks: int = 8,
+    epsilon: float = 1.0,
+    min_forecast_cases: float = 2.0,
+    model_name: str = "preferred",
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    w = int(weeks_to_sum)
+    b = int(baseline_weeks)
+    eps = float(epsilon)
+
+    hist = weekly_full.copy()
+    hist["ds"] = pd.to_datetime(hist["WeekStart"], errors="coerce")
+    hist["barangay"] = hist["Barangay_key"].astype(str)
+    hist["Cases"] = pd.to_numeric(hist["Cases"], errors="coerce").fillna(0.0)
+    latest_obs = pd.to_datetime(hist["ds"], errors="coerce").dropna().max()
+    if pd.isna(latest_obs):
+        empty = pd.DataFrame(
+            columns=[
+                "run_id", "view_mode", "queue_type", "weeks_to_sum", "baseline_weeks", "epsilon",
+                "ranking_formula_version", "model_name", "rank", "barangay", "actual_cases_past_W",
+                "past_8w_avg", "baseline_expected_W", "forecast_cases_next_W", "surge_ratio",
+                "surge_eligible", "rank_reason",
+            ]
+        )
+        empty.to_csv(cfg.out / f"action_priority_observed_W{w}.csv", index=False)
+        empty.to_csv(cfg.out / f"action_priority_forecast_W{w}.csv", index=False)
+        qa = pd.DataFrame([{"run_id": cfg.run_id, "weeks_to_sum": w, "baseline_weeks": b, "epsilon": eps}])
+        qa.to_csv(cfg.out / "qa_action_priority_report.csv", index=False)
+        return empty, empty, qa
+
+    obs_weeks = pd.date_range(end=latest_obs, periods=w, freq="W-MON")
+    base_weeks = pd.date_range(end=latest_obs, periods=b, freq="W-MON")
+    all_barangays = sorted(hist["barangay"].astype(str).unique().tolist())
+    obs_lookup = (
+        hist.groupby(["barangay", "ds"], as_index=False)["Cases"].sum()
+        .set_index(["barangay", "ds"])["Cases"]
+        .to_dict()
+    )
+
+    future = barangay_future_long.copy()
+    if "horizon_type" in future.columns:
+        future = future[future["horizon_type"] == "future"].copy()
+    if "model_name" in future.columns:
+        target_model = str(model_name)
+        scoped = future[future["model_name"].astype(str) == target_model].copy()
+        if scoped.empty:
+            first_model = str(pd.Series(future["model_name"]).dropna().astype(str).iloc[0]) if not future.empty else target_model
+            scoped = future[future["model_name"].astype(str) == first_model].copy()
+            target_model = first_model
+        future = scoped
+    else:
+        target_model = str(model_name)
+    future["ds"] = pd.to_datetime(future["ds"], errors="coerce")
+    future["barangay"] = future["Barangay_key"].astype(str)
+    future["yhat"] = pd.to_numeric(future["yhat"], errors="coerce").fillna(0.0)
+    fut_min = pd.to_datetime(future["ds"], errors="coerce").dropna().min()
+    fut_weeks = pd.date_range(start=fut_min, periods=w, freq="W-MON") if pd.notna(fut_min) else pd.DatetimeIndex([])
+    fut_lookup = (
+        future.groupby(["barangay", "ds"], as_index=False)["yhat"].sum()
+        .set_index(["barangay", "ds"])["yhat"]
+        .to_dict()
+    )
+
+    rows = []
+    for brgy in all_barangays:
+        actual_w = float(sum(float(obs_lookup.get((brgy, d), 0.0)) for d in obs_weeks))
+        past_avg = float(sum(float(obs_lookup.get((brgy, d), 0.0)) for d in base_weeks)) / float(b) if b > 0 else 0.0
+        baseline_w = float(past_avg) * float(w)
+        forecast_w = float(sum(float(fut_lookup.get((brgy, d), 0.0)) for d in fut_weeks))
+        surge_ratio = float(forecast_w) / float(baseline_w + eps)
+        surge_eligible = bool(forecast_w >= float(min_forecast_cases))
+        rows.append(
+            {
+                "barangay": brgy,
+                "actual_cases_past_W": actual_w,
+                "past_8w_avg": past_avg,
+                "baseline_expected_W": baseline_w,
+                "forecast_cases_next_W": forecast_w,
+                "surge_ratio": surge_ratio,
+                "surge_eligible": surge_eligible,
+            }
+        )
+    feat = pd.DataFrame(rows)
+
+    observed = feat.sort_values(
+        ["actual_cases_past_W", "barangay"], ascending=[False, True]
+    ).reset_index(drop=True)
+    observed["rank"] = observed.index + 1
+    observed["view_mode"] = "observed"
+    observed["queue_type"] = "respond_now"
+    observed["rank_reason"] = observed["actual_cases_past_W"].map(lambda v: f"High recent observed burden (past W: {v:.2f})")
+
+    forecast = feat.sort_values(
+        ["surge_eligible", "surge_ratio", "forecast_cases_next_W", "barangay"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+    forecast["rank"] = forecast.index + 1
+    forecast["view_mode"] = "forecast"
+    forecast["queue_type"] = "prepare_next"
+    forecast["rank_reason"] = forecast.apply(
+        lambda r: f"Surge {float(r['surge_ratio']):.2f}x vs baseline; forecast W: {float(r['forecast_cases_next_W']):.2f}",
+        axis=1,
+    )
+
+    common_cols = [
+        "run_id", "view_mode", "queue_type", "weeks_to_sum", "baseline_weeks", "epsilon",
+        "ranking_formula_version", "model_name", "rank", "barangay", "actual_cases_past_W",
+        "past_8w_avg", "baseline_expected_W", "forecast_cases_next_W", "surge_ratio",
+        "surge_eligible", "rank_reason",
+    ]
+    for df in (observed, forecast):
+        df["run_id"] = cfg.run_id
+        df["weeks_to_sum"] = w
+        df["baseline_weeks"] = b
+        df["epsilon"] = eps
+        df["ranking_formula_version"] = "v1_action_priority_observed_cases__forecast_surge"
+        df["model_name"] = target_model
+    observed = observed[common_cols]
+    forecast = forecast[common_cols]
+    observed.to_csv(cfg.out / f"action_priority_observed_W{w}.csv", index=False)
+    forecast.to_csv(cfg.out / f"action_priority_forecast_W{w}.csv", index=False)
+
+    surge_vals = pd.to_numeric(forecast["surge_ratio"], errors="coerce")
+    finite_mask = np.isfinite(surge_vals.to_numpy())
+    baseline_calc = pd.to_numeric(forecast["past_8w_avg"], errors="coerce").fillna(0.0) * float(w)
+    baseline_diff = (pd.to_numeric(forecast["baseline_expected_W"], errors="coerce").fillna(0.0) - baseline_calc).abs()
+    top10_surge = set(forecast.head(10)["barangay"].astype(str).tolist())
+    top10_cases = set(forecast.sort_values("forecast_cases_next_W", ascending=False).head(10)["barangay"].astype(str).tolist())
+    qa = pd.DataFrame(
+        [
+            {
+                "run_id": cfg.run_id,
+                "weeks_to_sum": w,
+                "baseline_weeks": b,
+                "epsilon": eps,
+                "model_name": target_model,
+                "n_barangays": int(len(forecast)),
+                "surge_nan_count": int(surge_vals.isna().sum()),
+                "surge_non_finite_count": int((~finite_mask).sum()),
+                "baseline_formula_max_abs_diff": float(baseline_diff.max()) if len(baseline_diff) else 0.0,
+                "surge_zero_when_forecast_zero_pass_rate": float(
+                    (
+                        (pd.to_numeric(forecast["forecast_cases_next_W"], errors="coerce").fillna(0.0) > 0)
+                        | (pd.to_numeric(forecast["surge_ratio"], errors="coerce").fillna(0.0).abs() < 1e-12)
+                    ).mean()
+                ) if len(forecast) else 1.0,
+                "surge_eligible_pct": float(pd.to_numeric(forecast["surge_eligible"], errors="coerce").fillna(0).mean()) if len(forecast) else 0.0,
+                "top10_overlap_surge_vs_cases": int(len(top10_surge & top10_cases)),
+            }
+        ]
+    )
+    qa.to_csv(cfg.out / "qa_action_priority_report.csv", index=False)
+    return observed, forecast, qa
+
+
 def _tag_barangay_method(df: pd.DataFrame, method: str) -> pd.DataFrame:
     out = df.copy()
     out["model_name"] = str(method)
@@ -1125,9 +1285,22 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         preferred_future=preferred_future_df,
     )
     all_models_future_df.to_csv(cfg.out / "barangay_forecasts_all_models_future_long.csv", index=False)
+    action_obs_df, action_fc_df, action_qa_df = _save_action_priority_artifacts(
+        cfg,
+        weekly_full=weekly_full,
+        barangay_future_long=all_models_future_df,
+        weeks_to_sum=int(getattr(cfg, "action_priority_snapshot_weeks", 4)),
+        baseline_weeks=8,
+        epsilon=1.0,
+        min_forecast_cases=2.0,
+        model_name="preferred",
+    )
     _ = (
         preferred_future_df,
         all_models_future_df,
+        action_obs_df,
+        action_fc_df,
+        action_qa_df,
         city_backtest_df,
         city_prophet_future,
         city_arima_future,
@@ -1325,7 +1498,17 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         preferred_future=preferred_future_df,
     )
     all_models_future_df.to_csv(cfg.out / "barangay_forecasts_long.csv", index=False)
-    _ = (run_metadata_df, coherence_future_df, barangay_risk_scores_df)
+    action_obs_df, action_fc_df, action_qa_df = _save_action_priority_artifacts(
+        cfg,
+        weekly_full=weekly_full,
+        barangay_future_long=all_models_future_df,
+        weeks_to_sum=int(getattr(cfg, "action_priority_snapshot_weeks", 4)),
+        baseline_weeks=8,
+        epsilon=1.0,
+        min_forecast_cases=2.0,
+        model_name="preferred",
+    )
+    _ = (run_metadata_df, coherence_future_df, barangay_risk_scores_df, action_obs_df, action_fc_df, action_qa_df)
 
     vc = all_models_future_df["model_name"].value_counts(dropna=False)
     print("model_name counts:\n", vc)

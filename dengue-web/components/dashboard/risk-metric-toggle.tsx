@@ -14,12 +14,25 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
     <ButtonGroup className={compact ? "w-full" : ""}>
       <Button
         size={compact ? "sm" : "default"}
-        variant={riskMetric === "cases" ? "default" : "outline"}
-        onClick={() => setRiskMetric("cases")}
+        variant={riskMetric === "action_priority" ? "default" : "outline"}
+        onClick={() => setRiskMetric("action_priority")}
         className={
           compact
             ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none"
             : "h-9 px-4 text-sm font-medium rounded-r-none"
+        }
+        title={dataMode === "observed" ? "Recommended queue: Respond Now." : "Recommended queue: Prepare Next."}
+      >
+        {compact ? "Action" : "Action"}
+      </Button>
+      <Button
+        size={compact ? "sm" : "default"}
+        variant={riskMetric === "cases" ? "default" : "outline"}
+        onClick={() => setRiskMetric("cases")}
+        className={
+          compact
+            ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
+            : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
         }
         title={dataMode === "observed" ? "Observed cases (Past W)." : "Forecast cases (Next W)."}
       >

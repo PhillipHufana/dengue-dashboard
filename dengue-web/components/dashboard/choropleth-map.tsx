@@ -68,8 +68,11 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
 
+  const effectiveMetric =
+    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+
   const { data: geo, isLoading: loadingGeo } = useChoropleth(runId, modelName, period, dataMode);
-  const { data: rankingData } = useRankings(period, runId, modelName, riskMetric, dataMode);
+  const { data: rankingData } = useRankings(period, runId, modelName, effectiveMetric, dataMode);
   const geoMeta = geo as ChoroplethMeta | undefined;
 
   const rankingByName = useMemo(() => {
@@ -80,17 +83,17 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
 
   const legend = useMemo(() => {
     const b =
-      riskMetric === "incidence"
+      effectiveMetric === "incidence"
         ? geoMeta?.jenks_breaks_incidence
-        : riskMetric === "surge"
+        : effectiveMetric === "surge"
         ? geoMeta?.jenks_breaks_surge
         : geoMeta?.jenks_breaks_cases;
     if (!Array.isArray(b) || b.length < 6) return null;
-    const unit = riskMetric === "incidence" ? "/100k" : riskMetric === "surge" ? "ratio" : "cases";
+    const unit = effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "ratio" : "cases";
     const labels = ["Very Low", "Low", "Medium", "High", "Very High"];
     const classes = ["very_low", "low", "medium", "high", "very_high"] as const;
     return classes.map((cls, i) => ({ cls, label: labels[i], range: formatRange(b[i], b[i + 1], unit) }));
-  }, [geoMeta, riskMetric]);
+  }, [geoMeta, effectiveMetric]);
 
   const stats = useMemo(() => {
     if (!geo?.features?.length) {
@@ -109,15 +112,15 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
       const name = String(f.properties.name ?? "");
       const row = rankingByName.get(name);
       const value =
-        riskMetric === "surge"
+        effectiveMetric === "surge"
           ? Number(row?.surge_score ?? f.properties.forecast_surge_ratio ?? 0)
-          : riskMetric === "incidence"
+          : effectiveMetric === "incidence"
           ? Number(row?.total_forecast_incidence_per_100k ?? f.properties.forecast_incidence_per_100k ?? 0)
           : Number(row?.total_forecast_cases ?? row?.total_forecast ?? f.properties.forecast_cases ?? f.properties.latest_forecast ?? 0);
       const cls =
-        riskMetric === "surge"
+        effectiveMetric === "surge"
           ? String(row?.surge_class ?? f.properties.surge_class ?? "unknown")
-          : riskMetric === "incidence"
+          : effectiveMetric === "incidence"
           ? String(row?.burden_class ?? f.properties.burden_class ?? "unknown")
           : String(row?.cases_class ?? f.properties.cases_class ?? "unknown");
 
@@ -134,7 +137,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     }
 
     return { total, very_high, high, medium, low, very_low, hottestName, hottestValue };
-  }, [geo, rankingByName, riskMetric]);
+  }, [geo, rankingByName, effectiveMetric]);
 
   const asOfDate = useMemo(() => {
     const raw = geoMeta?.data_last_updated ?? null;
@@ -153,9 +156,9 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     const key = String(feature.properties.name ?? "");
     const row = rankingByName.get(key);
     const level =
-      riskMetric === "surge"
+      effectiveMetric === "surge"
         ? String(row?.surge_class ?? feature.properties.surge_class ?? "unknown")
-        : riskMetric === "incidence"
+        : effectiveMetric === "incidence"
         ? String(row?.burden_class ?? feature.properties.burden_class ?? "unknown")
         : String(row?.cases_class ?? feature.properties.cases_class ?? "unknown");
     const selected = selectedBarangay?.pretty === feature.properties.display_name;
@@ -172,23 +175,23 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     const row = rankingByName.get(key);
     const label = String(feature.properties.display_name ?? key);
     const level =
-      riskMetric === "surge"
+      effectiveMetric === "surge"
         ? String(row?.surge_class ?? feature.properties.surge_class ?? "unknown")
-        : riskMetric === "incidence"
+        : effectiveMetric === "incidence"
         ? String(row?.burden_class ?? feature.properties.burden_class ?? "unknown")
         : String(row?.cases_class ?? feature.properties.cases_class ?? "unknown");
     const value =
-      riskMetric === "surge"
+      effectiveMetric === "surge"
         ? Number(row?.surge_score ?? feature.properties.forecast_surge_ratio ?? 0)
-        : riskMetric === "incidence"
+        : effectiveMetric === "incidence"
         ? Number(row?.total_forecast_incidence_per_100k ?? feature.properties.forecast_incidence_per_100k ?? 0)
         : Number(row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.forecast_cases ?? feature.properties.latest_forecast ?? 0);
     const pop = feature.properties.population ? Number(feature.properties.population).toLocaleString() : "-";
-    const labelValue = riskMetric === "cases" ? value.toLocaleString() : value.toFixed(2);
+    const labelValue = effectiveMetric === "cases" ? value.toLocaleString() : value.toFixed(2);
     const mainLabel =
-      riskMetric === "surge" ? "Forecast surge ratio" : riskMetric === "incidence" ? (dataMode === "observed" ? "Observed /100k" : "Forecast /100k") : (dataMode === "observed" ? "Observed cases" : "Forecast cases");
+      effectiveMetric === "surge" ? "Forecast surge ratio" : effectiveMetric === "incidence" ? (dataMode === "observed" ? "Observed /100k" : "Forecast /100k") : (dataMode === "observed" ? "Observed cases" : "Forecast cases");
     const surgeDetail =
-      riskMetric === "surge"
+      effectiveMetric === "surge"
         ? `<br/>Baseline expected (${period.toUpperCase()}): <strong>${Number(row?.baseline_expected_w ?? feature.properties.baseline_expected_w ?? 0).toFixed(2)}</strong>`
         : "";
 
@@ -222,12 +225,12 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
             </div>
             <Badge variant="secondary" className="text-xs">
               {dataMode === "observed"
-                ? riskMetric === "cases"
+                ? effectiveMetric === "cases"
                   ? "Observed Cases (Past W)"
                   : "Observed Incidence (Past W)"
-                : riskMetric === "cases"
+                : effectiveMetric === "cases"
                 ? "Forecast Cases (Next W)"
-                : riskMetric === "incidence"
+                : effectiveMetric === "incidence"
                 ? "Forecast Incidence (Next W)"
                 : "Forecast Surge (Next W vs Past 8W)"}
             </Badge>
@@ -244,7 +247,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
           {!loadingGeo ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {[
-                { label: "Total", value: riskMetric === "cases" ? stats.total.toLocaleString() : stats.total.toFixed(2) },
+                { label: "Total", value: effectiveMetric === "cases" ? stats.total.toLocaleString() : stats.total.toFixed(2) },
                 { label: "Very High", value: stats.very_high, color: "text-red-500" },
                 { label: "High", value: stats.high, color: "text-orange-500" },
                 { label: "Medium", value: stats.medium, color: "text-yellow-500" },
@@ -269,7 +272,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
             <MapContainer center={[7.1907, 125.4553]} zoom={11} scrollWheelZoom className="w-full h-full">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" opacity={0.35} />
               <GeoJSON
-                key={`${riskMetric}-${dataMode}-${period}-${geoMeta?.run_id ?? ""}-${geoMeta?.model_name ?? ""}`}
+                key={`${effectiveMetric}-${dataMode}-${period}-${geoMeta?.run_id ?? ""}-${geoMeta?.model_name ?? ""}`}
                 data={geo}
                 style={style}
                 onEachFeature={onEachFeature}
@@ -285,13 +288,13 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
               {nameToLabel.get(stats.hottestName ?? "") ?? stats.hottestName ?? "-"}
             </div>
             <div className="text-xs text-red-500/70">
-              {stats.hottestValue > -Infinity ? stats.hottestValue.toFixed(2) : "-"} {riskMetric === "incidence" ? "/100k" : riskMetric === "surge" ? "ratio" : "cases"}
+              {stats.hottestValue > -Infinity ? stats.hottestValue.toFixed(2) : "-"} {effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "ratio" : "cases"}
             </div>
           </div>
 
           <div className="absolute bottom-2 left-2 max-w-[56vw] md:max-w-[360px] bg-background/95 border p-1.5 md:p-3 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[9px] md:text-xs font-medium mb-1 md:mb-2 text-muted-foreground">
-              {riskMetric === "incidence" ? "Incidence classes" : riskMetric === "surge" ? "Surge classes" : "Cases classes"}
+              {effectiveMetric === "incidence" ? "Incidence classes" : effectiveMetric === "surge" ? "Surge classes" : "Cases classes"}
             </div>
             {legend ? (
               <div className="space-y-0.5 md:space-y-1">

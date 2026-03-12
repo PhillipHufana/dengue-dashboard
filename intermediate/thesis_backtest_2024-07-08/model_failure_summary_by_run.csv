@@ -51,3 +51,7 @@ city,prophet,1,1,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
 city,arima,1,1,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
 local,local_prophet,0,0,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
 local,local_arima,0,0,0,0.0,c402f9ff-d5ac-41b9-8c22-ebef95bb3f98,backtest
+city,prophet,1,1,0,0.0,fcc6965d-6047-40ee-b3ef-35556bc1df59,backtest
+city,arima,1,1,0,0.0,fcc6965d-6047-40ee-b3ef-35556bc1df59,backtest
+local,local_prophet,0,0,0,0.0,fcc6965d-6047-40ee-b3ef-35556bc1df59,backtest
+local,local_arima,0,0,0,0.0,fcc6965d-6047-40ee-b3ef-35556bc1df59,backtest

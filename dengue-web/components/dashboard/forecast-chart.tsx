@@ -100,6 +100,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const horizonType = useDashboardStore((s) => s.horizonType);
   const freq = useDashboardStore((s) => s.freq);
   const riskMetric = useDashboardStore((s) => s.riskMetric);
+  const dataMode = useDashboardStore((s) => s.dataMode);
   const brgyName = selectedBarangay?.clean ?? null;
   const [view, setView] = useState<"focused" | "full">("focused");
 
@@ -137,6 +138,10 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
 
   const modeSubtitle = isCityView
     ? "Historical + Prophet + ARIMA (city-level)"
+    : riskMetric === "action_priority"
+    ? dataMode === "observed"
+      ? "Action Priority - Respond Now (past W)"
+      : "Action Priority - Prepare Next (next W vs past 8W baseline)"
     : riskMetric === "cases"
     ? "Forecast Cases (Next W)"
     : riskMetric === "incidence"

@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 export type Frequency = "weekly" | "monthly" | "yearly";
 export type ModelName = string;
-export type RiskMetric = "cases" | "incidence" | "surge";
+export type RiskMetric = "cases" | "incidence" | "surge" | "action_priority";
 export type DataMode = "observed" | "forecast";
 export type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
 
@@ -64,7 +64,7 @@ export const useDashboardStore = create<DashboardState>()(
       period: "1m",
       setPeriod: (p) => set({ period: p }),
 
-      riskMetric: "cases",
+      riskMetric: "action_priority",
       setRiskMetric: (v) => set({ riskMetric: v }),
       dataMode: "forecast",
       setDataMode: (v) => set({ dataMode: v }),

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { RankingRow } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { TrendingUp, Search, ChevronUp, ChevronDown } from "lucide-react";
-import { useRankings } from "@/lib/query/hooks";
+import { useActionPriority, useRankings } from "@/lib/query/hooks";
 
 interface ForecastRankingsProps {
   selectedBarangay: { pretty: string; clean: string } | null;
@@ -33,9 +33,19 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
 
-  const { data, isLoading } = useRankings(timePeriod, runId, modelName, riskMetric, dataMode);
+  const useAction = riskMetric === "action_priority";
+  const effectiveMetric =
+    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+  const rankingsQuery = useRankings(timePeriod, runId, modelName, effectiveMetric, dataMode);
+  const actionQuery = useActionPriority(timePeriod, runId, modelName, dataMode, useAction);
+  const data = useAction ? actionQuery.data : rankingsQuery.data;
+  const isLoading = useAction ? actionQuery.isLoading : rankingsQuery.isLoading;
   const rankingTitle =
-    dataMode === "observed"
+    useAction
+      ? dataMode === "observed"
+        ? "Action Priority - Respond Now (past W weeks)"
+        : "Action Priority - Prepare Next (next W weeks)"
+      : dataMode === "observed"
       ? riskMetric === "cases"
         ? "Highest observed burden (past W weeks)"
         : "Highest observed per-capita risk (past W weeks)"
@@ -45,7 +55,10 @@ export const ForecastRankings = React.memo(function ForecastRankings({
       ? "Highest expected per-capita risk (next W weeks)"
       : "Early warning: largest expected increase";
   const barangays: RankingRow[] = useMemo(() => {
-    const list = (data?.rankings ?? []).slice();
+    const baseRows = useAction ? (actionQuery.data?.rows ?? []) : (data?.rankings ?? []);
+    const list = baseRows.slice();
+
+    if (useAction) return list;
 
     list.sort((a, b) => {
       if (riskMetric === "surge") {
@@ -64,7 +77,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     });
 
     return list;
-  }, [data, riskMetric]);
+  }, [useAction, actionQuery.data?.rows, data, riskMetric]);
   const lastUpdated = data?.model_current_date;
 
   const filtered = useMemo(() => {
@@ -72,10 +85,10 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
     if (riskFilter !== "all") {
       list = list.filter((b) => {
-        const cls = riskMetric === "surge"
+        const cls = effectiveMetric === "surge"
           ? (b.surge_class ?? "unknown")
           :
-          riskMetric === "cases"
+          effectiveMetric === "cases"
             ? (b.cases_class ?? "unknown")
             : (b.burden_class ?? "unknown");
         return cls === riskFilter;
@@ -85,7 +98,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     return list.filter((b) =>
       b.pretty_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [barangays, searchQuery, riskFilter, riskMetric]);
+  }, [barangays, searchQuery, riskFilter, effectiveMetric]);
 
   const displayed = showAll ? filtered : filtered.slice(0, 10);
 
@@ -198,18 +211,18 @@ export const ForecastRankings = React.memo(function ForecastRankings({
               const isSelected = selectedBarangay?.clean === b.name;
 
               const cls =
-                riskMetric === "surge"
+                effectiveMetric === "surge"
                   ? (b.surge_class ?? "unknown")
                   :
-                riskMetric === "cases"
+                effectiveMetric === "cases"
                   ? (b.cases_class ?? b.risk_level_cases ?? b.risk_level ?? "unknown")
                   : (b.burden_class ?? b.risk_level_incidence ?? "unknown");
 
               const value =
-                riskMetric === "surge"
+                effectiveMetric === "surge"
                   ? Number(b.surge_score ?? 0)
                   :
-                riskMetric === "cases"
+                effectiveMetric === "cases"
                   ? Number(b.total_forecast_cases ?? b.total_forecast ?? 0)
                   : Number(b.total_forecast_incidence_per_100k ?? 0);
 
@@ -246,13 +259,13 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
                   <div className="text-right">
                     <p className="font-bold text-sm">
-                      {riskMetric === "surge"
+                      {effectiveMetric === "surge"
                         ? value.toFixed(2)
-                        : riskMetric === "cases"
+                        : effectiveMetric === "cases"
                         ? value.toLocaleString()
                         : value.toFixed(2)}
                     </p>
-                    {riskMetric === "surge" ? (
+                    {effectiveMetric === "surge" ? (
                       <div className="text-[10px] text-muted-foreground">
                         fW {Number(b.forecast_w_cases ?? 0).toFixed(2)} | baseW {Number(b.baseline_expected_w ?? 0).toFixed(2)}
                       </div>
