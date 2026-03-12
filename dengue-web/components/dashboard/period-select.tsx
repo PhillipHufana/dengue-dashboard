@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardStore, type TimePeriod } from "@/lib/store/dashboard-store";
 
@@ -20,6 +21,12 @@ export function PeriodSelect({ compact = false }: { compact?: boolean }) {
 
   // Optional safety: if someone has 6m/1y persisted, auto-fallback
   const safePeriod: TimePeriod = ALLOWED_PERIODS.includes(period) ? period : "1m";
+
+  useEffect(() => {
+    if (period !== safePeriod) {
+      setPeriod(safePeriod);
+    }
+  }, [period, safePeriod, setPeriod]);
 
   return (
     <Select value={safePeriod} onValueChange={(v) => setPeriod(v as TimePeriod)}>

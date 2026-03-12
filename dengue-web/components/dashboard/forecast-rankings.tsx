@@ -6,10 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RankingRow } from "@/lib/api";
-import { useDashboardStore, type TimePeriod } from "@/lib/store/dashboard-store";
+import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { TrendingUp, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { useRankings } from "@/lib/query/hooks";
 
@@ -22,18 +21,29 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   selectedBarangay,
   onBarangaySelect,
 }: ForecastRankingsProps) {
+  type RiskFilter = "all" | "very_high" | "high" | "medium" | "low" | "very_low";
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const timePeriod = useDashboardStore((s) => s.period);
+  const dataMode = useDashboardStore((s) => s.dataMode);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const [riskFilter, setRiskFilter] =
-    useState<"all" | "very_high" | "high" | "medium" | "low" | "very_low">("all");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
 
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
 
-  const { data, isLoading } = useRankings(timePeriod, runId, modelName, riskMetric);
+  const { data, isLoading } = useRankings(timePeriod, runId, modelName, riskMetric, dataMode);
+  const rankingTitle =
+    dataMode === "observed"
+      ? riskMetric === "cases"
+        ? "Highest observed burden (past W weeks)"
+        : "Highest observed per-capita risk (past W weeks)"
+      : riskMetric === "cases"
+      ? "Highest expected burden (next W weeks)"
+      : riskMetric === "incidence"
+      ? "Highest expected per-capita risk (next W weeks)"
+      : "Early warning: largest expected increase";
   const barangays: RankingRow[] = useMemo(() => {
     const list = (data?.rankings ?? []).slice();
 
@@ -63,7 +73,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     if (riskFilter !== "all") {
       list = list.filter((b) => {
         const cls = riskMetric === "surge"
-          ? (b.cases_class ?? "unknown")
+          ? (b.surge_class ?? "unknown")
           :
           riskMetric === "cases"
             ? (b.cases_class ?? "unknown")
@@ -133,18 +143,21 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   }
 
   return (
-    <Card className="bg-card border-border">
+    <Card className="bg-card border-border h-full xl:h-[780px] flex flex-col">
       <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
-            <CardTitle className="text-base md:text-lg font-semibold">Forecast Rankings</CardTitle>
+            <CardTitle className="text-base md:text-lg font-semibold">{rankingTitle}</CardTitle>
           </div>
 
           
 
           {lastUpdated && data ? (
             <div className="text-[10px] text-muted-foreground leading-tight">
+              <p>
+                Mode: {dataMode === "observed" ? "Observed (Past W weeks)" : "Forecast (Next W weeks)"}
+              </p>
               <p>Model date (latest real data): {data.model_current_date}</p>
               <p>Your current date: {data.user_current_date}</p>
               <p className="italic opacity-80">Forecast horizons are relative to the model date.</p>
@@ -168,7 +181,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                 size="sm"
                 variant={riskFilter === r ? "default" : "ghost"}
                 className="text-[10px]"
-                onClick={() => setRiskFilter(r as any)}
+                onClick={() => setRiskFilter(r as RiskFilter)}
               >
                 {r === "all" ? "ALL" : r.replace("_", " ").toUpperCase()}
               </Button>
@@ -177,8 +190,8 @@ export const ForecastRankings = React.memo(function ForecastRankings({
         </div>
       </CardHeader>
 
-      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-        <ScrollArea className="h-80 md:h-[400px]">
+      <CardContent className="p-3 pt-0 md:p-6 md:pt-0 flex-1 min-h-0">
+        <ScrollArea className="h-full">
           <div className="space-y-2">
             {displayed.map((b, index) => {
               const rank = index + 1;
@@ -186,7 +199,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
               const cls =
                 riskMetric === "surge"
-                  ? (b.cases_class ?? b.risk_level_cases ?? b.risk_level ?? "unknown")
+                  ? (b.surge_class ?? "unknown")
                   :
                 riskMetric === "cases"
                   ? (b.cases_class ?? b.risk_level_cases ?? b.risk_level ?? "unknown")
@@ -239,6 +252,14 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                         ? value.toLocaleString()
                         : value.toFixed(2)}
                     </p>
+                    {riskMetric === "surge" ? (
+                      <div className="text-[10px] text-muted-foreground">
+                        fW {Number(b.forecast_w_cases ?? 0).toFixed(2)} | baseW {Number(b.baseline_expected_w ?? 0).toFixed(2)}
+                      </div>
+                    ) : null}
+                    <div className="text-[10px] text-muted-foreground">
+                      Obs {Number(b.observed_cases_w ?? 0).toFixed(2)} | P {Number(b.prophet_forecast_w ?? 0).toFixed(2)} | A {Number(b.arima_forecast_w ?? 0).toFixed(2)}
+                    </div>
                     <div
                       title={b.trend_message}
                       className={`flex items-center justify-end gap-1 text-[10px] ${

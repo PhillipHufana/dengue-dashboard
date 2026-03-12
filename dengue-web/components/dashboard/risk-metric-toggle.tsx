@@ -7,6 +7,8 @@ import { useDashboardStore } from "@/lib/store/dashboard-store";
 export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const setRiskMetric = useDashboardStore((s) => s.setRiskMetric);
+  const dataMode = useDashboardStore((s) => s.dataMode);
+  const showSurge = dataMode === "forecast";
 
   return (
     <ButtonGroup className={compact ? "w-full" : ""}>
@@ -19,9 +21,9 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
             ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none"
             : "h-9 px-4 text-sm font-medium rounded-r-none"
         }
-        title="Use absolute forecasted case counts for ranking and map colors."
+        title={dataMode === "observed" ? "Observed cases (Past W)." : "Forecast cases (Next W)."}
       >
-        Cases
+        {compact ? "Cases" : "Cases"}
       </Button>
       <Button
         size={compact ? "sm" : "default"}
@@ -32,23 +34,25 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
             ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
             : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
         }
-        title="Use forecasted incidence per 100k population. Recommended for fair cross-barangay comparison."
+        title={dataMode === "observed" ? "Observed incidence per 100k (Past W)." : "Forecast incidence per 100k (Next W)."}
       >
-        Incidence (/100k)
+        {compact ? "Incidence" : "Incidence"}
       </Button>
-      <Button
-        size={compact ? "sm" : "default"}
-        variant={riskMetric === "surge" ? "default" : "outline"}
-        onClick={() => setRiskMetric("surge")}
-        className={
-          compact
-            ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
-            : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
-        }
-        title="Surge ranking: next 4 weeks forecast divided by past 8 weeks average actual + 1.0."
-      >
-        Surge
-      </Button>
+      {showSurge ? (
+        <Button
+          size={compact ? "sm" : "default"}
+          variant={riskMetric === "surge" ? "default" : "outline"}
+          onClick={() => setRiskMetric("surge")}
+          className={
+            compact
+              ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
+              : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
+          }
+          title="Forecast surge (Next W vs Past 8W baseline)."
+        >
+          {compact ? "Surge" : "Surge"}
+        </Button>
+      ) : null}
     </ButtonGroup>
   );
 }

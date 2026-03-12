@@ -10,8 +10,6 @@ import { useDashboardStore } from "@/lib/store/dashboard-store"
 import { useEffect } from "react"
 import { getDataInfo } from "@/lib/api"
 import { AppHeader } from "./dashboard/AppHeader"
-import { RiskMetricToggle } from "./dashboard/risk-metric-toggle";
-import { PeriodSelect } from "./dashboard/period-select";
 
 
 const ChoroplethMap = dynamic(
@@ -46,6 +44,9 @@ export function DengueDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [disaggScheme, setDisaggScheme] = useState<string | null>(null)
   const setRunId = useDashboardStore((s) => s.setRunId)
+  const dataMode = useDashboardStore((s) => s.dataMode)
+  const riskMetric = useDashboardStore((s) => s.riskMetric)
+  const setRiskMetric = useDashboardStore((s) => s.setRiskMetric)
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +68,12 @@ export function DengueDashboard() {
     return () => { alive = false; };
   }, [setRunId]);
 
+  useEffect(() => {
+    if (dataMode === "observed" && riskMetric === "surge") {
+      setRiskMetric("cases");
+    }
+  }, [dataMode, riskMetric, setRiskMetric]);
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,29 +81,28 @@ export function DengueDashboard() {
         mode="public"
         lastUpdated={formatReadableDate(lastUpdated)}
         disaggScheme={disaggScheme}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <RiskMetricToggle />
-            <PeriodSelect />
-          </div>
-        }
       />
 
       <main className="p-3 md:p-6">
         <div className="space-y-4 md:space-y-6">
-          <ChoroplethMap
-            selectedBarangay={selectedBarangay}
-            onBarangaySelect={setSelectedBarangay}
-          />
-
-          <ForecastChart selectedBarangay={selectedBarangay} />
-
           <KpiCards />
 
-          <ForecastRankings
-            selectedBarangay={selectedBarangay}
-            onBarangaySelect={setSelectedBarangay}
-          />
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6 items-stretch">
+            <div className="xl:col-span-8 h-full">
+              <ChoroplethMap
+                selectedBarangay={selectedBarangay}
+                onBarangaySelect={setSelectedBarangay}
+              />
+            </div>
+            <div className="xl:col-span-4 h-full">
+              <ForecastRankings
+                selectedBarangay={selectedBarangay}
+                onBarangaySelect={setSelectedBarangay}
+              />
+            </div>
+          </div>
+
+          <ForecastChart selectedBarangay={selectedBarangay} />
 
           {/* <DataUploadLogs /> */}
 

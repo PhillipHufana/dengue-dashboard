@@ -1,7 +1,7 @@
 // lib/api.ts
 const API_BASE = "http://127.0.0.1:8000";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
+import type { DataMode, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
 export function cleanName(name: string): string {
   if (!name) return "";
 
@@ -78,7 +78,7 @@ export interface SummaryResponse {
   model_name: string;
   horizon_type: "future";
   data_last_updated: string | null;
-  city_latest: any | null;
+  city_latest: { week_start?: string; city_cases?: number } | null;
   total_forecasted_cases: number;
   barangay_latest: SummaryBarangayRow[];
 
@@ -91,11 +91,13 @@ export async function getSummary(options?: {
   runId?: string;
   modelName?: string;
   period?: TimePeriod;
+  dataMode?: DataMode;
 }): Promise<SummaryResponse> {
   const params = new URLSearchParams();
   if (options?.runId) params.set("run_id", options.runId);
   if (options?.modelName) params.set("model_name", options.modelName);
   if (options?.period) params.set("period", options.period);
+  if (options?.dataMode) params.set("data_mode", options.dataMode);
 
   const url = params.toString()
     ? `${API_BASE}/forecast/summary?${params.toString()}`
@@ -121,11 +123,13 @@ export async function getChoropleth(options?: {
   runId?: string;
   modelName?: string;
   period?: TimePeriod;
+  dataMode?: DataMode;
 }): Promise<ChoroplethFC> {
   const params = new URLSearchParams();
   if (options?.runId) params.set("run_id", options.runId);
   if (options?.modelName) params.set("model_name", options.modelName);
   if (options?.period) params.set("period", options.period);
+  if (options?.dataMode) params.set("data_mode", options.dataMode);
 
   const url = params.toString()
     ? `${API_BASE}/geo/choropleth?${params.toString()}`
@@ -162,6 +166,36 @@ export async function getCitySeries() {
   return res.json();
 }
 
+export interface CityComparePoint {
+  date: string;
+  cases: number | null;
+  yhat_prophet: number | null;
+  yhat_prophet_lower: number | null;
+  yhat_prophet_upper: number | null;
+  yhat_arima: number | null;
+  yhat_arima_lower: number | null;
+  yhat_arima_upper: number | null;
+  is_future: boolean;
+}
+
+export interface CityCompareResponse {
+  run_id: string;
+  series: CityComparePoint[];
+}
+
+export async function getCityCompareSeries(options?: {
+  runId?: string;
+}): Promise<CityCompareResponse> {
+  const params = new URLSearchParams();
+  if (options?.runId) params.set("run_id", options.runId);
+  const url = params.toString()
+    ? `${API_BASE}/forecast/city/compare?${params.toString()}`
+    : `${API_BASE}/forecast/city/compare`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load city compare series");
+  return res.json();
+}
+
 export interface RankingRow {
   name: string;
   pretty_name: string;
@@ -182,14 +216,27 @@ export interface RankingRow {
   last_week: number | null;
   trend_source: string;
   trend_message: string;
-  forecast_4w_cases?: number;
+  forecast_w_cases?: number;
   past_8w_avg_cases?: number;
+  baseline_expected_w?: number;
   surge_score?: number;
+  surge_class?: JenksClass;
+  surge_eligible?: boolean;
+  observed_cases_w?: number;
+  observed_incidence_w?: number | null;
+  prophet_forecast_w?: number;
+  arima_forecast_w?: number;
 }
 
 export interface RankingResponse {
   period: string;
+  data_mode?: DataMode;
   ranking_basis?: RiskMetric;
+  weeks_to_sum?: number;
+  baseline_weeks?: number;
+  surge_epsilon?: number;
+  surge_min_forecast_cases?: number;
+  ranking_formula_version?: string;
   model_current_date: string | null;
   user_current_date: string;
   data_last_updated: string | null;
@@ -201,13 +248,14 @@ export interface RankingResponse {
 
 export async function getForecastRankings(
   period: string,
-  options?: { runId?: string; modelName?: string; rankingBasis?: RiskMetric }
+  options?: { runId?: string; modelName?: string; rankingBasis?: RiskMetric; dataMode?: DataMode }
 ): Promise<RankingResponse> {
   const params = new URLSearchParams();
   params.set("period", period);
   if (options?.runId) params.set("run_id", options.runId);
   if (options?.modelName) params.set("model_name", options.modelName);
   if (options?.rankingBasis) params.set("ranking_basis", options.rankingBasis);
+  if (options?.dataMode) params.set("data_mode", options.dataMode);
 
   const res = await fetch(`${API_BASE}/forecast/rankings?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load rankings");

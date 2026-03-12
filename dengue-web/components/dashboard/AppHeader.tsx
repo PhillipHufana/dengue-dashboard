@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bug, Calendar, LogIn, Shield, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { LoginModal } from "@/components/dashboard/login-modal";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchMyProfile, supabaseLogout, type AdminProfile } from "@/lib/adminApi";
 import { RiskMetricToggle } from "@/components/dashboard/risk-metric-toggle";
+import { DataModeToggle } from "@/components/dashboard/data-mode-toggle";
 import { PeriodSelect } from "@/components/dashboard/period-select";
 import { ModelSelect } from "@/components/dashboard/model-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,29 +34,6 @@ function profileInitials(profile: AdminProfile | null): string {
   const b = last ? last[0] : "";
   const out = `${a}${b}`.toUpperCase();
   return out || "P";
-}
-
-function formatReadableDate(value?: string | null): string {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  const hasTime = /T|\d{1,2}:\d{2}/.test(value);
-  return d.toLocaleString(
-    [],
-    hasTime
-      ? {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      : {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-        },
-  );
 }
 
 function ProfileMenu({
@@ -87,15 +65,9 @@ function ProfileMenu({
       <PopoverContent className="w-72" align="end">
         <div className="space-y-2">
           <div className="text-sm font-semibold">{displayName(profile)}</div>
-          <div className="text-xs text-muted-foreground">
-            Email: {email || "—"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Association: {profile?.association || "—"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Role: {profile?.role || "user"}
-          </div>
+          <div className="text-xs text-muted-foreground">Email: {email || "—"}</div>
+          <div className="text-xs text-muted-foreground">Association: {profile?.association || "—"}</div>
+          <div className="text-xs text-muted-foreground">Role: {profile?.role || "user"}</div>
           <Button className="w-full mt-2" variant="outline" onClick={onLogout}>
             Logout
           </Button>
@@ -109,12 +81,10 @@ export function AppHeader({
   mode,
   lastUpdated,
   disaggScheme,
-  rightSlot,
 }: {
   mode: HeaderMode;
   lastUpdated?: string | null;
   disaggScheme?: string | null;
-  rightSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const [isAuthed, setIsAuthed] = useState(false);
@@ -166,8 +136,9 @@ export function AppHeader({
 
   useEffect(() => {
     if (mode === "admin" && authChecked && !isAuthed && !autoOpenedLoginRef.current) {
-      setLoginOpen(true);
+      const t = setTimeout(() => setLoginOpen(true), 0);
       autoOpenedLoginRef.current = true;
+      return () => clearTimeout(t);
     }
   }, [mode, authChecked, isAuthed]);
 
@@ -181,19 +152,9 @@ export function AppHeader({
   const title = mode === "admin" ? "Denguard Admin Console" : "Denguard Dengue Surveillance";
   const subtitle = mode === "admin" ? "Uploads - Runs - Logs" : "Predictive outbreak monitoring - 182 Barangays";
 
-  const adminActionDesktop = useMemo(() => {
-    if (!isAuthed) return null;
-    return <ProfileMenu profile={profile} email={email} onLogout={onLogout} />;
-  }, [isAuthed, profile, email]);
-
   return (
-    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background opacity-100 px-3 py-2 md:px-6 md:py-4">
-      <LoginModal
-        open={loginOpen}
-        onOpenChange={setLoginOpen}
-        showTrigger={false}
-        redirectToAdminOnLogin
-      />
+    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background px-3 py-2 md:px-6 md:py-4">
+      <LoginModal open={loginOpen} onOpenChange={setLoginOpen} showTrigger={false} redirectToAdminOnLogin />
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -213,19 +174,16 @@ export function AppHeader({
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>Last updated: {lastUpdated ?? "—"}</span>
+            <span className="whitespace-nowrap">Last updated: {lastUpdated ?? "—"}</span>
+            {disaggScheme ? (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Disagg: {disaggScheme}
+              </Badge>
+            ) : null}
           </div>
-
-          {rightSlot ?? null}
-          {disaggScheme ? (
-            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-              Disagg: {disaggScheme}
-            </Badge>
-          ) : null}
-          {mode === "public" ? <ModelSelect /> : null}
 
           {mode === "public" ? (
             isAuthed ? (
@@ -239,39 +197,27 @@ export function AppHeader({
               </Button>
             )
           ) : null}
-
           {mode === "admin" ? (
             <Link href="/">
               <Button variant="outline" className="bg-transparent">Dashboard</Button>
             </Link>
           ) : null}
-
           <ThemeToggle />
-          {adminActionDesktop}
+          {isAuthed ? <ProfileMenu profile={profile} email={email} onLogout={onLogout} /> : null}
         </div>
 
         <div className="flex md:hidden items-center gap-2 shrink-0">
           <ThemeToggle />
           {mode === "admin" ? (
             <Link href="/">
-              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">
-                Dashboard
-              </Button>
+              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">Dashboard</Button>
             </Link>
           ) : isAuthed ? (
             <Link href="/admin">
-              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">
-                Admin
-              </Button>
+              <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent">Admin</Button>
             </Link>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-3 bg-transparent"
-              onClick={() => setLoginOpen(true)}
-              title="Sign in to access admin"
-            >
+            <Button variant="outline" size="sm" className="h-8 px-3 bg-transparent" onClick={() => setLoginOpen(true)}>
               Admin Login
             </Button>
           )}
@@ -279,32 +225,37 @@ export function AppHeader({
         </div>
       </div>
 
-      <div className="mt-2 md:hidden space-y-1.5">
+      <div className="mt-2 border-t border-border pt-2">
         {mode === "public" ? (
           <>
-            <div className="grid grid-cols-2 gap-1.5">
-              <ModelSelect compact />
-              <PeriodSelect compact />
+            <div className="hidden md:flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ModelSelect />
+                <PeriodSelect />
+              </div>
+              <div className="flex items-center gap-2">
+                <DataModeToggle />
+                <RiskMetricToggle />
+              </div>
             </div>
-            <RiskMetricToggle compact />
+            <div className="md:hidden space-y-1.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                <ModelSelect compact />
+                <PeriodSelect compact />
+              </div>
+              <DataModeToggle compact />
+              <RiskMetricToggle compact />
+            </div>
           </>
         ) : null}
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Calendar className="h-3.5 w-3.5" />
-          <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
-          {disaggScheme ? (
-            <Badge variant="secondary" className="text-[9px] uppercase tracking-wide ml-1">
-              {disaggScheme}
-            </Badge>
-          ) : null}
-        </div>
       </div>
 
-      <div className="mt-1 flex md:hidden items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="mt-1 md:hidden flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Calendar className="h-3.5 w-3.5" />
         <span className="truncate">Last updated: {lastUpdated ?? "—"}</span>
         {disaggScheme ? (
-          <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
-            Disagg: {disaggScheme}
+          <Badge variant="secondary" className="text-[9px] uppercase tracking-wide ml-1">
+            {disaggScheme}
           </Badge>
         ) : null}
       </div>

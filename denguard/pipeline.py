@@ -131,6 +131,10 @@ def _save_run_metadata(
                 "disagg_scheme": str(selected_disagg_scheme),
                 "alpha_smooth": float(alpha_smooth),
                 "selected_primary_model": str(selected_primary_model),
+                "ranking_formula_version": "v2_forecastW_over_baselineW",
+                "surge_baseline_weeks": 8,
+                "surge_epsilon": 1.0,
+                "surge_min_forecast_cases": 2.0,
                 "incoming_mode": cfg.incoming_mode,
                 "backtest_end_date": getattr(cfg, "backtest_end_date", None),
             }

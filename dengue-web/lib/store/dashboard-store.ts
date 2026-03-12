@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 export type Frequency = "weekly" | "monthly" | "yearly";
 export type ModelName = string;
 export type RiskMetric = "cases" | "incidence" | "surge";
+export type DataMode = "observed" | "forecast";
 export type TimePeriod = "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
 
 interface DashboardState {
@@ -31,6 +32,8 @@ interface DashboardState {
 
   riskMetric: RiskMetric;
   setRiskMetric: (v: RiskMetric) => void;
+  dataMode: DataMode;
+  setDataMode: (v: DataMode) => void;
 
   // Actions
   setSelectedBarangay: (name: string | null) => void;
@@ -63,6 +66,8 @@ export const useDashboardStore = create<DashboardState>()(
 
       riskMetric: "cases",
       setRiskMetric: (v) => set({ riskMetric: v }),
+      dataMode: "forecast",
+      setDataMode: (v) => set({ dataMode: v }),
 
       rangeStart: 0,
       rangeEnd: 10,

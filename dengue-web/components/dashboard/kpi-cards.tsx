@@ -3,75 +3,80 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
-import { useSummary } from "@/lib/query/hooks";
+import { useChoropleth, useCityCompareSeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
-import { useChoropleth } from "@/lib/query/hooks";
+import type { ChoroplethFC } from "@/lib/api";
 
-type BarangayLatest = {
-  name: string;
-  display_name?: string;
-  forecast: number | null;
-  week_start: string;
-  risk_level?: string;
+const PERIOD_WEEKS: Record<string, number> = {
+  "1w": 1,
+  "2w": 2,
+  "1m": 4,
+  "3m": 12,
+  "6m": 26,
+  "1y": 52,
 };
 
-type SummaryResponse = {
-  city_latest: { week_start: string; city_cases: number; created_at: string } | null;
-  barangay_latest: BarangayLatest[];
-  total_forecasted_cases: number;
-};
+type MetricClass = "cases_class" | "burden_class" | "surge_class";
 
 export function KpiCards() {
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
   const period = useDashboardStore((s) => s.period);
-
-  const { data, isLoading, error } = useSummary(runId, modelName, period);
-
-  const { data: geo } = useChoropleth(runId, modelName, period);
-  const cityForecastCases = (geo as any)?.city_forecast_cases ?? null;
-  const cityIncidence = (geo as any)?.city_incidence_per_100k ?? null;
-  const summary: SummaryResponse | null = data ?? null;
-  const city = summary?.city_latest ?? null;
-
-  const barangays: BarangayLatest[] = summary?.barangay_latest ?? [];
-  const totalForecasted = summary?.total_forecasted_cases ?? 0;
-
   const riskMetric = useDashboardStore((s) => s.riskMetric);
+  const dataMode = useDashboardStore((s) => s.dataMode);
 
- 
+  const { data: geo, isLoading, error } = useChoropleth(runId, modelName, period, dataMode);
+  const { data: cityCompare } = useCityCompareSeries(runId, dataMode === "forecast");
+  const geoSafe = geo as (ChoroplethFC & {
+    city_forecast_cases?: number | null;
+    city_incidence_per_100k?: number | null;
+    city_surge_ratio?: number | null;
+  }) | undefined;
+
+  const cityForecastCases = geoSafe?.city_forecast_cases ?? null;
+  const cityIncidence = geoSafe?.city_incidence_per_100k ?? null;
+  const citySurgeRatio = geoSafe?.city_surge_ratio ?? null;
+  const geoFeatures = useMemo(() => geoSafe?.features ?? [], [geoSafe?.features]);
+
+  const compareCityTotals = useMemo(() => {
+    if (!cityCompare?.series?.length) return null;
+    const w = PERIOD_WEEKS[period] ?? 4;
+    const fut = cityCompare.series.filter((x) => x.is_future).slice(0, w);
+    const prophet = fut.reduce((a, x) => a + Number(x.yhat_prophet ?? 0), 0);
+    const arima = fut.reduce((a, x) => a + Number(x.yhat_arima ?? 0), 0);
+    return { prophet, arima };
+  }, [cityCompare, period]);
+
   const veryHighCount = useMemo(() => {
-    const feats = (geo as any)?.features ?? [];
-    const key = riskMetric === "cases" ? "cases_class" : "burden_class";
-    return feats.filter((f: any) => f?.properties?.[key] === "very_high").length;
-  }, [geo, riskMetric]);
+    const key: MetricClass = riskMetric === "cases" ? "cases_class" : riskMetric === "incidence" ? "burden_class" : "surge_class";
+    return geoFeatures.filter((f) => (f?.properties as Record<string, string | undefined>)?.[key] === "very_high").length;
+  }, [geoFeatures, riskMetric]);
 
   const hotspot = useMemo(() => {
-    const feats = (geo as any)?.features ?? [];
     const valueKey =
-      riskMetric === "cases" ? "forecast_cases" : "forecast_incidence_per_100k";
+      riskMetric === "cases"
+        ? (dataMode === "observed" ? "observed_cases" : "forecast_cases")
+        : riskMetric === "incidence"
+        ? (dataMode === "observed" ? "observed_incidence_per_100k" : "forecast_incidence_per_100k")
+        : "forecast_surge_ratio";
 
-    let best: any = null;
+    let best: (typeof geoFeatures)[number] | null = null;
     let bestVal = -Infinity;
-
-    for (const f of feats) {
-      const v = Number(f?.properties?.[valueKey]);
+    for (const f of geoFeatures) {
+      const props = f?.properties as Record<string, unknown>;
+      const v = Number(props?.[valueKey] ?? 0);
       if (Number.isFinite(v) && v > bestVal) {
         bestVal = v;
         best = f;
       }
     }
-
     if (!best) return null;
-
+    const props = best.properties as Record<string, unknown>;
     return {
-      name: best.properties?.display_name ?? best.properties?.name ?? "—",
+      name: String(props?.display_name ?? props?.name ?? "-"),
       value: bestVal,
     };
-  }, [geo, riskMetric]);
-
-
-
+  }, [geoFeatures, riskMetric, dataMode]);
 
   if (isLoading) {
     return (
@@ -110,11 +115,18 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {cityForecastCases != null ? Number(cityForecastCases).toLocaleString() : "—"}
+              {cityForecastCases != null ? Number(cityForecastCases).toLocaleString() : "-"}
             </p>
-            <p className="text-xs text-muted-foreground">
-              City forecast cases (next {period.toUpperCase()})
-            </p>
+            {dataMode === "observed" ? (
+              <p className="text-xs text-muted-foreground">City observed cases (past {period.toUpperCase()})</p>
+            ) : (
+              <div className="text-xs text-muted-foreground">
+                <p>City forecast cases (next {period.toUpperCase()})</p>
+                {compareCityTotals ? (
+                  <p>P {compareCityTotals.prophet.toFixed(1)} | A {compareCityTotals.arima.toFixed(1)}</p>
+                ) : null}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -129,9 +141,21 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {cityIncidence != null ? Number(cityIncidence).toFixed(2) : "—"}
+              {riskMetric === "surge"
+                ? citySurgeRatio != null
+                  ? Number(citySurgeRatio).toFixed(2)
+                  : "-"
+                : cityIncidence != null
+                ? Number(cityIncidence).toFixed(2)
+                : "-"}
             </p>
-            <p className="text-xs text-muted-foreground">City cumulative incidence (/100k)</p>
+            <p className="text-xs text-muted-foreground">
+              {riskMetric === "surge"
+                ? `City surge ratio (${period.toUpperCase()} vs past 8W)`
+                : dataMode === "observed"
+                ? "City observed incidence (/100k)"
+                : "City forecast incidence (/100k)"}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -147,7 +171,7 @@ export function KpiCards() {
           <div className="mt-4">
             <p className="text-xl font-bold">{veryHighCount}</p>
             <p className="text-xs text-muted-foreground">
-              Barangays (Very High {riskMetric === "cases" ? "cases" : "burden"})
+              Barangays (Very High {riskMetric === "cases" ? "cases" : riskMetric === "incidence" ? "burden" : "surge"})
             </p>
           </div>
         </CardContent>
@@ -167,11 +191,17 @@ export function KpiCards() {
                 ? riskMetric === "cases"
                   ? hotspot.value.toLocaleString()
                   : hotspot.value.toFixed(2)
-                : "—"}
+                : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {hotspot?.name ?? "—"}{" "}
-              {hotspot ? (riskMetric === "cases" ? "(cases)" : "(/100k)") : ""}
+              {hotspot?.name ?? "-"}{" "}
+              {hotspot
+                ? riskMetric === "cases"
+                  ? "(cases)"
+                  : riskMetric === "incidence"
+                  ? "(/100k)"
+                  : "(surge ratio)"
+                : ""}
             </p>
           </div>
         </CardContent>

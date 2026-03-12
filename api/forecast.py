@@ -260,6 +260,91 @@ def get_city_forecast_series(
     }
 
 
+@router.get("/city/compare")
+def get_city_compare_series(
+    run_id: Optional[str] = Query(None),
+):
+    sb = get_supabase()
+    rid = resolve_run_id(sb, run_id)
+
+    city_rows = (
+        sb.table("city_weekly_runs")
+        .select("week_start, city_cases")
+        .eq("run_id", rid)
+        .order("week_start")
+        .execute()
+        .data
+    ) or []
+    if not city_rows:
+        city_rows = (
+            sb.table("city_weekly")
+            .select("week_start, city_cases")
+            .order("week_start")
+            .execute()
+            .data
+        ) or []
+
+    frows = (
+        sb.table("city_forecasts_long")
+        .select("week_start, model_name, yhat, yhat_lower, yhat_upper, horizon_type")
+        .eq("run_id", rid)
+        .in_("model_name", ["prophet", "arima"])
+        .order("week_start")
+        .execute()
+        .data
+    ) or []
+
+    series_map: Dict[str, Dict[str, object]] = {}
+    for row in city_rows:
+        ds = row["week_start"]
+        series_map.setdefault(
+            ds,
+            {
+                "date": ds,
+                "cases": None,
+                "yhat_prophet": None,
+                "yhat_prophet_lower": None,
+                "yhat_prophet_upper": None,
+                "yhat_arima": None,
+                "yhat_arima_lower": None,
+                "yhat_arima_upper": None,
+                "is_future": False,
+            },
+        )
+        series_map[ds]["cases"] = row.get("city_cases")
+
+    for row in frows:
+        ds = row["week_start"]
+        m = str(row.get("model_name") or "").strip().lower()
+        series_map.setdefault(
+            ds,
+            {
+                "date": ds,
+                "cases": None,
+                "yhat_prophet": None,
+                "yhat_prophet_lower": None,
+                "yhat_prophet_upper": None,
+                "yhat_arima": None,
+                "yhat_arima_lower": None,
+                "yhat_arima_upper": None,
+                "is_future": True,
+            },
+        )
+        if m == "prophet":
+            series_map[ds]["yhat_prophet"] = row.get("yhat")
+            series_map[ds]["yhat_prophet_lower"] = row.get("yhat_lower")
+            series_map[ds]["yhat_prophet_upper"] = row.get("yhat_upper")
+        elif m == "arima":
+            series_map[ds]["yhat_arima"] = row.get("yhat")
+            series_map[ds]["yhat_arima_lower"] = row.get("yhat_lower")
+            series_map[ds]["yhat_arima_upper"] = row.get("yhat_upper")
+        if series_map[ds].get("cases") is not None:
+            series_map[ds]["is_future"] = False
+
+    series = sorted(series_map.values(), key=lambda x: str(x["date"]))
+    return {"run_id": rid, "series": series}
+
+
 
 # ================================================================
 # 🟩 4. LATEST forecast per barangay — WITH RISK
@@ -325,11 +410,15 @@ def get_forecast_summary(
     run_id: Optional[str] = Query(None),
     model_name: Optional[str] = Query(None),
     period: str = Query("1w"),
+    data_mode: str = Query("forecast"),
 ):
     sb = get_supabase()
     rid = resolve_run_id(sb, run_id)
     model = resolve_model_name(sb, rid, model_name)
     weeks_to_sum = PERIOD_WEEKS.get(period, 1)
+    mode = str(data_mode or "forecast").strip().lower()
+    if mode not in {"forecast", "observed"}:
+        mode = "forecast"
 
     city_rows = (
         sb.table("city_weekly_runs")
@@ -362,7 +451,6 @@ def get_forecast_summary(
     pop_map = _load_population_map(sb)
 
     # Pull *future forecasts* for next N weeks for each barangay (period-aware)
-    # NOTE: this avoids relying on "latest_barangay_forecast" which is 1-week only.
     frows = (
         sb.table("barangay_forecasts_long")
         .select("name, week_start, yhat, yhat_lower, yhat_upper")
@@ -380,17 +468,39 @@ def get_forecast_summary(
         nm = normalize_name(r["name"])
         grouped.setdefault(nm, []).append(r)
 
+    all_model_rows = (
+        sb.table("barangay_forecasts_long")
+        .select("name, model_name, week_start, yhat")
+        .eq("run_id", rid)
+        .in_("model_name", ["prophet", "arima"])
+        .eq("horizon_type", "future")
+        .order("name")
+        .order("model_name")
+        .order("week_start")
+        .execute()
+        .data
+    ) or []
+    grouped_by_model: Dict[str, Dict[str, List[dict]]] = {"prophet": {}, "arima": {}}
+    for r in all_model_rows:
+        nm = normalize_name(r["name"])
+        mm = str(r.get("model_name") or "").strip().lower()
+        if mm not in grouped_by_model:
+            continue
+        grouped_by_model[mm].setdefault(nm, []).append(r)
+
     barangay_latest = []
     total = 0.0
 
     rows_tmp = []      # store per-barangay computed values for a second pass
-    case_values = []   # for Jenks on forecast_cases over period
-    inc_values = []    # for Jenks on incidence per 100k over period
+    case_values = []   # for Jenks on displayed cases over period
+    inc_values = []    # for Jenks on displayed incidence per 100k over period
 
     for nm, rows in grouped.items():
         slice_rows = rows[:weeks_to_sum]
 
         total_fc = sum(float(x.get("yhat") or 0.0) for x in slice_rows)
+        observed_total = sum(float(x) for x in history.get(nm, [])[-weeks_to_sum:]) if history.get(nm) else 0.0
+        display_total = observed_total if mode == "observed" else total_fc
         total += total_fc
 
         week_start = slice_rows[0]["week_start"] if slice_rows else None
@@ -398,7 +508,10 @@ def get_forecast_summary(
         pop = pop_map.get(nm)
         inc = None
         if pop and pop > 0:
-            inc = (float(total_fc) / float(pop)) * 100000.0
+            inc = (float(display_total) / float(pop)) * 100000.0
+        observed_inc = (float(observed_total) / float(pop)) * 100000.0 if pop and pop > 0 else None
+        prophet_fc = sum(float(x.get("yhat") or 0.0) for x in grouped_by_model["prophet"].get(nm, [])[:weeks_to_sum])
+        arima_fc = sum(float(x.get("yhat") or 0.0) for x in grouped_by_model["arima"].get(nm, [])[:weeks_to_sum])
 
         # bounds (optional)
         yhat_lower = (
@@ -414,9 +527,9 @@ def get_forecast_summary(
 
         history_len = len(history.get(nm, []))
 
-        rows_tmp.append((nm, week_start, total_fc, inc, pop, history_len, yhat_lower, yhat_upper))
+        rows_tmp.append((nm, week_start, total_fc, display_total, observed_total, inc, observed_inc, prophet_fc, arima_fc, pop, history_len, yhat_lower, yhat_upper))
 
-        case_values.append(float(total_fc))
+        case_values.append(float(display_total))
         if inc is not None:
             inc_values.append(float(inc))
 
@@ -425,8 +538,8 @@ def get_forecast_summary(
     inc_breaks = jenks_breaks_safe(inc_values, n_classes=5)
 
     # ✅ second pass: assign classes + build response rows
-    for (nm, week_start, total_fc, inc, pop, history_len, yhat_lower, yhat_upper) in rows_tmp:
-        cases_class = jenks_class(float(total_fc), case_breaks) if total_fc is not None else "unknown"
+    for (nm, week_start, total_fc, display_total, observed_total, inc, observed_inc, prophet_fc, arima_fc, pop, history_len, yhat_lower, yhat_upper) in rows_tmp:
+        cases_class = jenks_class(float(display_total), case_breaks) if display_total is not None else "unknown"
         burden_class = jenks_class(float(inc), inc_breaks) if inc is not None else "unknown"
 
         barangay_latest.append( 
@@ -438,9 +551,13 @@ def get_forecast_summary(
                 "weeks_to_sum": weeks_to_sum,
                 "history_len": history_len,
 
-                "forecast": float(total_fc),
-                "forecast_cases": float(total_fc),
+                "forecast": float(display_total),
+                "forecast_cases": float(display_total),
                 "forecast_incidence_per_100k": inc,
+                "observed_cases_w": float(observed_total),
+                "observed_incidence_w": observed_inc,
+                "prophet_forecast_w": float(prophet_fc),
+                "arima_forecast_w": float(arima_fc),
 
                 # ✅ Jenks classes
                 "cases_class": cases_class,
@@ -460,6 +577,7 @@ def get_forecast_summary(
         "model_name": model,
         "horizon_type": "future",
         "disagg_scheme": resolve_disagg_scheme_for_run(sb, rid),
+        "data_mode": mode,
         "period": period,
         "weeks_to_sum": weeks_to_sum,
         "city_latest": city_rows[0] if city_rows else None,

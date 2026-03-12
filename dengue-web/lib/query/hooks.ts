@@ -1,38 +1,42 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getSummary, getChoropleth, getTimeseries, getForecastRankings } from "@/lib/api";
+import { getSummary, getChoropleth, getTimeseries, getForecastRankings, getCityCompareSeries } from "@/lib/api";
 
-import type { Frequency, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
+import type { DataMode, Frequency, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
 import type { ChoroplethFC, SummaryResponse, RankingResponse } from "@/lib/api";
 
 export function useSummary(
   runId?: string | null,
   modelName?: string | null,
-  period?: TimePeriod | null
+  period?: TimePeriod | null,
+  dataMode?: DataMode | null
 ) {
   return useQuery<SummaryResponse>({
-    queryKey: ["summary", runId ?? null, modelName ?? null, period ?? null],
+    queryKey: ["summary", runId ?? null, modelName ?? null, period ?? null, dataMode ?? null],
     queryFn: () =>
       getSummary({
         runId: runId ?? undefined,
         modelName: modelName ?? undefined,
         period: period ?? undefined,
+        dataMode: dataMode ?? undefined,
       }),
   });
 }
 export function useChoropleth(
   runId?: string | null,
   modelName?: string | null,
-  period?: TimePeriod | null
+  period?: TimePeriod | null,
+  dataMode?: DataMode | null
 ) {
   return useQuery<ChoroplethFC>({
-    queryKey: ["choropleth", runId ?? null, modelName ?? null, period ?? null],
+    queryKey: ["choropleth", runId ?? null, modelName ?? null, period ?? null, dataMode ?? null],
     queryFn: () =>
       getChoropleth({
         runId: runId ?? undefined,
         modelName: modelName ?? undefined,
         period: period ?? undefined,
+        dataMode: dataMode ?? undefined,
       }),
   });
 }
@@ -41,19 +45,20 @@ export function useRankings(
   period: string,
   runId?: string | null,
   modelName?: string | null,
-  rankingBasis?: RiskMetric | null
+  rankingBasis?: RiskMetric | null,
+  dataMode?: DataMode | null
 ) {
   return useQuery<RankingResponse>({
-    queryKey: ["rankings", period, runId ?? null, modelName ?? null, rankingBasis ?? null],
+    queryKey: ["rankings", period, runId ?? null, modelName ?? null, rankingBasis ?? null, dataMode ?? null],
     queryFn: () =>
       getForecastRankings(period, {
         runId: runId ?? undefined,
         modelName: modelName ?? undefined,
         rankingBasis: rankingBasis ?? undefined,
+        dataMode: dataMode ?? undefined,
       }),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
-    placeholderData: (prev) => prev,
     refetchOnWindowFocus: false,
   });
 }
@@ -88,6 +93,17 @@ export function useCitySeries(freq: Frequency, runId: string | null, modelName: 
         runId: runId ?? undefined,
         modelName,
         horizonType,
+      }),
+  });
+}
+
+export function useCityCompareSeries(runId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["timeseries", "city", "compare", runId ?? null],
+    enabled,
+    queryFn: () =>
+      getCityCompareSeries({
+        runId: runId ?? undefined,
       }),
   });
 }

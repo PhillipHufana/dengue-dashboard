@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Activity, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBarangaySeries, useCitySeries } from "@/lib/query/hooks";
+import { useBarangaySeries, useCityCompareSeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -24,36 +24,72 @@ interface ForecastChartProps {
   selectedBarangay: { pretty: string; clean: string } | null;
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: Record<string, number | string | boolean | null | undefined> }>;
+  label?: string;
+}) {
   if (!active || !payload || !payload.length) return null;
+  const row = (payload[0]?.payload ?? {}) as Record<string, number | string | boolean | null | undefined>;
 
-  const p = payload[0].payload;
+  const isCityCompare = row.yhat_prophet !== undefined || row.yhat_arima !== undefined;
 
   return (
     <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
       <p className="font-semibold mb-1 border-b pb-1">{label}</p>
 
-      {p.cases != null && (
+      {row.cases != null && (
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground flex items-center gap-1">
             <Activity className="h-3 w-3 text-emerald-500" /> Actual
           </span>
-          <span className="font-medium text-emerald-500">{p.cases}</span>
+          <span className="font-medium text-emerald-500">{Number(row.cases).toFixed(2)}</span>
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-muted-foreground flex items-center gap-1">
-          <TrendingUp className="h-3 w-3 text-blue-400" /> Forecast
-        </span>
-        {p.forecast != null ? p.forecast.toFixed(2) : "—"}
-      </div>
-
-      {p.is_future && (
-        <p className="mt-1 text-[10px] text-muted-foreground italic border-t pt-1">
-          Forecast period
-        </p>
+      {isCityCompare ? (
+        <>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-blue-500" /> Prophet
+            </span>
+            <span>{row.yhat_prophet != null ? Number(row.yhat_prophet).toFixed(2) : "—"}</span>
+          </div>
+          {row.yhat_prophet_lower != null || row.yhat_prophet_upper != null ? (
+            <div className="text-[10px] text-muted-foreground">
+              CI: {row.yhat_prophet_lower != null ? Number(row.yhat_prophet_lower).toFixed(2) : "—"} to{" "}
+              {row.yhat_prophet_upper != null ? Number(row.yhat_prophet_upper).toFixed(2) : "—"}
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-violet-400" /> ARIMA
+            </span>
+            <span>{row.yhat_arima != null ? Number(row.yhat_arima).toFixed(2) : "—"}</span>
+          </div>
+          {row.yhat_arima_lower != null || row.yhat_arima_upper != null ? (
+            <div className="text-[10px] text-muted-foreground">
+              CI: {row.yhat_arima_lower != null ? Number(row.yhat_arima_lower).toFixed(2) : "—"} to{" "}
+              {row.yhat_arima_upper != null ? Number(row.yhat_arima_upper).toFixed(2) : "—"}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-muted-foreground flex items-center gap-1">
+            <TrendingUp className="h-3 w-3 text-blue-400" /> Forecast
+          </span>
+          <span>{row.forecast != null ? Number(row.forecast).toFixed(2) : "—"}</span>
+        </div>
       )}
+
+      {row.is_future ? (
+        <p className="mt-1 text-[10px] text-muted-foreground italic border-t pt-1">Forecast period</p>
+      ) : null}
     </div>
   );
 }
@@ -63,31 +99,31 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const modelName = useDashboardStore((s) => s.modelName);
   const horizonType = useDashboardStore((s) => s.horizonType);
   const freq = useDashboardStore((s) => s.freq);
+  const riskMetric = useDashboardStore((s) => s.riskMetric);
   const brgyName = selectedBarangay?.clean ?? null;
   const [view, setView] = useState<"focused" | "full">("focused");
-  const q = brgyName
-    ? useBarangaySeries(brgyName, freq, runId, modelName, horizonType)
-    : useCitySeries(freq, runId, modelName, horizonType);
 
-  const { data, isLoading, isError } = q;
-  const series = data?.series ?? [];
+  const barangayQuery = useBarangaySeries(brgyName, freq, runId, modelName, horizonType);
+  const cityCompareQuery = useCityCompareSeries(runId, !brgyName);
+
+  const isCityView = !brgyName;
+  const isLoading = isCityView ? cityCompareQuery.isLoading : barangayQuery.isLoading;
+  const isError = isCityView ? cityCompareQuery.isError : barangayQuery.isError;
+  const series = useMemo(() => {
+    if (isCityView) return cityCompareQuery.data?.series ?? [];
+    return barangayQuery.data?.series ?? [];
+  }, [isCityView, cityCompareQuery.data?.series, barangayQuery.data?.series]);
+
   const displaySeries = useMemo(() => {
     if (view === "full") return series;
-
     const historyCount = freq === "weekly" ? 16 : freq === "monthly" ? 12 : 10;
-
-    const idx = series.findIndex((d: any) => d.is_future);
-
-    // If no future flag found, just show recent history window
+    const idx = series.findIndex((d: { is_future?: boolean }) => !!d.is_future);
     if (idx < 0) return series.slice(-historyCount);
-
-    // Show last N historical points + all remaining points (including future)
     const start = Math.max(0, idx - historyCount);
     return series.slice(start);
   }, [series, view, freq]);
-  const locationName =
-    selectedBarangay?.pretty ?? "City-Wide";
 
+  const locationName = selectedBarangay?.pretty ?? "City-Wide";
   const isBarangay = selectedBarangay !== null;
 
   const freqLabel = {
@@ -96,12 +132,16 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
     yearly: "Yearly",
   }[freq];
 
-  const forecastStartIndex = series.findIndex(
-    (d: { is_future: boolean }) => d.is_future
-  );
+  const forecastStartIndex = series.findIndex((d: { is_future?: boolean }) => !!d.is_future);
+  const forecastStartDate = forecastStartIndex > -1 ? (series[forecastStartIndex] as { date?: string }).date ?? null : null;
 
-  const forecastStartDate =
-    forecastStartIndex > -1 ? series[forecastStartIndex].date : null;
+  const modeSubtitle = isCityView
+    ? "Historical + Prophet + ARIMA (city-level)"
+    : riskMetric === "cases"
+    ? "Forecast Cases (Next W)"
+    : riskMetric === "incidence"
+    ? "Forecast Incidence (Next W)"
+    : "Forecast Surge (Next W vs Past 8W baseline)";
 
   if (isLoading) {
     return (
@@ -109,40 +149,22 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
         <CardHeader className="p-4 pb-2">
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center">
-              {/* Title + badge skeleton */}
               <div className="flex items-center gap-2">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-4 w-12 rounded-full" />
               </div>
-
-              {/* Location pill skeleton */}
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border">
                 <Skeleton className="h-3 w-3 rounded-full" />
                 <Skeleton className="h-3 w-32" />
               </div>
             </div>
-
-            {/* Subtitle skeleton */}
             <Skeleton className="h-3 w-40" />
           </div>
         </CardHeader>
 
         <CardContent className="p-4 pt-0">
-          {/* Chart area skeleton */}
-          <div className="h-60 w-full ">
+          <div className="h-60 w-full">
             <Skeleton className="w-full h-full" />
-          </div>
-
-          {/* Legend skeleton */}
-          <div className="mt-3 flex justify-center gap-4 text-[10px]">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-0.5 w-5" />
-              <Skeleton className="h-3 w-10" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-0.5 w-5" />
-              <Skeleton className="h-3 w-10" />
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -150,7 +172,6 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   }
 
   if (isError) return <div className="p-4 text-red-500">Failed to load timeseries.</div>;
-
 
   return (
     <Card className="bg-card border-border">
@@ -161,25 +182,15 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
               {freqLabel}
             </Badge>
             <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-secondary/50 border max-w-[62%]">
-              <MapPin
-                className={`h-3 w-3 ${
-                  isBarangay ? "text-primary" : "text-muted-foreground"
-                }`}
-              />
-              <span
-                className={`text-xs font-medium ${
-                  isBarangay ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
+              <MapPin className={`h-3 w-3 ${isBarangay ? "text-primary" : "text-muted-foreground"}`} />
+              <span className={`text-xs font-medium ${isBarangay ? "text-primary" : "text-muted-foreground"}`}>
                 {locationName}
               </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-            <CardTitle className="text-base font-semibold">
-              Predictive Forecast
-            </CardTitle>
+            <CardTitle className="text-base font-semibold">Predictive Forecast</CardTitle>
 
             <ButtonGroup className="w-fit">
               <Button
@@ -201,11 +212,10 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
             </ButtonGroup>
           </div>
 
-          {!isBarangay && (
-            <p className="text-[10px] text-muted-foreground">
-              Tap a barangay on the map to view its forecast
-            </p>
-          )}
+          {!isBarangay ? (
+            <p className="text-[10px] text-muted-foreground">City chart overlays both models for direct comparison</p>
+          ) : null}
+          <p className="text-[10px] text-muted-foreground">{modeSubtitle}</p>
         </div>
       </CardHeader>
 
@@ -214,76 +224,63 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displaySeries} margin={{ top: 10, left: -15, right: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "#888", fontSize: 9 }}
-                axisLine={{ stroke: "#333" }}
-                tickLine={false}
-                interval={19}
-              />
-
-              <YAxis
-                tick={{ fill: "#888", fontSize: 9 }}
-                axisLine={{ stroke: "#333" }}
-                tickLine={false}
-                width={35}
-              />
-
+              <XAxis dataKey="date" tick={{ fill: "#888", fontSize: 9 }} axisLine={{ stroke: "#333" }} tickLine={false} interval={19} />
+              <YAxis tick={{ fill: "#888", fontSize: 9 }} axisLine={{ stroke: "#333" }} tickLine={false} width={35} />
               <Tooltip content={<CustomTooltip />} />
 
-              {forecastStartDate && (
+              {forecastStartDate ? (
                 <ReferenceLine
                   x={forecastStartDate}
                   stroke="#666"
                   strokeDasharray="5 5"
-                  label={{
-                    value: "Forecast",
-                    position: "top",
-                    fill: "#999",
-                    fontSize: 10,
-                  }}
+                  label={{ value: "Forecast", position: "top", fill: "#999", fontSize: 10 }}
                 />
+              ) : null}
+
+              <Line type="monotone" dataKey="cases" stroke="#10b981" strokeWidth={2} dot={false} name="Actual Cases" connectNulls={false} />
+
+              {isCityView ? (
+                <>
+                  <Line type="monotone" dataKey="yhat_prophet" stroke="#3b82f6" strokeWidth={2} dot={false} name="Prophet" connectNulls />
+                  <Line type="monotone" dataKey="yhat_prophet_lower" stroke="#93c5fd" strokeWidth={1} dot={false} strokeDasharray="3 3" name="Prophet CI Lower" connectNulls />
+                  <Line type="monotone" dataKey="yhat_prophet_upper" stroke="#93c5fd" strokeWidth={1} dot={false} strokeDasharray="3 3" name="Prophet CI Upper" connectNulls />
+                  <Line type="monotone" dataKey="yhat_arima" stroke="#a78bfa" strokeWidth={2} dot={false} strokeDasharray="4 3" name="ARIMA" connectNulls />
+                  <Line type="monotone" dataKey="yhat_arima_lower" stroke="#c4b5fd" strokeWidth={1} dot={false} strokeDasharray="2 2" name="ARIMA CI Lower" connectNulls />
+                  <Line type="monotone" dataKey="yhat_arima_upper" stroke="#c4b5fd" strokeWidth={1} dot={false} strokeDasharray="2 2" name="ARIMA CI Upper" connectNulls />
+                </>
+              ) : (
+                <Line type="monotone" dataKey="forecast" stroke="#60a5fa" strokeWidth={2} strokeDasharray="4 4" dot={false} name="Forecast" connectNulls />
               )}
-
-              {/* Actual */}
-              <Line
-                type="monotone"
-                dataKey="cases"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={false}
-                name="Actual Cases"
-                connectNulls={false}
-              />
-
-              {/* Forecast */}
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                stroke="#60a5fa"
-                strokeWidth={2}
-                strokeDasharray="4 4"
-                dot={false}
-                name="Forecast"
-              />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Legend */}
-        <div className="mt-3 flex justify-center gap-4 text-[10px]">
+        <div className="mt-3 flex flex-wrap justify-center gap-4 text-[10px]">
           <div className="flex items-center gap-2">
             <div className="h-0.5 w-5 bg-emerald-500" />
             <span className="text-muted-foreground">Actual</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-0.5 w-5 bg-blue-400"
-              style={{ borderBottom: "1px dashed #60a5fa" }}
-            />
-            <span className="text-muted-foreground">Forecast</span>
-          </div>
+          {isCityView ? (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="h-0.5 w-5 bg-blue-500" />
+                <span className="text-muted-foreground">Prophet</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-0.5 w-5 bg-blue-300" />
+                <span className="text-muted-foreground">Prophet CI</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-0.5 w-5 bg-violet-400" style={{ borderBottom: "1px dashed #a78bfa" }} />
+                <span className="text-muted-foreground">ARIMA</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 w-5 bg-blue-400" style={{ borderBottom: "1px dashed #60a5fa" }} />
+              <span className="text-muted-foreground">Forecast</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
