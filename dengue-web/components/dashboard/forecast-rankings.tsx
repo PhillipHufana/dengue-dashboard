@@ -11,6 +11,8 @@ import type { RankingRow } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { TrendingUp, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { useActionPriority, useRankings } from "@/lib/query/hooks";
+import { usePathname } from "next/navigation";
+import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
 
 interface ForecastRankingsProps {
   selectedBarangay: { pretty: string; clean: string } | null;
@@ -32,6 +34,8 @@ export const ForecastRankings = React.memo(function ForecastRankings({
 
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
+  const pathname = usePathname();
+  const isAdminView = pathname?.startsWith("/admin") ?? false;
 
   const useAction = riskMetric === "action_priority";
   const effectiveMetric =
@@ -43,17 +47,17 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const rankingTitle =
     useAction
       ? dataMode === "observed"
-        ? "Action Priority - Respond Now (past W weeks)"
-        : "Action Priority - Prepare Next (next W weeks)"
+        ? "Recommended Queue - Respond Now (past W weeks)"
+        : "Recommended Queue - Prepare Next (next W weeks)"
       : dataMode === "observed"
       ? riskMetric === "cases"
-        ? "Highest observed burden (past W weeks)"
-        : "Highest observed per-capita risk (past W weeks)"
+        ? "Highest reported cases (past W weeks)"
+        : "Highest risk rate (past W weeks)"
       : riskMetric === "cases"
-      ? "Highest expected burden (next W weeks)"
+      ? "Highest expected cases (next W weeks)"
       : riskMetric === "incidence"
-      ? "Highest expected per-capita risk (next W weeks)"
-      : "Early warning: largest expected increase";
+      ? "Highest expected risk rate (next W weeks)"
+      : "Early warning: fastest expected rise";
   const barangays: RankingRow[] = useMemo(() => {
     const baseRows = useAction ? (actionQuery.data?.rows ?? []) : (data?.rankings ?? []);
     const list = baseRows.slice();
@@ -169,11 +173,11 @@ export const ForecastRankings = React.memo(function ForecastRankings({
           {lastUpdated && data ? (
             <div className="text-[10px] text-muted-foreground leading-tight">
               <p>
-                Mode: {dataMode === "observed" ? "Observed (Past W weeks)" : "Forecast (Next W weeks)"}
+                Mode: {dataMode === "observed" ? "Respond Now (Past W weeks)" : "Prepare Next (Next W weeks)"}
               </p>
-              <p>Model date (latest real data): {data.model_current_date}</p>
-              <p>Your current date: {data.user_current_date}</p>
-              <p className="italic opacity-80">Forecast horizons are relative to the model date.</p>
+              <p>Data updated through: {data.model_current_date}</p>
+              <p>Today: {data.user_current_date}</p>
+              <p className="italic opacity-80">Forecast dates are counted from the latest available data.</p>
             </div>
           ) : null}
 
@@ -260,19 +264,21 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                   <div className="text-right">
                     <p className="font-bold text-sm">
                       {effectiveMetric === "surge"
-                        ? value.toFixed(2)
+                        ? formatSurgeX(value)
                         : effectiveMetric === "cases"
-                        ? value.toLocaleString()
-                        : value.toFixed(2)}
+                        ? formatCases(value)
+                        : formatRate(value)}
                     </p>
                     {effectiveMetric === "surge" ? (
                       <div className="text-[10px] text-muted-foreground">
-                        fW {Number(b.forecast_w_cases ?? 0).toFixed(2)} | baseW {Number(b.baseline_expected_w ?? 0).toFixed(2)}
+                        Next W: {formatCases(b.forecast_w_cases ?? 0)} | Baseline W: {formatCases(b.baseline_expected_w ?? 0)}
                       </div>
                     ) : null}
-                    <div className="text-[10px] text-muted-foreground">
-                      Obs {Number(b.observed_cases_w ?? 0).toFixed(2)} | P {Number(b.prophet_forecast_w ?? 0).toFixed(2)} | A {Number(b.arima_forecast_w ?? 0).toFixed(2)}
-                    </div>
+                    {isAdminView ? (
+                      <div className="text-[10px] text-muted-foreground">
+                        Obs {formatCases(b.observed_cases_w ?? 0)} | P {formatCases(b.prophet_forecast_w ?? 0)} | A {formatCases(b.arima_forecast_w ?? 0)}
+                      </div>
+                    ) : null}
                     <div
                       title={b.trend_message}
                       className={`flex items-center justify-end gap-1 text-[10px] ${

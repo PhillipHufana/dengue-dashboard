@@ -6,6 +6,8 @@ import { Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
 import { useChoropleth, useCityCompareSeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import type { ChoroplethFC } from "@/lib/api";
+import { usePathname } from "next/navigation";
+import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
 
 const PERIOD_WEEKS: Record<string, number> = {
   "1w": 1,
@@ -19,6 +21,8 @@ const PERIOD_WEEKS: Record<string, number> = {
 type MetricClass = "cases_class" | "burden_class" | "surge_class";
 
 export function KpiCards() {
+  const pathname = usePathname();
+  const isAdminView = pathname?.startsWith("/admin") ?? false;
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
   const period = useDashboardStore((s) => s.period);
@@ -117,15 +121,15 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {cityForecastCases != null ? Number(cityForecastCases).toLocaleString() : "-"}
+              {cityForecastCases != null ? formatCases(cityForecastCases) : "-"}
             </p>
             {dataMode === "observed" ? (
-              <p className="text-xs text-muted-foreground">City observed cases (past {period.toUpperCase()})</p>
+              <p className="text-xs text-muted-foreground">Reported city cases (past {period.toUpperCase()})</p>
             ) : (
               <div className="text-xs text-muted-foreground">
-                <p>City forecast cases (next {period.toUpperCase()})</p>
-                {compareCityTotals ? (
-                  <p>P {compareCityTotals.prophet.toFixed(1)} | A {compareCityTotals.arima.toFixed(1)}</p>
+                <p>Expected city cases (next {period.toUpperCase()})</p>
+                {isAdminView && compareCityTotals ? (
+                  <p>P {formatCases(compareCityTotals.prophet)} | A {formatCases(compareCityTotals.arima)}</p>
                 ) : null}
               </div>
             )}
@@ -145,18 +149,18 @@ export function KpiCards() {
             <p className="text-xl font-bold">
               {effectiveMetric === "surge"
                 ? citySurgeRatio != null
-                  ? Number(citySurgeRatio).toFixed(2)
+                  ? formatSurgeX(citySurgeRatio)
                   : "-"
                 : cityIncidence != null
-                ? Number(cityIncidence).toFixed(2)
+                ? formatRate(cityIncidence)
                 : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
               {effectiveMetric === "surge"
-                ? `City surge ratio (${period.toUpperCase()} vs past 8W)`
+                ? `City risk change (${period.toUpperCase()} vs baseline)`
                 : dataMode === "observed"
-                ? "City observed incidence (/100k)"
-                : "City forecast incidence (/100k)"}
+                ? "City risk rate (/100k)"
+                : "Expected city risk rate (/100k)"}
             </p>
           </div>
         </CardContent>
@@ -173,7 +177,7 @@ export function KpiCards() {
           <div className="mt-4">
             <p className="text-xl font-bold">{veryHighCount}</p>
             <p className="text-xs text-muted-foreground">
-              Barangays (Very High {effectiveMetric === "cases" ? "cases" : effectiveMetric === "incidence" ? "burden" : "surge"})
+              Barangays (Very High {effectiveMetric === "cases" ? "cases" : effectiveMetric === "incidence" ? "risk rate" : "risk change"})
             </p>
           </div>
         </CardContent>
@@ -191,8 +195,10 @@ export function KpiCards() {
             <p className="text-xl font-bold">
               {hotspot
                 ? effectiveMetric === "cases"
-                  ? hotspot.value.toLocaleString()
-                  : hotspot.value.toFixed(2)
+                  ? formatCases(hotspot.value)
+                  : effectiveMetric === "surge"
+                  ? formatSurgeX(hotspot.value)
+                  : formatRate(hotspot.value)
                 : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -202,7 +208,7 @@ export function KpiCards() {
                   ? "(cases)"
                   : effectiveMetric === "incidence"
                   ? "(/100k)"
-                  : "(surge ratio)"
+                  : "(change)"
                 : ""}
             </p>
           </div>

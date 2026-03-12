@@ -21,9 +21,9 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
             ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none"
             : "h-9 px-4 text-sm font-medium rounded-r-none"
         }
-        title={dataMode === "observed" ? "Recommended queue: Respond Now." : "Recommended queue: Prepare Next."}
+        title={dataMode === "observed" ? "Recommended queue for Respond Now." : "Recommended queue for Prepare Next."}
       >
-        {compact ? "Action" : "Action"}
+        {compact ? "Recommended" : "Recommended"}
       </Button>
       <Button
         size={compact ? "sm" : "default"}
@@ -47,9 +47,9 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
             ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
             : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
         }
-        title={dataMode === "observed" ? "Observed incidence per 100k (Past W)." : "Forecast incidence per 100k (Next W)."}
+        title={dataMode === "observed" ? "Risk rate based on recent reported cases." : "Risk rate based on forecasted cases."}
       >
-        {compact ? "Incidence" : "Incidence"}
+        {compact ? "Rate" : "Risk Rate"}
       </Button>
       {showSurge ? (
         <Button
@@ -61,9 +61,9 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
               ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0"
               : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"
           }
-          title="Forecast surge (Next W vs Past 8W baseline)."
+          title="How fast risk may rise compared with recent weeks."
         >
-          {compact ? "Surge" : "Surge"}
+          {compact ? "Change" : "Risk Change"}
         </Button>
       ) : null}
     </ButtonGroup>

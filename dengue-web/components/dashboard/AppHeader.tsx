@@ -229,12 +229,14 @@ export function AppHeader({
         {mode === "public" ? (
           <>
             <div className="hidden md:flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 justify-start">
                 <ModelSelect />
                 <PeriodSelect />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center justify-center">
                 <DataModeToggle />
+              </div>
+              <div className="flex items-center gap-2 justify-end">
                 <RiskMetricToggle />
               </div>
             </div>
@@ -243,7 +245,9 @@ export function AppHeader({
                 <ModelSelect compact />
                 <PeriodSelect compact />
               </div>
-              <DataModeToggle compact />
+              <div className="flex justify-center">
+                <DataModeToggle />
+              </div>
               <RiskMetricToggle compact />
             </div>
           </>

@@ -47,6 +47,8 @@ export function DengueDashboard() {
   const dataMode = useDashboardStore((s) => s.dataMode)
   const riskMetric = useDashboardStore((s) => s.riskMetric)
   const setRiskMetric = useDashboardStore((s) => s.setRiskMetric)
+  const effectiveMetric =
+    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
 
   useEffect(() => {
     let alive = true;
@@ -85,6 +87,28 @@ export function DengueDashboard() {
 
       <main className="p-3 md:p-6">
         <div className="space-y-4 md:space-y-6">
+          <section className="rounded-lg border border-border bg-card p-3 md:p-4">
+            <p className="text-sm md:text-base font-semibold">
+              {dataMode === "observed"
+                ? "Where are reported cases highest right now?"
+                : effectiveMetric === "surge"
+                ? "Where is risk rising fastest versus recent baseline?"
+                : "Where are the most cases expected soon?"}
+            </p>
+            <p className="mt-1 text-xs md:text-sm text-muted-foreground">
+              {dataMode === "observed"
+                ? "Respond Now uses observed data from the past selected period (W weeks)."
+                : effectiveMetric === "surge"
+                ? "Prepare Next uses forecasts. Surge compares next W weeks against recent baseline."
+                : "Prepare Next uses forecast estimates for the next selected period (W weeks)."}
+            </p>
+            {dataMode === "forecast" ? (
+              <p className="mt-1 text-[11px] md:text-xs text-muted-foreground italic">
+                Forecast views are estimates, not confirmed case counts.
+              </p>
+            ) : null}
+          </section>
+
           <KpiCards />
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6 items-stretch">

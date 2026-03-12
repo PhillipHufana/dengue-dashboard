@@ -14,6 +14,7 @@ import "leaflet/dist/leaflet.css";
 import { useChoropleth, useRankings } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import type { ChoroplethFC, RankingRow } from "@/lib/api";
+import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
 
 const getColor = (level: string | null): string => {
   switch (level) {
@@ -32,10 +33,12 @@ const getColor = (level: string | null): string => {
   }
 };
 
-function formatRange(a: number, b: number, unit: string) {
-  const lo = Number.isFinite(a) ? a.toFixed(2) : "-";
-  const hi = Number.isFinite(b) ? b.toFixed(2) : "-";
-  return `${lo}-${hi} ${unit}`;
+function formatRange(a: number, b: number, unit: string, metric: string) {
+  const lo = Number.isFinite(a) ? a : 0;
+  const hi = Number.isFinite(b) ? b : 0;
+  if (metric === "cases") return `${formatCases(lo)}-${formatCases(hi)} ${unit}`;
+  if (metric === "surge") return `${formatRate(lo)}-${formatRate(hi)} ${unit}`;
+  return `${formatRate(lo)}-${formatRate(hi)} ${unit}`;
 }
 
 interface ChoroplethMapProps {
@@ -89,10 +92,10 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
         ? geoMeta?.jenks_breaks_surge
         : geoMeta?.jenks_breaks_cases;
     if (!Array.isArray(b) || b.length < 6) return null;
-    const unit = effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "ratio" : "cases";
+    const unit = effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "x" : "cases";
     const labels = ["Very Low", "Low", "Medium", "High", "Very High"];
     const classes = ["very_low", "low", "medium", "high", "very_high"] as const;
-    return classes.map((cls, i) => ({ cls, label: labels[i], range: formatRange(b[i], b[i + 1], unit) }));
+    return classes.map((cls, i) => ({ cls, label: labels[i], range: formatRange(b[i], b[i + 1], unit, effectiveMetric) }));
   }, [geoMeta, effectiveMetric]);
 
   const stats = useMemo(() => {
@@ -187,17 +190,21 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
         ? Number(row?.total_forecast_incidence_per_100k ?? feature.properties.forecast_incidence_per_100k ?? 0)
         : Number(row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.forecast_cases ?? feature.properties.latest_forecast ?? 0);
     const pop = feature.properties.population ? Number(feature.properties.population).toLocaleString() : "-";
-    const labelValue = effectiveMetric === "cases" ? value.toLocaleString() : value.toFixed(2);
+    const labelValue = effectiveMetric === "cases" ? formatCases(value) : effectiveMetric === "surge" ? formatSurgeX(value) : formatRate(value);
     const mainLabel =
-      effectiveMetric === "surge" ? "Forecast surge ratio" : effectiveMetric === "incidence" ? (dataMode === "observed" ? "Observed /100k" : "Forecast /100k") : (dataMode === "observed" ? "Observed cases" : "Forecast cases");
+      effectiveMetric === "surge"
+        ? "Expected change"
+        : effectiveMetric === "incidence"
+        ? (dataMode === "observed" ? "Observed risk rate (/100k)" : "Expected risk rate (/100k)")
+        : (dataMode === "observed" ? "Reported cases" : "Expected cases");
     const surgeDetail =
       effectiveMetric === "surge"
-        ? `<br/>Baseline expected (${period.toUpperCase()}): <strong>${Number(row?.baseline_expected_w ?? feature.properties.baseline_expected_w ?? 0).toFixed(2)}</strong>`
+        ? `<br/>Compared with recent baseline: <strong>${formatCases(row?.baseline_expected_w ?? feature.properties.baseline_expected_w ?? 0)}</strong>`
         : "";
 
     layer.bindTooltip(
       `<strong>${label}</strong><br/>
-      Mode: <strong>${dataMode === "observed" ? "Observed (Past W)" : "Forecast (Next W)"}</strong><br/>
+      Mode: <strong>${dataMode === "observed" ? "Respond Now (Past W)" : "Prepare Next (Next W)"}</strong><br/>
       Period: <strong>${period.toUpperCase()}</strong><br/>
       Population: <strong>${pop}</strong><br/>
       Class: <strong>${level}</strong><br/>
@@ -213,7 +220,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
   };
 
   return (
-    <Card className="bg-card border-border h-full xl:h-[780px] flex flex-col">
+    <Card className="bg-card border-border flex flex-col xl:h-[780px]">
       <CardHeader className="p-3 md:p-6">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -226,13 +233,13 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
             <Badge variant="secondary" className="text-xs">
               {dataMode === "observed"
                 ? effectiveMetric === "cases"
-                  ? "Observed Cases (Past W)"
-                  : "Observed Incidence (Past W)"
+                  ? "Respond Now - Cases (Past W)"
+                  : "Respond Now - Risk Rate (Past W)"
                 : effectiveMetric === "cases"
-                ? "Forecast Cases (Next W)"
+                ? "Prepare Next - Cases (Next W)"
                 : effectiveMetric === "incidence"
-                ? "Forecast Incidence (Next W)"
-                : "Forecast Surge (Next W vs Past 8W)"}
+                ? "Prepare Next - Risk Rate (Next W)"
+                : "Prepare Next - Risk Change (Next W vs Baseline)"}
             </Badge>
           </div>
           {selectedBarangay ? (
@@ -247,7 +254,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
           {!loadingGeo ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {[
-                { label: "Total", value: effectiveMetric === "cases" ? stats.total.toLocaleString() : stats.total.toFixed(2) },
+                { label: "Total", value: effectiveMetric === "cases" ? formatCases(stats.total) : effectiveMetric === "surge" ? formatSurgeX(stats.total) : formatRate(stats.total) },
                 { label: "Very High", value: stats.very_high, color: "text-red-500" },
                 { label: "High", value: stats.high, color: "text-orange-500" },
                 { label: "Medium", value: stats.medium, color: "text-yellow-500" },
@@ -265,7 +272,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
       </CardHeader>
 
       <CardContent className="p-3 md:p-6 space-y-3 flex-1 min-h-0">
-        <div className="relative h-full w-full rounded-lg border overflow-hidden">
+        <div className="relative h-[320px] md:h-[450px] xl:h-full w-full rounded-lg border overflow-hidden">
           {loadingGeo ? (
             <div className="flex items-center justify-center h-full">Loading map...</div>
           ) : geo ? (
@@ -288,13 +295,20 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
               {nameToLabel.get(stats.hottestName ?? "") ?? stats.hottestName ?? "-"}
             </div>
             <div className="text-xs text-red-500/70">
-              {stats.hottestValue > -Infinity ? stats.hottestValue.toFixed(2) : "-"} {effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "ratio" : "cases"}
+              {stats.hottestValue > -Infinity
+                ? effectiveMetric === "cases"
+                  ? formatCases(stats.hottestValue)
+                  : effectiveMetric === "surge"
+                  ? formatSurgeX(stats.hottestValue)
+                  : formatRate(stats.hottestValue)
+                : "-"}{" "}
+              {effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "baseline" : "cases"}
             </div>
           </div>
 
           <div className="absolute bottom-2 left-2 max-w-[56vw] md:max-w-[360px] bg-background/95 border p-1.5 md:p-3 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[9px] md:text-xs font-medium mb-1 md:mb-2 text-muted-foreground">
-              {effectiveMetric === "incidence" ? "Incidence classes" : effectiveMetric === "surge" ? "Surge classes" : "Cases classes"}
+              {effectiveMetric === "incidence" ? "Risk rate levels" : effectiveMetric === "surge" ? "Risk change levels" : "Case levels"}
             </div>
             {legend ? (
               <div className="space-y-0.5 md:space-y-1">

@@ -66,7 +66,7 @@ export const useDashboardStore = create<DashboardState>()(
 
       riskMetric: "action_priority",
       setRiskMetric: (v) => set({ riskMetric: v }),
-      dataMode: "forecast",
+      dataMode: "observed",
       setDataMode: (v) => set({ dataMode: v }),
 
       rangeStart: 0,

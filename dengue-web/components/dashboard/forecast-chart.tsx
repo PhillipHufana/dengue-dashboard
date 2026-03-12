@@ -9,6 +9,7 @@ import { useBarangaySeries, useCityCompareSeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { formatCaseRange, formatCases } from "@/lib/number-format";
 import {
   LineChart,
   Line,
@@ -47,7 +48,7 @@ function CustomTooltip({
           <span className="text-muted-foreground flex items-center gap-1">
             <Activity className="h-3 w-3 text-emerald-500" /> Actual
           </span>
-          <span className="font-medium text-emerald-500">{Number(row.cases).toFixed(2)}</span>
+          <span className="font-medium text-emerald-500">{formatCases(row.cases)}</span>
         </div>
       )}
 
@@ -57,24 +58,22 @@ function CustomTooltip({
             <span className="text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-blue-500" /> Prophet
             </span>
-            <span>{row.yhat_prophet != null ? Number(row.yhat_prophet).toFixed(2) : "—"}</span>
+            <span>{row.yhat_prophet != null ? formatCases(row.yhat_prophet) : "-"}</span>
           </div>
           {row.yhat_prophet_lower != null || row.yhat_prophet_upper != null ? (
             <div className="text-[10px] text-muted-foreground">
-              CI: {row.yhat_prophet_lower != null ? Number(row.yhat_prophet_lower).toFixed(2) : "—"} to{" "}
-              {row.yhat_prophet_upper != null ? Number(row.yhat_prophet_upper).toFixed(2) : "—"}
+              Range: {formatCaseRange(row.yhat_prophet_lower, row.yhat_prophet_upper)}
             </div>
           ) : null}
           <div className="flex items-center justify-between mt-1">
             <span className="text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-violet-400" /> ARIMA
             </span>
-            <span>{row.yhat_arima != null ? Number(row.yhat_arima).toFixed(2) : "—"}</span>
+            <span>{row.yhat_arima != null ? formatCases(row.yhat_arima) : "-"}</span>
           </div>
           {row.yhat_arima_lower != null || row.yhat_arima_upper != null ? (
             <div className="text-[10px] text-muted-foreground">
-              CI: {row.yhat_arima_lower != null ? Number(row.yhat_arima_lower).toFixed(2) : "—"} to{" "}
-              {row.yhat_arima_upper != null ? Number(row.yhat_arima_upper).toFixed(2) : "—"}
+              Range: {formatCaseRange(row.yhat_arima_lower, row.yhat_arima_upper)}
             </div>
           ) : null}
         </>
@@ -83,7 +82,7 @@ function CustomTooltip({
           <span className="text-muted-foreground flex items-center gap-1">
             <TrendingUp className="h-3 w-3 text-blue-400" /> Forecast
           </span>
-          <span>{row.forecast != null ? Number(row.forecast).toFixed(2) : "—"}</span>
+          <span>{row.forecast != null ? formatCases(row.forecast) : "-"}</span>
         </div>
       )}
 
@@ -137,16 +136,16 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const forecastStartDate = forecastStartIndex > -1 ? (series[forecastStartIndex] as { date?: string }).date ?? null : null;
 
   const modeSubtitle = isCityView
-    ? "Historical + Prophet + ARIMA (city-level)"
+    ? "Past trend plus model estimates (city-wide)"
     : riskMetric === "action_priority"
     ? dataMode === "observed"
-      ? "Action Priority - Respond Now (past W)"
-      : "Action Priority - Prepare Next (next W vs past 8W baseline)"
+      ? "Recommended view for immediate response (past W)"
+      : "Recommended view for planning ahead (next W vs baseline)"
     : riskMetric === "cases"
-    ? "Forecast Cases (Next W)"
+    ? "Expected cases (Next W)"
     : riskMetric === "incidence"
-    ? "Forecast Incidence (Next W)"
-    : "Forecast Surge (Next W vs Past 8W baseline)";
+    ? "Expected risk rate (Next W)"
+    : "Expected risk change (Next W vs baseline)";
 
   if (isLoading) {
     return (
@@ -217,9 +216,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
             </ButtonGroup>
           </div>
 
-          {!isBarangay ? (
-            <p className="text-[10px] text-muted-foreground">City chart overlays both models for direct comparison</p>
-          ) : null}
+          {!isBarangay ? <p className="text-[10px] text-muted-foreground">City chart shows both model estimates for comparison</p> : null}
           <p className="text-[10px] text-muted-foreground">{modeSubtitle}</p>
         </div>
       </CardHeader>
