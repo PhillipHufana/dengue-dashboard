@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Activity, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
-import { useChoropleth, useCityCompareSeries } from "@/lib/query/hooks";
+import { useActionPriority, useChoropleth, useCityCompareSeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
-import type { ChoroplethFC } from "@/lib/api";
+import type { ActionPriorityResponse, ChoroplethFC, RankingRow } from "@/lib/api";
 import { usePathname } from "next/navigation";
 import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
 
@@ -28,10 +28,12 @@ export function KpiCards() {
   const period = useDashboardStore((s) => s.period);
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const dataMode = useDashboardStore((s) => s.dataMode);
+  const useAction = riskMetric === "action_priority";
   const effectiveMetric =
-    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+    useAction ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
 
   const { data: geo, isLoading, error } = useChoropleth(runId, modelName, period, dataMode);
+  const actionQuery = useActionPriority(period, runId, modelName, dataMode, useAction);
   const { data: cityCompare } = useCityCompareSeries(runId, dataMode === "forecast");
   const geoSafe = geo as (ChoroplethFC & {
     city_forecast_cases?: number | null;
@@ -43,6 +45,8 @@ export function KpiCards() {
   const cityIncidence = geoSafe?.city_incidence_per_100k ?? null;
   const citySurgeRatio = geoSafe?.city_surge_ratio ?? null;
   const geoFeatures = useMemo(() => geoSafe?.features ?? [], [geoSafe?.features]);
+  const actionData = actionQuery.data as ActionPriorityResponse | undefined;
+  const actionRows = useMemo(() => actionData?.rows ?? [], [actionData?.rows]);
 
   const compareCityTotals = useMemo(() => {
     if (!cityCompare?.series?.length) return null;
@@ -53,12 +57,42 @@ export function KpiCards() {
     return { prophet, arima };
   }, [cityCompare, period]);
 
+  const actionSummary = useMemo(() => {
+    if (!useAction) return null;
+    const rows = actionRows;
+    const top = rows[0];
+    return {
+      cityTotalCases: Number(actionData?.summary?.city_total_cases ?? rows.reduce((a: number, r: RankingRow) => {
+        return a + Number(dataMode === "observed" ? (r.observed_cases_w ?? r.total_forecast_cases ?? r.total_forecast ?? 0) : (r.forecast_w_cases ?? 0));
+      }, 0)),
+      priorityCount: Number(actionData?.summary?.priority_count ?? (dataMode === "observed"
+        ? rows.filter((r: RankingRow) => Number(r.observed_cases_w ?? r.total_forecast_cases ?? 0) > 0).length
+        : rows.filter((r: RankingRow) => Boolean(r.priority_eligible)).length)),
+      veryHighCount: Number(actionData?.summary?.very_high_count ?? rows.filter((r: RankingRow) => (
+        dataMode === "observed"
+          ? String(r.cases_class ?? r.risk_level_cases ?? r.risk_level ?? "unknown")
+          : String(r.surge_class ?? "unknown")
+      ) === "very_high").length),
+      topName: String(actionData?.summary?.top_name ?? top?.pretty_name ?? top?.name ?? "-"),
+      topValue: Number(actionData?.summary?.top_value ?? (dataMode === "observed"
+        ? (top?.observed_cases_w ?? top?.total_forecast_cases ?? top?.total_forecast ?? 0)
+        : (top?.surge_score ?? 0))),
+    };
+  }, [useAction, actionRows, actionData, dataMode]);
+
   const veryHighCount = useMemo(() => {
+    if (useAction && actionSummary) return actionSummary.veryHighCount;
     const key: MetricClass = effectiveMetric === "cases" ? "cases_class" : effectiveMetric === "incidence" ? "burden_class" : "surge_class";
     return geoFeatures.filter((f) => (f?.properties as Record<string, string | undefined>)?.[key] === "very_high").length;
-  }, [geoFeatures, effectiveMetric]);
+  }, [useAction, actionSummary, geoFeatures, effectiveMetric]);
 
   const hotspot = useMemo(() => {
+    if (useAction && actionSummary) {
+      return {
+        name: actionSummary.topName,
+        value: actionSummary.topValue,
+      };
+    }
     const valueKey =
       effectiveMetric === "cases"
         ? (dataMode === "observed" ? "observed_cases" : "forecast_cases")
@@ -82,9 +116,11 @@ export function KpiCards() {
       name: String(props?.display_name ?? props?.name ?? "-"),
       value: bestVal,
     };
-  }, [geoFeatures, effectiveMetric, dataMode]);
+  }, [useAction, actionSummary, geoFeatures, effectiveMetric, dataMode]);
 
-  if (isLoading) {
+  const cardsLoading = isLoading || (useAction && actionQuery.isLoading);
+
+  if (cardsLoading) {
     return (
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
@@ -105,7 +141,7 @@ export function KpiCards() {
     );
   }
 
-  if (error && !geo) {
+  if ((error && !geo) || (useAction && actionQuery.error && !actionData)) {
     return <div className="text-sm text-destructive">Failed to load dashboard data.</div>;
   }
 
@@ -121,7 +157,11 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {cityForecastCases != null ? formatCases(cityForecastCases) : "-"}
+              {useAction && actionSummary
+                ? formatCases(actionSummary.cityTotalCases)
+                : cityForecastCases != null
+                ? formatCases(cityForecastCases)
+                : "-"}
             </p>
             {dataMode === "observed" ? (
               <p className="text-xs text-muted-foreground">Reported city cases (past {period.toUpperCase()})</p>
@@ -147,7 +187,9 @@ export function KpiCards() {
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold">
-              {effectiveMetric === "surge"
+              {useAction && actionSummary
+                ? formatCases(actionSummary.priorityCount)
+                : effectiveMetric === "surge"
                 ? citySurgeRatio != null
                   ? formatSurgeX(citySurgeRatio)
                   : "-"
@@ -156,7 +198,11 @@ export function KpiCards() {
                 : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {effectiveMetric === "surge"
+              {useAction
+                ? dataMode === "observed"
+                  ? "Barangays with reported cases"
+                  : "Barangays prioritized"
+                : effectiveMetric === "surge"
                 ? `City risk change (${period.toUpperCase()} vs baseline)`
                 : dataMode === "observed"
                 ? "City risk rate (/100k)"

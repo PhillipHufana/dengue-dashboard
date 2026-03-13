@@ -45,6 +45,7 @@ def load_new_raw_files(
     dfs: List[pd.DataFrame] = []
     loaded_files: List[str] = []
     pending_registry_rows: List[dict[str, Any]] = []
+    schema_rows: List[dict[str, Any]] = []
 
     for f in files:
         try:
@@ -57,6 +58,20 @@ def load_new_raw_files(
                 temp = pd.read_excel(f, dtype={"CASE ID": "string"})
             else:
                 temp = pd.read_csv(f, dtype={"CASE ID": "string"}, low_memory=False)
+
+            for col in temp.columns:
+                ser = temp[col]
+                schema_rows.append(
+                    {
+                        "source_file": os.path.basename(f),
+                        "file_md5": md5,
+                        "column_name": str(col),
+                        "row_count": int(len(temp)),
+                        "missing_count": int(ser.isna().sum()),
+                        "missing_pct": float(ser.isna().mean()) if len(temp) else 0.0,
+                        "dtype_raw": str(ser.dtype),
+                    }
+                )
 
             temp["__source_row"] = range(len(temp))
             temp["__source_file"] = os.path.basename(f)
@@ -75,6 +90,17 @@ def load_new_raw_files(
             print(f"Loaded new file: {f}")
         except Exception as e:
             print(f"Failed to load {f}: {e}")
+
+    if schema_rows:
+        out_dir = Path(processed_registry_csv).parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        schema_df = pd.DataFrame(schema_rows)
+        schema_path = out_dir / "schema_drift_report.csv"
+        if schema_path.exists():
+            prev = pd.read_csv(schema_path)
+            schema_df = pd.concat([prev, schema_df], ignore_index=True)
+        schema_df = schema_df.drop_duplicates(subset=["source_file", "file_md5", "column_name"], keep="last")
+        schema_df.to_csv(schema_path, index=False)
 
     if not dfs:
         return pd.DataFrame(), [], pending_registry_rows

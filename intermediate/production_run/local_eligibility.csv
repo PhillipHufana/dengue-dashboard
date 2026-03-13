@@ -1,183 +1,183 @@
 Barangay_key,train_weeks,nonzero_weeks,total_cases,eligible_local,eligibility_reason,run_id
-acacia,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-agdao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-alambre,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-alejandra navarro,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-alfonso angliongto sr,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-angalan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-atan awe,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-baganihan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bago aplaya,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bago gallera,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bago oshiro,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-baguio,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-balengaeng,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-baliok,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bangkas heights,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bantol,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-baracatan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 1 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 10 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 11 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 12 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 13 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 14 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 15 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 16 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 17 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 18 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 19 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 2 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 20 b,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 21 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 22 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 23 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 24 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 25 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 26 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 27 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 28 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 29 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 3 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 30 c,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 31 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 32 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 33 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 34 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 35 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 36 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 37 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 38 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 39 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 4 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 40 d,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 5 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 6 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 7 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 8 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-barangay 9 a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bato,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bayabas,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-biao escuela,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-biao guianga,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-biao joaquin,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-binugao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bucana,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-buda,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-buhangin,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-bunawan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-cabantian,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-cadalian,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-calinan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-callawa,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-camansi,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-carmen,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-catalunan grande,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-catalunan pequeno,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-catigan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-cawayan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-centro,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-colosas,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-communal,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-crossing bayabas,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-dacudao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-dalag,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-dalagdag,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-daliao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-daliaon plantation,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-datu salumay,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-dominga,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-dumoy,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-eden,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-fatima,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-gatungan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-gov paciano bangoy,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-gov vicente duterte,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-gumalang,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-gumitan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-ilang,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-inayangan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-indangan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-kap tomas monteverde sr,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-kilate,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lacson,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lamanan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lampianao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-langub,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lapu lapu,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-leon garcia sr,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lizada,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-los amigos,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lubogan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-lumiad,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-ma a,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mabuhay,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-magsaysay,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-magtuod,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mahayag,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-malabog,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-malagos,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-malamba,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-manambulan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mandug,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-manuel guianga,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mapula,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-marapangi,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-marilog,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-matina aplaya,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-matina biao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-matina crossing,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-matina pangi,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-megkawayan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mintal,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mudiang,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-mulig,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-new carmen,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-new valencia,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-pampanga,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-panacan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-panalum,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-pandaitan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-pangyan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-paquibato,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-paradise embak,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-rafael castillo,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-riverside,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-salapawan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-salaysay,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-saloy,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-san antonio,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-san isidro,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-santo nino,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-sasa,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-sibulan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-sirawan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-sirib,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-suawan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-subasta,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-sumimao,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tacunan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tagakpan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tagluno,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tagurano,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-talandang,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-talomo,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-talomo river,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tamayong,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tambobong,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tamugan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tapak,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tawan tawan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tibuloy,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tibungco,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tigatto,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-toril,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tugbok,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-tungakalan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-ubalde,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-ula,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-vicente hizon sr,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-waan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-wangan,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-wilfredo aquino,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
-wines,,,,False,local_models_disabled,eb73c652-651b-4f3f-b366-d5b503a9c503
+acacia,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+agdao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+alambre,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+alejandra navarro,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+alfonso angliongto sr,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+angalan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+atan awe,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+baganihan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bago aplaya,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bago gallera,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bago oshiro,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+baguio,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+balengaeng,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+baliok,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bangkas heights,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bantol,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+baracatan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 1 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 10 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 11 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 12 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 13 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 14 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 15 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 16 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 17 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 18 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 19 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 2 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 20 b,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 21 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 22 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 23 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 24 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 25 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 26 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 27 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 28 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 29 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 3 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 30 c,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 31 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 32 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 33 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 34 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 35 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 36 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 37 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 38 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 39 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 4 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 40 d,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 5 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 6 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 7 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 8 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+barangay 9 a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bato,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bayabas,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+biao escuela,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+biao guianga,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+biao joaquin,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+binugao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bucana,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+buda,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+buhangin,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+bunawan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+cabantian,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+cadalian,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+calinan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+callawa,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+camansi,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+carmen,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+catalunan grande,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+catalunan pequeno,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+catigan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+cawayan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+centro,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+colosas,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+communal,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+crossing bayabas,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+dacudao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+dalag,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+dalagdag,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+daliao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+daliaon plantation,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+datu salumay,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+dominga,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+dumoy,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+eden,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+fatima,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+gatungan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+gov paciano bangoy,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+gov vicente duterte,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+gumalang,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+gumitan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+ilang,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+inayangan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+indangan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+kap tomas monteverde sr,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+kilate,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lacson,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lamanan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lampianao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+langub,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lapu lapu,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+leon garcia sr,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lizada,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+los amigos,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lubogan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+lumiad,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+ma a,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mabuhay,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+magsaysay,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+magtuod,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mahayag,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+malabog,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+malagos,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+malamba,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+manambulan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mandug,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+manuel guianga,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mapula,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+marapangi,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+marilog,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+matina aplaya,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+matina biao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+matina crossing,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+matina pangi,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+megkawayan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mintal,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mudiang,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+mulig,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+new carmen,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+new valencia,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+pampanga,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+panacan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+panalum,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+pandaitan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+pangyan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+paquibato,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+paradise embak,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+rafael castillo,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+riverside,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+salapawan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+salaysay,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+saloy,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+san antonio,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+san isidro,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+santo nino,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+sasa,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+sibulan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+sirawan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+sirib,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+suawan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+subasta,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+sumimao,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tacunan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tagakpan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tagluno,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tagurano,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+talandang,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+talomo,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+talomo river,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tamayong,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tambobong,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tamugan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tapak,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tawan tawan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tibuloy,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tibungco,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tigatto,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+toril,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tugbok,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+tungakalan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+ubalde,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+ula,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+vicente hizon sr,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+waan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+wangan,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+wilfredo aquino,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e
+wines,,,,False,local_models_disabled,6ec3cbf1-cf64-45cc-8921-07db0e69459e

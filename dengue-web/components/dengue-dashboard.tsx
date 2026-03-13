@@ -47,8 +47,50 @@ export function DengueDashboard() {
   const dataMode = useDashboardStore((s) => s.dataMode)
   const riskMetric = useDashboardStore((s) => s.riskMetric)
   const setRiskMetric = useDashboardStore((s) => s.setRiskMetric)
-  const effectiveMetric =
-    riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+
+  const banner = (() => {
+    if (dataMode === "observed") {
+      if (riskMetric === "incidence") {
+        return {
+          title: "Which places have the highest risk rate right now?",
+          body: "This view compares reported cases to population over the selected past period.",
+        };
+      }
+      if (riskMetric === "action_priority") {
+        return {
+          title: "Where should we respond first right now?",
+          body: "Recommended uses recent reported cases to show which barangays need the most immediate attention in the selected past period.",
+        };
+      }
+      return {
+        title: "Where are reported cases highest right now?",
+        body: "This view shows where the most reported cases were recorded in the selected past period.",
+      };
+    }
+
+    if (riskMetric === "incidence") {
+      return {
+        title: "Which places are expected to have the highest risk rate soon?",
+        body: "This view shows expected risk rate for the selected future period using forecasted cases and population.",
+      };
+    }
+    if (riskMetric === "surge") {
+      return {
+        title: "Where is risk expected to rise the fastest?",
+        body: "Risk Change compares the next selected period against a recent baseline to highlight places with the strongest expected increase.",
+      };
+    }
+    if (riskMetric === "action_priority") {
+      return {
+        title: "Where should we prepare first for the coming weeks?",
+        body: "Recommended prioritizes barangays with meaningful expected rise and forecasted burden in the selected future period.",
+      };
+    }
+    return {
+      title: "Where are the most cases expected soon?",
+      body: "This view shows expected cases for the selected future period.",
+    };
+  })();
 
   useEffect(() => {
     let alive = true;
@@ -88,19 +130,9 @@ export function DengueDashboard() {
       <main className="p-3 md:p-6">
         <div className="space-y-4 md:space-y-6">
           <section className="rounded-lg border border-border bg-card p-3 md:p-4">
-            <p className="text-sm md:text-base font-semibold">
-              {dataMode === "observed"
-                ? "Where are reported cases highest right now?"
-                : effectiveMetric === "surge"
-                ? "Where is risk rising fastest versus recent baseline?"
-                : "Where are the most cases expected soon?"}
-            </p>
+            <p className="text-sm md:text-base font-semibold">{banner.title}</p>
             <p className="mt-1 text-xs md:text-sm text-muted-foreground">
-              {dataMode === "observed"
-                ? "Respond Now uses observed data from the past selected period (W weeks)."
-                : effectiveMetric === "surge"
-                ? "Prepare Next uses forecasts. Surge compares next W weeks against recent baseline."
-                : "Prepare Next uses forecast estimates for the next selected period (W weeks)."}
+              {banner.body}
             </p>
             {dataMode === "forecast" ? (
               <p className="mt-1 text-[11px] md:text-xs text-muted-foreground italic">

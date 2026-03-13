@@ -1,2 +1,2 @@
-run_id,weeks_to_sum,baseline_weeks,epsilon,model_name,n_barangays,surge_nan_count,surge_non_finite_count,baseline_formula_max_abs_diff,surge_zero_when_forecast_zero_pass_rate,surge_eligible_pct,top10_overlap_surge_vs_cases
-fcc6965d-6047-40ee-b3ef-35556bc1df59,4,8,1.0,preferred,182,0,0,0.0,1.0,0.5054945054945055,1
+run_id,weeks_to_sum,baseline_weeks,baseline_fallback_weeks,epsilon,model_name,n_barangays,surge_nan_count,surge_non_finite_count,baseline_formula_max_abs_diff,surge_zero_when_forecast_zero_pass_rate,surge_eligible_pct,priority_eligible_pct,top10_overlap_surge_vs_cases
+2de8a461-3769-4086-89c9-ab356d166348,4,8,26,1.0,preferred,182,0,0,0.0,1.0,0.5054945054945055,0.3516483516483517,4

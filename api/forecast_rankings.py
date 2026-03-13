@@ -27,6 +27,7 @@ SURGE_FALLBACK_BASELINE_WEEKS = 26
 SURGE_MIN_NONZERO_FOR_SHORT_BASELINE = 4
 SURGE_EPSILON = 1.0
 SURGE_MIN_FORECAST_CASES = 2.0
+OBSERVED_INCIDENCE_TIEBREAK_MIN_CASES = 3.0
 RANKING_FORMULA_VERSION = "v3_adaptive_baseline_8w_or_26w"
 
 _rankings_cache = TTLCache(maxsize=64, ttl=300)  # 5 minute cache for rankings
@@ -90,8 +91,10 @@ def _build_action_priority_rows(rows: list[dict[str, Any]], mode: str) -> list[d
     if mode == "observed":
         items.sort(
             key=lambda x: (
-                float(x.get("total_forecast_cases") or 0.0),
-                float(x.get("total_forecast_incidence_per_100k") or 0.0),
+                float(x.get("observed_cases_w") or x.get("total_forecast_cases") or 0.0),
+                float(x.get("observed_incidence_w") or x.get("total_forecast_incidence_per_100k") or 0.0)
+                if float(x.get("observed_cases_w") or x.get("total_forecast_cases") or 0.0) >= OBSERVED_INCIDENCE_TIEBREAK_MIN_CASES
+                else float("-inf"),
                 str(x.get("name") or ""),
             ),
             reverse=True,
@@ -103,7 +106,7 @@ def _build_action_priority_rows(rows: list[dict[str, Any]], mode: str) -> list[d
     else:
         items.sort(
             key=lambda x: (
-                1 if bool(x.get("surge_eligible")) else 0,
+                1 if bool(x.get("priority_eligible")) else 0,
                 float(x.get("surge_score") or 0.0),
                 float(x.get("forecast_w_cases") or 0.0),
                 str(x.get("name") or ""),
@@ -118,6 +121,18 @@ def _build_action_priority_rows(rows: list[dict[str, Any]], mode: str) -> list[d
                 f"forecast W: {float(r.get('forecast_w_cases') or 0.0):.2f}"
             )
     return items
+
+
+def _recommended_class(row: dict[str, Any], mode: str) -> str:
+    if mode == "observed":
+        return str(row.get("cases_class") or row.get("risk_level_cases") or row.get("risk_level") or "unknown")
+    return str(row.get("surge_class") or "unknown")
+
+
+def _recommended_value(row: dict[str, Any], mode: str) -> float:
+    if mode == "observed":
+        return float(row.get("observed_cases_w") or row.get("total_forecast_cases") or row.get("total_forecast") or 0.0)
+    return float(row.get("surge_score") or 0.0)
 
 
 @router.get("/action-priority")
@@ -153,6 +168,7 @@ def get_action_priority(
         )
 
     ranked = _build_action_priority_rows(list(base.get("rankings") or []), mode)
+    top_row = ranked[0] if ranked else None
     resp = {
         "run_id": base.get("run_id"),
         "model_name": base.get("model_name"),
@@ -165,10 +181,27 @@ def get_action_priority(
         "baseline_min_nonzero_8w": base.get("baseline_min_nonzero_8w"),
         "surge_epsilon": base.get("surge_epsilon"),
         "surge_min_forecast_cases": base.get("surge_min_forecast_cases"),
-        "ranking_formula_version": "v1_action_priority_observed_cases__forecast_surge",
+        "ranking_formula_version": base.get("ranking_formula_version") or RANKING_FORMULA_VERSION,
         "data_last_updated": base.get("data_last_updated"),
         "model_current_date": base.get("model_current_date"),
         "user_current_date": base.get("user_current_date"),
+        "recommended_metric": "cases" if mode == "observed" else "surge",
+        "summary": {
+            "city_total_cases": sum(
+                float(r.get("observed_cases_w") or r.get("total_forecast_cases") or r.get("total_forecast") or 0.0)
+                if mode == "observed"
+                else float(r.get("forecast_w_cases") or 0.0)
+                for r in ranked
+            ),
+            "very_high_count": sum(1 for r in ranked if _recommended_class(r, mode) == "very_high"),
+            "priority_count": (
+                sum(1 for r in ranked if float(r.get("observed_cases_w") or r.get("total_forecast_cases") or 0.0) > 0.0)
+                if mode == "observed"
+                else sum(1 for r in ranked if bool(r.get("priority_eligible")))
+            ),
+            "top_name": (top_row or {}).get("pretty_name") or (top_row or {}).get("name"),
+            "top_value": _recommended_value(top_row, mode) if top_row else None,
+        },
         "rows": ranked,
     }
     _action_priority_cache[cache_key] = resp
@@ -462,7 +495,19 @@ def get_forecast_rankings(
             reverse=True,
         )
     elif basis == "cases":
-        results.sort(key=lambda x: float(x.get("total_forecast_cases") or 0.0), reverse=True)
+        if mode == "observed":
+            results.sort(
+                key=lambda x: (
+                    float(x.get("observed_cases_w") or x.get("total_forecast_cases") or 0.0),
+                    float(x.get("observed_incidence_w") or x.get("total_forecast_incidence_per_100k") or 0.0)
+                    if float(x.get("observed_cases_w") or x.get("total_forecast_cases") or 0.0) >= OBSERVED_INCIDENCE_TIEBREAK_MIN_CASES
+                    else float("-inf"),
+                    str(x.get("name") or ""),
+                ),
+                reverse=True,
+            )
+        else:
+            results.sort(key=lambda x: float(x.get("total_forecast_cases") or 0.0), reverse=True)
     else:
         results.sort(key=lambda x: float(x.get("total_forecast_incidence_per_100k") or 0.0), reverse=True)
 
@@ -476,6 +521,7 @@ def get_forecast_rankings(
         "baseline_min_nonzero_8w": SURGE_MIN_NONZERO_FOR_SHORT_BASELINE,
         "surge_epsilon": SURGE_EPSILON,
         "surge_min_forecast_cases": SURGE_MIN_FORECAST_CASES,
+        "observed_incidence_tiebreak_min_cases": OBSERVED_INCIDENCE_TIEBREAK_MIN_CASES,
         "ranking_formula_version": RANKING_FORMULA_VERSION,
         "data_last_updated": latest_week_date,
         "model_current_date": latest_week_date,

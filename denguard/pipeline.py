@@ -36,6 +36,8 @@ from denguard.steps.step8_arima import fit_arima
 from denguard.steps.step9_comparison import comparison_plot
 from denguard.utils import ensure_outdir
 
+RANKING_FORMULA_VERSION = "v3_adaptive_baseline_8w_or_26w"
+
 
 def _init_run(cfg: Config) -> Config:
     ensure_outdir(cfg.out)
@@ -131,7 +133,7 @@ def _save_run_metadata(
                 "disagg_scheme": str(selected_disagg_scheme),
                 "alpha_smooth": float(alpha_smooth),
                 "selected_primary_model": str(selected_primary_model),
-                "ranking_formula_version": "v2_forecastW_over_baselineW",
+                "ranking_formula_version": RANKING_FORMULA_VERSION,
                 "surge_baseline_weeks": 8,
                 "surge_epsilon": 1.0,
                 "surge_min_forecast_cases": 2.0,
@@ -495,6 +497,42 @@ def _resolve_production_disagg_scheme(cfg: Config, chosen_city_model: str) -> st
         return configured
 
 
+def _resolve_production_city_model(cfg: Config) -> str:
+    configured = str(getattr(cfg, "production_city_model", "prophet")).lower().strip()
+    candidates: list[Path] = []
+    out_path = Path(cfg.out)
+    if out_path.exists():
+        candidates.extend(out_path.rglob("run_metadata.csv"))
+
+    project_intermediate = Path("intermediate")
+    if project_intermediate.exists():
+        candidates.extend(project_intermediate.rglob("run_metadata.csv"))
+
+    if not candidates:
+        print(f"No run_metadata.csv found; using configured production city model='{configured}'.")
+        return configured
+
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    try:
+        df = pd.read_csv(latest)
+        if df.empty or "selected_primary_model" not in df.columns:
+            print(f"run_metadata file '{latest}' is empty/invalid; using configured production city model='{configured}'.")
+            return configured
+        if "run_kind" in df.columns:
+            scoped = df[df["run_kind"].astype(str).str.lower() == "backtest"].copy()
+            if not scoped.empty:
+                df = scoped
+        winner = str(df.iloc[-1]["selected_primary_model"]).lower().strip()
+        if winner not in {"prophet", "arima"}:
+            print(f"Validated city winner '{winner}' unsupported; using configured production city model='{configured}'.")
+            return configured
+        print(f"Using latest validated city model '{winner}' from {latest}.")
+        return winner
+    except Exception as e:
+        print(f"Failed reading city winner from '{latest}': {e}; using configured production city model='{configured}'.")
+        return configured
+
+
 def _save_barangay_metric_distribution(
     cfg: Config,
     *,
@@ -646,6 +684,8 @@ def _save_action_priority_artifacts(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     w = int(weeks_to_sum)
     b = int(baseline_weeks)
+    b_fallback = 26
+    min_nonzero_short = 4
     eps = float(epsilon)
 
     hist = weekly_full.copy()
@@ -659,7 +699,8 @@ def _save_action_priority_artifacts(
                 "run_id", "view_mode", "queue_type", "weeks_to_sum", "baseline_weeks", "epsilon",
                 "ranking_formula_version", "model_name", "rank", "barangay", "actual_cases_past_W",
                 "past_8w_avg", "baseline_expected_W", "forecast_cases_next_W", "surge_ratio",
-                "surge_eligible", "rank_reason",
+                "surge_eligible", "baseline_eligible", "priority_eligible", "baseline_weeks_used",
+                "nonzero_weeks_8w", "rank_reason",
             ]
         )
         empty.to_csv(cfg.out / f"action_priority_observed_W{w}.csv", index=False)
@@ -669,7 +710,8 @@ def _save_action_priority_artifacts(
         return empty, empty, qa
 
     obs_weeks = pd.date_range(end=latest_obs, periods=w, freq="W-MON")
-    base_weeks = pd.date_range(end=latest_obs, periods=b, freq="W-MON")
+    base_weeks_short = pd.date_range(end=latest_obs, periods=b, freq="W-MON")
+    base_weeks_long = pd.date_range(end=latest_obs, periods=b_fallback, freq="W-MON")
     all_barangays = sorted(hist["barangay"].astype(str).unique().tolist())
     obs_lookup = (
         hist.groupby(["barangay", "ds"], as_index=False)["Cases"].sum()
@@ -704,11 +746,23 @@ def _save_action_priority_artifacts(
     rows = []
     for brgy in all_barangays:
         actual_w = float(sum(float(obs_lookup.get((brgy, d), 0.0)) for d in obs_weeks))
-        past_avg = float(sum(float(obs_lookup.get((brgy, d), 0.0)) for d in base_weeks)) / float(b) if b > 0 else 0.0
+        short_vals = [float(obs_lookup.get((brgy, d), 0.0)) for d in base_weeks_short]
+        long_vals = [float(obs_lookup.get((brgy, d), 0.0)) for d in base_weeks_long]
+        nonzero_8w = int(sum(1 for v in short_vals if v > 0.0))
+        if nonzero_8w >= min_nonzero_short:
+            baseline_vals = short_vals
+            baseline_weeks_used = int(b)
+        else:
+            baseline_vals = long_vals
+            baseline_weeks_used = int(b_fallback)
+        denom = float(len(baseline_vals)) if len(baseline_vals) else 1.0
+        past_avg = float(sum(baseline_vals)) / denom
         baseline_w = float(past_avg) * float(w)
         forecast_w = float(sum(float(fut_lookup.get((brgy, d), 0.0)) for d in fut_weeks))
         surge_ratio = float(forecast_w) / float(baseline_w + eps)
         surge_eligible = bool(forecast_w >= float(min_forecast_cases))
+        baseline_eligible = bool(baseline_w >= 1.0)
+        priority_eligible = bool(surge_eligible and baseline_eligible)
         rows.append(
             {
                 "barangay": brgy,
@@ -718,6 +772,10 @@ def _save_action_priority_artifacts(
                 "forecast_cases_next_W": forecast_w,
                 "surge_ratio": surge_ratio,
                 "surge_eligible": surge_eligible,
+                "baseline_eligible": baseline_eligible,
+                "priority_eligible": priority_eligible,
+                "baseline_weeks_used": baseline_weeks_used,
+                "nonzero_weeks_8w": nonzero_8w,
             }
         )
     feat = pd.DataFrame(rows)
@@ -731,7 +789,7 @@ def _save_action_priority_artifacts(
     observed["rank_reason"] = observed["actual_cases_past_W"].map(lambda v: f"High recent observed burden (past W: {v:.2f})")
 
     forecast = feat.sort_values(
-        ["surge_eligible", "surge_ratio", "forecast_cases_next_W", "barangay"],
+        ["priority_eligible", "surge_ratio", "forecast_cases_next_W", "barangay"],
         ascending=[False, False, False, True],
     ).reset_index(drop=True)
     forecast["rank"] = forecast.index + 1
@@ -746,14 +804,15 @@ def _save_action_priority_artifacts(
         "run_id", "view_mode", "queue_type", "weeks_to_sum", "baseline_weeks", "epsilon",
         "ranking_formula_version", "model_name", "rank", "barangay", "actual_cases_past_W",
         "past_8w_avg", "baseline_expected_W", "forecast_cases_next_W", "surge_ratio",
-        "surge_eligible", "rank_reason",
+        "surge_eligible", "baseline_eligible", "priority_eligible", "baseline_weeks_used",
+        "nonzero_weeks_8w", "rank_reason",
     ]
     for df in (observed, forecast):
         df["run_id"] = cfg.run_id
         df["weeks_to_sum"] = w
         df["baseline_weeks"] = b
         df["epsilon"] = eps
-        df["ranking_formula_version"] = "v1_action_priority_observed_cases__forecast_surge"
+        df["ranking_formula_version"] = RANKING_FORMULA_VERSION
         df["model_name"] = target_model
     observed = observed[common_cols]
     forecast = forecast[common_cols]
@@ -772,6 +831,7 @@ def _save_action_priority_artifacts(
                 "run_id": cfg.run_id,
                 "weeks_to_sum": w,
                 "baseline_weeks": b,
+                "baseline_fallback_weeks": b_fallback,
                 "epsilon": eps,
                 "model_name": target_model,
                 "n_barangays": int(len(forecast)),
@@ -785,6 +845,7 @@ def _save_action_priority_artifacts(
                     ).mean()
                 ) if len(forecast) else 1.0,
                 "surge_eligible_pct": float(pd.to_numeric(forecast["surge_eligible"], errors="coerce").fillna(0).mean()) if len(forecast) else 0.0,
+                "priority_eligible_pct": float(pd.to_numeric(forecast["priority_eligible"], errors="coerce").fillna(0).mean()) if len(forecast) else 0.0,
                 "top10_overlap_surge_vs_cases": int(len(top10_surge & top10_cases)),
             }
         ]
@@ -1328,6 +1389,7 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
 def run_production(cfg: Config = DEFAULT_CFG) -> None:
     cfg = replace(cfg, run_kind="production")
     cfg = _init_run(cfg)
+    cfg = replace(cfg, production_city_model=_resolve_production_city_model(cfg))
 
     df, _, pending_registry_rows = load_and_clean(cfg)
     df = standardize_barangays(df)

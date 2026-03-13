@@ -47,17 +47,17 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const rankingTitle =
     useAction
       ? dataMode === "observed"
-        ? "Recommended Queue - Respond Now (past W weeks)"
-        : "Recommended Queue - Prepare Next (next W weeks)"
+        ? "Recommended places to respond to now"
+        : "Recommended places to prepare for next"
       : dataMode === "observed"
       ? riskMetric === "cases"
-        ? "Highest reported cases (past W weeks)"
-        : "Highest risk rate (past W weeks)"
+        ? "Places with the most reported cases"
+        : "Places with the highest current risk rate"
       : riskMetric === "cases"
-      ? "Highest expected cases (next W weeks)"
+      ? "Places with the most expected cases"
       : riskMetric === "incidence"
-      ? "Highest expected risk rate (next W weeks)"
-      : "Early warning: fastest expected rise";
+      ? "Places with the highest expected risk rate"
+      : "Places where risk is expected to rise fastest";
   const barangays: RankingRow[] = useMemo(() => {
     const baseRows = useAction ? (actionQuery.data?.rows ?? []) : (data?.rankings ?? []);
     const list = baseRows.slice();

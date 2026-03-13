@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib
+from pathlib import Path
 import pandas as pd
 from denguard.config import Config
 
@@ -80,5 +81,25 @@ def fingerprint_dedupe(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     complete_dedup = complete_df.drop_duplicates(subset="__fingerprint", keep="last")
 
     out = pd.concat([complete_dedup, incomplete_df], ignore_index=True)
-    print("Fingerprint dedupe dropped:", before - len(out))
+    dropped = before - len(out)
+    print("Fingerprint dedupe dropped:", dropped)
+
+    report_path = Path(cfg.out) / "cleaning_step_report.csv"
+    step_row = pd.DataFrame(
+        [
+            {
+                "step": "fingerprint_dedupe",
+                "rows_before": int(before),
+                "rows_after": int(len(out)),
+                "rows_dropped": int(dropped),
+                "drop_pct": (float(dropped) / float(before)) if before else 0.0,
+            }
+        ]
+    )
+    if report_path.exists():
+        prev = pd.read_csv(report_path)
+        prev = prev[prev.get("step") != "fingerprint_dedupe"] if "step" in prev.columns else prev
+        pd.concat([prev, step_row], ignore_index=True).to_csv(report_path, index=False)
+    else:
+        step_row.to_csv(report_path, index=False)
     return out

@@ -1,0 +1,7 @@
+step,rows_before,rows_after,rows_dropped,drop_pct
+merge_strategy,39483,39483,0,0.0
+drop_blank_barangay,39483,39483,0,0.0
+drop_invalid_donset,39483,39483,0,0.0
+drop_future_donset,39483,39483,0,0.0
+drop_implausibly_old_donset,39483,39483,0,0.0
+fingerprint_dedupe,39483,39483,0,0.0

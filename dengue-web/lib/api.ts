@@ -222,10 +222,17 @@ export interface RankingRow {
   surge_score?: number;
   surge_class?: JenksClass;
   surge_eligible?: boolean;
+  baseline_eligible?: boolean;
+  priority_eligible?: boolean;
+  baseline_weeks_used?: number;
+  nonzero_weeks_8w?: number;
   observed_cases_w?: number;
   observed_incidence_w?: number | null;
   prophet_forecast_w?: number;
   arima_forecast_w?: number;
+  rank?: number;
+  queue_type?: "respond_now" | "prepare_next";
+  rank_reason?: string;
 }
 
 export interface RankingResponse {
@@ -260,6 +267,14 @@ export interface ActionPriorityResponse {
   data_last_updated: string | null;
   model_current_date: string | null;
   user_current_date: string;
+  recommended_metric?: "cases" | "surge";
+  summary?: {
+    city_total_cases?: number;
+    very_high_count?: number;
+    priority_count?: number;
+    top_name?: string | null;
+    top_value?: number | null;
+  };
   rows: RankingRow[];
 }
 
