@@ -9,10 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RankingRow } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
-import { TrendingUp, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { TrendingUp, Search } from "lucide-react";
 import { useActionPriority, useRankings } from "@/lib/query/hooks";
 import { usePathname } from "next/navigation";
 import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
+import { formatDateRange, humanizeClass, humanizeName } from "@/lib/display-text";
 
 interface ForecastRankingsProps {
   selectedBarangay: { pretty: string; clean: string } | null;
@@ -47,17 +48,17 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const rankingTitle =
     useAction
       ? dataMode === "observed"
-        ? "Recommended places to respond to now"
-        : "Recommended places to prepare for next"
+        ? "Observed Action Priority"
+        : "Forecasted Action Priority"
       : dataMode === "observed"
       ? riskMetric === "cases"
-        ? "Places with the most reported cases"
-        : "Places with the highest current risk rate"
+        ? "Observed Cases by Barangay"
+        : "Observed Incidence by Barangay"
       : riskMetric === "cases"
-      ? "Places with the most expected cases"
+      ? "Forecasted Cases by Barangay"
       : riskMetric === "incidence"
-      ? "Places with the highest expected risk rate"
-      : "Places where risk is expected to rise fastest";
+      ? "Forecasted Incidence by Barangay"
+      : "Forecasted Surge by Barangay";
   const barangays: RankingRow[] = useMemo(() => {
     const baseRows = useAction ? (actionQuery.data?.rows ?? []) : (data?.rankings ?? []);
     const list = baseRows.slice();
@@ -160,7 +161,9 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   }
 
   return (
-    <Card className="bg-card border-border h-full xl:h-[780px] flex flex-col">
+    <Card className={`h-full xl:h-[780px] flex flex-col ${
+      dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"
+    }`}>
       <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -173,11 +176,10 @@ export const ForecastRankings = React.memo(function ForecastRankings({
           {lastUpdated && data ? (
             <div className="text-[10px] text-muted-foreground leading-tight">
               <p>
-                Mode: {dataMode === "observed" ? "Respond Now (Past W weeks)" : "Prepare Next (Next W weeks)"}
+                View: {dataMode === "observed" ? "Observed" : "Forecasted"}
               </p>
+              <p>Date range: {formatDateRange(data.period_start_week, data.period_end_week) ?? timePeriod.toUpperCase()}</p>
               <p>Data updated through: {data.model_current_date}</p>
-              <p>Today: {data.user_current_date}</p>
-              <p className="italic opacity-80">Forecast dates are counted from the latest available data.</p>
             </div>
           ) : null}
 
@@ -253,10 +255,10 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{b.pretty_name}</p>
+                    <p className="font-medium text-sm truncate">{humanizeName(b.pretty_name)}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge className={`text-[9px] ${getRiskColor(cls)}`}>
-                        {cls.toUpperCase()}
+                        {humanizeClass(cls)}
                       </Badge>
                     </div>
                   </div>
@@ -271,10 +273,10 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                     </p>
                     {effectiveMetric === "surge" ? (
                       <div className="text-[10px] text-muted-foreground">
-                        Next W: {formatCases(b.forecast_w_cases ?? 0)} | Baseline W: {formatCases(b.baseline_expected_w ?? 0)}
+                        Forecast Window: {formatCases(b.forecast_w_cases ?? 0)} | Baseline: {formatCases(b.baseline_expected_w ?? 0)}
                       </div>
                     ) : null}
-                    {isAdminView ? (
+                    {isAdminView && dataMode === "forecast" ? (
                       <div className="text-[10px] text-muted-foreground">
                         Obs {formatCases(b.observed_cases_w ?? 0)} | P {formatCases(b.prophet_forecast_w ?? 0)} | A {formatCases(b.arima_forecast_w ?? 0)}
                       </div>

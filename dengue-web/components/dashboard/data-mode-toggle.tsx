@@ -19,9 +19,9 @@ export function DataModeToggle({ compact = false }: { compact?: boolean }) {
           setRiskMetric("action_priority");
         }}
         className={compact ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none" : "h-9 px-4 text-sm font-medium rounded-r-none"}
-        title="Respond now using observed data from the past W weeks."
+        title="Observed data from the selected past date range."
       >
-        {compact ? "Respond" : "Respond Now"}
+        {compact ? "Observed" : "Observed View"}
       </Button>
       <Button
         size={compact ? "sm" : "default"}
@@ -31,9 +31,9 @@ export function DataModeToggle({ compact = false }: { compact?: boolean }) {
           setRiskMetric("action_priority");
         }}
         className={compact ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-l-none border-l-0" : "h-9 px-4 text-sm font-medium rounded-l-none border-l-0"}
-        title="Prepare next using forecast estimates for the next W weeks."
+        title="Forecasted data for the selected future date range."
       >
-        {compact ? "Prepare" : "Prepare Next"}
+        {compact ? "Forecast" : "Forecasting View"}
       </Button>
     </ButtonGroup>
   );

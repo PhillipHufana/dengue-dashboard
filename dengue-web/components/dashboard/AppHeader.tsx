@@ -15,6 +15,7 @@ import { DataModeToggle } from "@/components/dashboard/data-mode-toggle";
 import { PeriodSelect } from "@/components/dashboard/period-select";
 import { ModelSelect } from "@/components/dashboard/model-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useDashboardStore } from "@/lib/store/dashboard-store";
 
 type HeaderMode = "public" | "admin";
 
@@ -87,6 +88,7 @@ export function AppHeader({
   disaggScheme?: string | null;
 }) {
   const router = useRouter();
+  const dataMode = useDashboardStore((s) => s.dataMode);
   const [isAuthed, setIsAuthed] = useState(false);
   const [profile, setProfile] = useState<AdminProfile | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -228,9 +230,13 @@ export function AppHeader({
       <div className="mt-2 border-t border-border pt-2">
         {mode === "public" ? (
           <>
-            <div className="hidden md:flex items-center justify-between gap-2">
+            <div className={`hidden md:flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${
+              dataMode === "observed"
+                ? "border-border bg-transparent"
+                : "border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20"
+            }`}>
               <div className="flex items-center gap-2 justify-start">
-                <ModelSelect />
+                {dataMode === "forecast" ? <ModelSelect /> : null}
                 <PeriodSelect />
               </div>
               <div className="flex-1 flex items-center justify-center">
@@ -240,9 +246,13 @@ export function AppHeader({
                 <RiskMetricToggle />
               </div>
             </div>
-            <div className="md:hidden space-y-1.5">
+            <div className={`md:hidden space-y-1.5 rounded-lg border px-2 py-2 ${
+              dataMode === "observed"
+                ? "border-border bg-transparent"
+                : "border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20"
+            }`}>
               <div className="grid grid-cols-2 gap-1.5">
-                <ModelSelect compact />
+                {dataMode === "forecast" ? <ModelSelect compact /> : <div />}
                 <PeriodSelect compact />
               </div>
               <div className="flex justify-center">

@@ -8,6 +8,7 @@ import { useDashboardStore } from "@/lib/store/dashboard-store";
 import type { ActionPriorityResponse, ChoroplethFC, RankingRow } from "@/lib/api";
 import { usePathname } from "next/navigation";
 import { formatCases, formatRate, formatSurgeX } from "@/lib/number-format";
+import { formatDateRange, humanizeName } from "@/lib/display-text";
 
 const PERIOD_WEEKS: Record<string, number> = {
   "1w": 1,
@@ -39,11 +40,14 @@ export function KpiCards() {
     city_forecast_cases?: number | null;
     city_incidence_per_100k?: number | null;
     city_surge_ratio?: number | null;
+    period_start_week?: string | null;
+    period_end_week?: string | null;
   }) | undefined;
 
   const cityForecastCases = geoSafe?.city_forecast_cases ?? null;
   const cityIncidence = geoSafe?.city_incidence_per_100k ?? null;
   const citySurgeRatio = geoSafe?.city_surge_ratio ?? null;
+  const periodLabel = formatDateRange(geoSafe?.period_start_week, geoSafe?.period_end_week) ?? period.toUpperCase();
   const geoFeatures = useMemo(() => geoSafe?.features ?? [], [geoSafe?.features]);
   const actionData = actionQuery.data as ActionPriorityResponse | undefined;
   const actionRows = useMemo(() => actionData?.rows ?? [], [actionData?.rows]);
@@ -147,16 +151,16 @@ export function KpiCards() {
 
   return (
     <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-      <Card className="bg-card border-border">
+      <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <Activity className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
+            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
-            <p className="text-xl font-bold">
+            <p className="text-2xl md:text-3xl font-bold">
               {useAction && actionSummary
                 ? formatCases(actionSummary.cityTotalCases)
                 : cityForecastCases != null
@@ -164,10 +168,10 @@ export function KpiCards() {
                 : "-"}
             </p>
             {dataMode === "observed" ? (
-              <p className="text-xs text-muted-foreground">Reported city cases (past {period.toUpperCase()})</p>
+              <p className="text-xs text-muted-foreground">Observed city cases</p>
             ) : (
               <div className="text-xs text-muted-foreground">
-                <p>Expected city cases (next {period.toUpperCase()})</p>
+                <p>Forecasted city cases</p>
                 {isAdminView && compareCityTotals ? (
                   <p>P {formatCases(compareCityTotals.prophet)} | A {formatCases(compareCityTotals.arima)}</p>
                 ) : null}
@@ -177,16 +181,16 @@ export function KpiCards() {
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-border">
+      <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <BarChart3 className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
+            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
-            <p className="text-xl font-bold">
+            <p className="text-2xl md:text-3xl font-bold">
               {useAction && actionSummary
                 ? formatCases(actionSummary.priorityCount)
                 : effectiveMetric === "surge"
@@ -200,45 +204,45 @@ export function KpiCards() {
             <p className="text-xs text-muted-foreground">
               {useAction
                 ? dataMode === "observed"
-                  ? "Barangays with reported cases"
+                  ? "Observed action priority"
                   : "Barangays prioritized"
                 : effectiveMetric === "surge"
-                ? `City risk change (${period.toUpperCase()} vs baseline)`
+                ? "Forecasted surge vs baseline"
                 : dataMode === "observed"
-                ? "City risk rate (/100k)"
-                : "Expected city risk rate (/100k)"}
+                ? "Observed incidence (/100k)"
+                : "Forecasted incidence (/100k)"}
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-border">
+      <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <span className="text-xs md:text-sm text-destructive font-medium">{period.toUpperCase()}</span>
+            <span className="text-xs md:text-sm text-destructive font-medium">{periodLabel}</span>
           </div>
           <div className="mt-4">
-            <p className="text-xl font-bold">{veryHighCount}</p>
+            <p className="text-2xl md:text-3xl font-bold">{veryHighCount}</p>
             <p className="text-xs text-muted-foreground">
-              Barangays (Very High {effectiveMetric === "cases" ? "cases" : effectiveMetric === "incidence" ? "risk rate" : "risk change"})
+              Very High barangays ({effectiveMetric === "cases" ? "cases" : effectiveMetric === "incidence" ? "incidence" : "surge"})
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-border">
+      <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
         <CardContent className="p-3 md:p-6">
           <div className="flex items-center justify-between">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
               <MapPin className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xs md:text-sm text-primary font-medium">{period.toUpperCase()}</span>
+            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
-            <p className="text-xl font-bold">
+            <p className="text-2xl md:text-3xl font-bold">
               {hotspot
                 ? effectiveMetric === "cases"
                   ? formatCases(hotspot.value)
@@ -248,7 +252,7 @@ export function KpiCards() {
                 : "-"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {hotspot?.name ?? "-"}{" "}
+              {humanizeName(hotspot?.name ?? "-")}{" "}
               {hotspot
                 ? effectiveMetric === "cases"
                   ? "(cases)"

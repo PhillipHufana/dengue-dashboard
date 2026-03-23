@@ -185,6 +185,8 @@ def get_action_priority(
         "data_last_updated": base.get("data_last_updated"),
         "model_current_date": base.get("model_current_date"),
         "user_current_date": base.get("user_current_date"),
+        "period_start_week": base.get("period_start_week"),
+        "period_end_week": base.get("period_end_week"),
         "recommended_metric": "cases" if mode == "observed" else "surge",
         "summary": {
             "city_total_cases": sum(
@@ -308,6 +310,11 @@ def get_forecast_rankings(
     weeks_for_surge_long = [x.get("week_start") for x in city_weeks[:SURGE_FALLBACK_BASELINE_WEEKS] if x.get("week_start") is not None]
     weeks_for_observed = [x.get("week_start") for x in city_weeks[:weeks_to_sum] if x.get("week_start") is not None]
     weeks_for_weekly = list(dict.fromkeys(weeks_for_trend + weeks_for_surge_long + weeks_for_observed))
+    future_week_starts = sorted({str(r.get("week_start")) for r in forecasts if r.get("week_start") is not None})
+    forecast_window = future_week_starts[:weeks_to_sum]
+    observed_window = sorted([str(x) for x in weeks_for_observed])
+    period_start_week = observed_window[0] if mode == "observed" and observed_window else (forecast_window[0] if forecast_window else None)
+    period_end_week = observed_window[-1] if mode == "observed" and observed_window else (forecast_window[-1] if forecast_window else None)
 
     # --- Fetch only barangay rows for trend + surge windows
     weekly_rows_raw = []
@@ -526,6 +533,8 @@ def get_forecast_rankings(
         "data_last_updated": latest_week_date,
         "model_current_date": latest_week_date,
         "user_current_date": str(date.today()),
+        "period_start_week": period_start_week,
+        "period_end_week": period_end_week,
         "rankings": results,
         "run_id": rid,
         "model_name": model,

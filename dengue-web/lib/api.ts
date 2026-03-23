@@ -58,13 +58,22 @@ export type ChoroplethFeatureProps = {
   // new richer keys (safe optional)
   forecast_cases?: number | null;
   forecast_incidence_per_100k?: number | null;
+  forecast_surge_ratio?: number | null;
+  observed_cases?: number | null;
+  observed_incidence_per_100k?: number | null;
+  population?: number | null;
+  baseline_expected_w?: number | null;
   risk_level_cases?: JenksClass;
   risk_level_incidence?: JenksClass | null;
+  cases_class?: JenksClass;
+  burden_class?: JenksClass | null;
+  surge_class?: JenksClass | null;
 
   // new sync fields
   period?: TimePeriod;
   weeks_to_sum?: number;
   period_start_week?: string | null;
+  period_end_week?: string | null;
 
   run_id: string;
   model_name: string;
@@ -247,6 +256,8 @@ export interface RankingResponse {
   model_current_date: string | null;
   user_current_date: string;
   data_last_updated: string | null;
+  period_start_week?: string | null;
+  period_end_week?: string | null;
   rankings: RankingRow[];
   run_id: string;
   model_name: string;
@@ -267,6 +278,8 @@ export interface ActionPriorityResponse {
   data_last_updated: string | null;
   model_current_date: string | null;
   user_current_date: string;
+  period_start_week?: string | null;
+  period_end_week?: string | null;
   recommended_metric?: "cases" | "surge";
   summary?: {
     city_total_cases?: number;

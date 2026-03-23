@@ -10,6 +10,7 @@ import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { formatCaseRange, formatCases } from "@/lib/number-format";
+import { formatDateRange, humanizeName } from "@/lib/display-text";
 import {
   LineChart,
   Line,
@@ -29,15 +30,17 @@ function CustomTooltip({
   active,
   payload,
   label,
+  mode,
 }: {
   active?: boolean;
   payload?: Array<{ payload?: Record<string, number | string | boolean | null | undefined> }>;
   label?: string;
+  mode: "observed" | "forecast";
 }) {
   if (!active || !payload || !payload.length) return null;
   const row = (payload[0]?.payload ?? {}) as Record<string, number | string | boolean | null | undefined>;
 
-  const isCityCompare = row.yhat_prophet !== undefined || row.yhat_arima !== undefined;
+  const isCityCompare = mode === "forecast" && (row.yhat_prophet !== undefined || row.yhat_arima !== undefined);
 
   return (
     <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
@@ -115,15 +118,16 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   }, [isCityView, cityCompareQuery.data?.series, barangayQuery.data?.series]);
 
   const displaySeries = useMemo(() => {
-    if (view === "full") return series;
+    const baseSeries = dataMode === "observed" ? series.filter((d: { is_future?: boolean }) => !d.is_future) : series;
+    if (view === "full") return baseSeries;
     const historyCount = freq === "weekly" ? 16 : freq === "monthly" ? 12 : 10;
-    const idx = series.findIndex((d: { is_future?: boolean }) => !!d.is_future);
-    if (idx < 0) return series.slice(-historyCount);
+    const idx = baseSeries.findIndex((d: { is_future?: boolean }) => !!d.is_future);
+    if (idx < 0) return baseSeries.slice(-historyCount);
     const start = Math.max(0, idx - historyCount);
-    return series.slice(start);
-  }, [series, view, freq]);
+    return baseSeries.slice(start);
+  }, [series, view, freq, dataMode]);
 
-  const locationName = selectedBarangay?.pretty ?? "City-Wide";
+  const locationName = humanizeName(selectedBarangay?.pretty ?? "City Wide");
   const isBarangay = selectedBarangay !== null;
 
   const freqLabel = {
@@ -134,18 +138,24 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
 
   const forecastStartIndex = series.findIndex((d: { is_future?: boolean }) => !!d.is_future);
   const forecastStartDate = forecastStartIndex > -1 ? (series[forecastStartIndex] as { date?: string }).date ?? null : null;
+  const rangeLabel = useMemo(() => {
+    if (!displaySeries.length) return null;
+    const start = String((displaySeries[0] as { date?: string }).date ?? "");
+    const end = String((displaySeries[displaySeries.length - 1] as { date?: string }).date ?? "");
+    return formatDateRange(start, end);
+  }, [displaySeries]);
 
-  const modeSubtitle = isCityView
-    ? "Past trend plus model estimates (city-wide)"
+  const modeSubtitle = dataMode === "observed"
+    ? `Observed cases${rangeLabel ? `: ${rangeLabel}` : ""}`
+    : isCityView
+    ? `Forecasted and observed city series${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "action_priority"
-    ? dataMode === "observed"
-      ? "Recommended view for immediate response (past W)"
-      : "Recommended view for planning ahead (next W vs baseline)"
+    ? `Forecasted action priority context${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "cases"
-    ? "Expected cases (Next W)"
+    ? `Forecasted cases${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "incidence"
-    ? "Expected risk rate (Next W)"
-    : "Expected risk change (Next W vs baseline)";
+    ? `Forecasted incidence${rangeLabel ? `: ${rangeLabel}` : ""}`
+    : `Forecasted surge${rangeLabel ? `: ${rangeLabel}` : ""}`;
 
   if (isLoading) {
     return (
@@ -178,7 +188,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   if (isError) return <div className="p-4 text-red-500">Failed to load timeseries.</div>;
 
   return (
-    <Card className="bg-card border-border">
+    <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
       <CardHeader className="p-4 pb-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -194,7 +204,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
           </div>
 
           <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-            <CardTitle className="text-base font-semibold">Predictive Forecast</CardTitle>
+            <CardTitle className="text-base font-semibold">{dataMode === "observed" ? "Observed Cases" : "Forecasted Cases"}</CardTitle>
 
             <ButtonGroup className="w-fit">
               <Button
@@ -216,7 +226,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
             </ButtonGroup>
           </div>
 
-          {!isBarangay ? <p className="text-[10px] text-muted-foreground">City chart shows both model estimates for comparison</p> : null}
+          {!isBarangay && dataMode === "forecast" ? <p className="text-[10px] text-muted-foreground">City chart shows both model estimates for comparison</p> : null}
           <p className="text-[10px] text-muted-foreground">{modeSubtitle}</p>
         </div>
       </CardHeader>
@@ -228,9 +238,9 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="date" tick={{ fill: "#888", fontSize: 9 }} axisLine={{ stroke: "#333" }} tickLine={false} interval={19} />
               <YAxis tick={{ fill: "#888", fontSize: 9 }} axisLine={{ stroke: "#333" }} tickLine={false} width={35} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip mode={dataMode} />} />
 
-              {forecastStartDate ? (
+              {dataMode === "forecast" && forecastStartDate ? (
                 <ReferenceLine
                   x={forecastStartDate}
                   stroke="#666"
@@ -241,7 +251,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
 
               <Line type="monotone" dataKey="cases" stroke="#10b981" strokeWidth={2} dot={false} name="Actual Cases" connectNulls={false} />
 
-              {isCityView ? (
+              {isCityView && dataMode === "forecast" ? (
                 <>
                   <Line type="monotone" dataKey="yhat_prophet" stroke="#3b82f6" strokeWidth={2} dot={false} name="Prophet" connectNulls />
                   <Line type="monotone" dataKey="yhat_prophet_lower" stroke="#93c5fd" strokeWidth={1} dot={false} strokeDasharray="3 3" name="Prophet CI Lower" connectNulls />
@@ -250,9 +260,9 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
                   <Line type="monotone" dataKey="yhat_arima_lower" stroke="#c4b5fd" strokeWidth={1} dot={false} strokeDasharray="2 2" name="ARIMA CI Lower" connectNulls />
                   <Line type="monotone" dataKey="yhat_arima_upper" stroke="#c4b5fd" strokeWidth={1} dot={false} strokeDasharray="2 2" name="ARIMA CI Upper" connectNulls />
                 </>
-              ) : (
+              ) : dataMode === "forecast" ? (
                 <Line type="monotone" dataKey="forecast" stroke="#60a5fa" strokeWidth={2} strokeDasharray="4 4" dot={false} name="Forecast" connectNulls />
-              )}
+              ) : null}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -262,7 +272,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
             <div className="h-0.5 w-5 bg-emerald-500" />
             <span className="text-muted-foreground">Actual</span>
           </div>
-          {isCityView ? (
+          {isCityView && dataMode === "forecast" ? (
             <>
               <div className="flex items-center gap-2">
                 <div className="h-0.5 w-5 bg-blue-500" />
@@ -277,12 +287,12 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
                 <span className="text-muted-foreground">ARIMA</span>
               </div>
             </>
-          ) : (
+          ) : dataMode === "forecast" ? (
             <div className="flex items-center gap-2">
               <div className="h-0.5 w-5 bg-blue-400" style={{ borderBottom: "1px dashed #60a5fa" }} />
               <span className="text-muted-foreground">Forecast</span>
             </div>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

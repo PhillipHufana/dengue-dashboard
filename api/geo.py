@@ -121,6 +121,11 @@ def get_choropleth(
     weeks_for_surge = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
     weeks_for_observed = [x.get("week_start") for x in city_weeks[:weeks_to_sum] if x.get("week_start") is not None]
     weeks_for_needed = list(dict.fromkeys(weeks_for_surge + weeks_for_observed))
+    future_week_starts = sorted({str(r.get("week_start")) for r in frows if r.get("week_start") is not None})
+    forecast_window = future_week_starts[:weeks_to_sum]
+    observed_window = sorted([str(x) for x in weeks_for_observed])
+    period_start_week = observed_window[0] if mode == "observed" and observed_window else (forecast_window[0] if forecast_window else None)
+    period_end_week = observed_window[-1] if mode == "observed" and observed_window else (forecast_window[-1] if forecast_window else None)
     weekly_rows = []
     if weeks_for_needed:
         weekly_rows = fetch_all(
@@ -306,6 +311,8 @@ def get_choropleth(
         "baseline_weeks": SURGE_HISTORY_WEEKS,
         "surge_epsilon": SURGE_EPSILON,
         "data_last_updated": data_last_updated,
+        "period_start_week": period_start_week,
+        "period_end_week": period_end_week,
 
         # public-health KPIs (city-level)
         "city_forecast_cases": round(city_forecast_cases, 2),

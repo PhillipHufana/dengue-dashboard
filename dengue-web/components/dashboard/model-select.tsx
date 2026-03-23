@@ -8,8 +8,8 @@ import { useDashboardStore } from "@/lib/store/dashboard-store";
 
 const PREFERRED_ORDER = ["preferred", "prophet", "arima"] as const;
 const MODEL_LABEL: Record<string, string> = {
-  preferred: "Preferred (Default)",
-  prophet: "PROPHET",
+  preferred: "Preferred",
+  prophet: "Prophet",
   arima: "ARIMA",
 };
 const MODEL_TOOLTIP: Record<string, string> = {
