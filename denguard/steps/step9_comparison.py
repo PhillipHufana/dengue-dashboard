@@ -40,7 +40,7 @@ def comparison_plot(
     if "prophet" in comp_with_errors.columns:
         comp_with_errors["err_prophet"] = comp_with_errors["actual"] - comp_with_errors["prophet"]
     comp_with_errors.to_csv(cfg.out / "model_comparison_table.csv", index=True)
-    print("✅ Saved:", cfg.out / "model_comparison_table.csv")
+    print(" Saved:", cfg.out / "model_comparison_table.csv")
 
     plt.figure(figsize=(12, 5))
     plt.plot(df.index, df["actual"], label="Actual")
@@ -51,7 +51,7 @@ def comparison_plot(
     plt.legend()
     plt.title("Prophet vs ARIMA Forecast Comparison (Test)")
     plot_and_save(cfg.out / "model_comparison.png")
-    print("✅ Saved:", cfg.out / "model_comparison.png")
+    print(" Saved:", cfg.out / "model_comparison.png")
 
     plt.figure(figsize=(12, 5))
     plt.axhline(0, color="gray", linestyle="--", linewidth=1)
@@ -65,5 +65,5 @@ def comparison_plot(
     plt.title("Forecast Error Over Time (Test Period)")
     plt.legend()
     plot_and_save(cfg.out / "model_error_curves.png")
-    print("✅ Saved:", cfg.out / "model_error_curves.png")
+    print(" Saved:", cfg.out / "model_error_curves.png")
 

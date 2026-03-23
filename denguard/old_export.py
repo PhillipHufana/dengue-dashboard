@@ -61,7 +61,7 @@ def _upsert_df(sb: Client, table: str, df: pd.DataFrame, conflict: str, chunk_si
         batch = records[i * chunk_size:(i + 1) * chunk_size]
         sb.table(table).upsert(batch, on_conflict=conflict).execute()
 
-    print(f"✅ Upserted {total} rows into {table}")
+    print(f"Upserted {total} rows into {table}")
 
 # ============================================================
 # PUBLIC UPSERT FUNCTIONS (SAFE: subset to table columns)

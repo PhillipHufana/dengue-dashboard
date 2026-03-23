@@ -25,7 +25,7 @@ def select_city_model(
     metrics_arima: Dict[str, float],
     forecast_prophet_test: Optional[pd.DataFrame],
     forecast_arima_test: Optional[pd.DataFrame],
-    city_prophet: pd.DataFrame,
+    city_model_df: pd.DataFrame,
     y_train: pd.Series,
     model_prophet: Any,
     model_arima: Any,
@@ -87,7 +87,7 @@ def select_city_model(
     # ---------------------------------------------------------
     # B) Build future dates from LAST OBSERVED WEEK
     # ---------------------------------------------------------
-    last_obs_ds = pd.to_datetime(city_prophet["ds"], errors="raise").max()
+    last_obs_ds = pd.to_datetime(city_model_df["ds"], errors="raise").max()
     future_dates = pd.date_range(last_obs_ds + pd.Timedelta(weeks=1), periods=int(horizon), freq="W-MON")
 
     # ---------------------------------------------------------

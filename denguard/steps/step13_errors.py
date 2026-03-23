@@ -87,7 +87,7 @@ def barangay_error_ranking(
     print(top_problematic.to_string(index=False))
 
     barangay_errors.to_csv(cfg.out / "barangay_error_ranking.csv", index=False, encoding="utf-8-sig")
-    print(f"✅ Barangay TEST error ranking saved to {cfg.out / 'barangay_error_ranking.csv'}")
+    print(f" Barangay TEST error ranking saved to {cfg.out / 'barangay_error_ranking.csv'}")
 
     plt.figure(figsize=(10, 5))
     plt.barh(top_problematic["Barangay_key"].iloc[::-1], top_problematic["RMSE"].iloc[::-1])

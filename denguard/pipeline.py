@@ -1143,7 +1143,7 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
     city_weekly = build_city_series(weekly_full, cfg)
 
     train_end = pd.to_datetime(cfg.backtest_end_date)
-    city_prophet, train_city, test_city, _ = train_test_split_city(city_weekly, cfg, train_end=train_end, require_test=True)
+    city_model_df, train_city, test_city, _ = train_test_split_city(city_weekly, cfg, train_end=train_end, require_test=True)
 
     eval_horizon = len(test_city)
     future_horizon = resolve_horizon(cfg, test_len=eval_horizon)
@@ -1177,7 +1177,7 @@ def run_backtest(cfg: Config = DEFAULT_CFG) -> None:
         metrics_arima,
         city_prophet_test,
         city_arima_test,
-        city_prophet,
+        city_model_df,
         train_city.set_index("ds")["y"].sort_index().asfreq("W-MON"),
         model_prophet,
         model_arima,
@@ -1402,7 +1402,7 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
     weekly_full = weekly_aggregation(df, cfg)
     city_weekly = build_city_series(weekly_full, cfg)
 
-    city_prophet, train_city, test_city, _ = train_test_split_city(
+    city_model_df, train_city, test_city, _ = train_test_split_city(
         city_weekly,
         cfg,
         train_end=None,
@@ -1428,7 +1428,7 @@ def run_production(cfg: Config = DEFAULT_CFG) -> None:
         metrics_arima,
         city_prophet_test,
         city_arima_test,
-        city_prophet,
+        city_model_df,
         train_city.set_index("ds")["y"].sort_index().asfreq("W-MON"),
         model_prophet,
         model_arima,

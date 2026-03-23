@@ -51,7 +51,7 @@ async function adminFetch(path: string, init: RequestInit = {}) {
   return res;
 }
 
-// ✅ New: Supabase login
+//  New: Supabase login
 export async function supabaseLogin(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);

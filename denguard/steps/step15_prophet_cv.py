@@ -24,7 +24,7 @@ def prophet_cross_validation(PROPHET_OK: bool, model_prophet, cfg: Config) -> No
     print(cv_metrics[summary_cols].groupby("horizon").mean().tail())
     avg_rmse = cv_metrics["rmse"].mean()
     avg_smape = cv_metrics["smape"].mean()
-    print(f"✅ CV average RMSE: {avg_rmse:.2f} | SMAPE: {avg_smape:.3f}")
+    print(f" CV average RMSE: {avg_rmse:.2f} | SMAPE: {avg_smape:.3f}")
     plt.figure(figsize=(8, 4))
     plt.plot(cv_metrics["horizon"], cv_metrics["rmse"], "o", alpha=0.5)
     plt.axhline(avg_rmse, color="red", linestyle="--", label=f"Avg RMSE={avg_rmse:.1f}")

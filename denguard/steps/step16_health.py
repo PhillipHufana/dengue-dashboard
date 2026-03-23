@@ -29,7 +29,7 @@ def model_health_report(
         "Barangay sum = city total (coherence)": (True if np.isnan(diff) else diff < 1e-6),
     }
 
-    report = pd.DataFrame({"Check": list(checks.keys()), "Status": ["✅ PASS" if v else "❌ FAIL" for v in checks.values()]})
+    report = pd.DataFrame({"Check": list(checks.keys()), "Status": [" PASS" if v else "FAIL" for v in checks.values()]})
     print(report.to_string(index=False))
 
     if all(checks.values()):

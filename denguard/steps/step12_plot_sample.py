@@ -34,4 +34,4 @@ def plot_sample_barangays(weekly_full: pd.DataFrame, barangay_forecasts: pd.Data
     plt.xlabel("Week (W-MON)")
     plt.ylabel("Predicted Cases")
     plot_and_save(cfg.out / "barangay_forecast_sample.png")
-    print(f"✅ Saved sample forecast plot for top barangays: {top_barangays}")
+    print(f" Saved sample forecast plot for top barangays: {top_barangays}")

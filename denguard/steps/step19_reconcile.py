@@ -148,7 +148,7 @@ def reconcile_forecasts(
     rec_sum = preferred_future.groupby("ds")["yhat"].sum().rename("sum_pref").reset_index()
     rec_sum = rec_sum.merge(city[["ds", "yhat"]].rename(columns={"yhat": "city_yhat"}), on="ds", how="left")
     diff = float((rec_sum["sum_pref"] - rec_sum["city_yhat"]).abs().mean())
-    print(f"✅ Preferred reconciliation complete. Mean abs diff = {diff:.12f}")
+    print(f" Preferred reconciliation complete. Mean abs diff = {diff:.12f}")
 
     return preferred_future, all_models_future
 
@@ -170,7 +170,7 @@ def _grid_fill_future_models(
     # Future horizon dates (authoritative)
     all_ds = pd.DatetimeIndex(pd.to_datetime(city_future["ds"], errors="raise")).sort_values()
 
-    # ✅ sanity guard: city ds must be unique
+    #  sanity guard: city ds must be unique
     if all_ds.duplicated().any():
         raise ValueError("city_future ds contains duplicates.")
 
@@ -196,7 +196,7 @@ def _grid_fill_future_models(
     dis = dis[dis["horizon_type"] == "future"].copy()
     dis = dis[base_cols]
 
-    # ✅ sanity guard: disagg must be labeled correctly
+    #  sanity guard: disagg must be labeled correctly
     expected = {"disagg"}
     got = set(dis["model_name"].unique())
     if got - expected:

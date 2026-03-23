@@ -1,0 +1,2 @@
+run_id,weeks_to_sum,baseline_weeks,baseline_fallback_weeks,epsilon,model_name,n_barangays,surge_nan_count,surge_non_finite_count,baseline_formula_max_abs_diff,surge_zero_when_forecast_zero_pass_rate,surge_eligible_pct,priority_eligible_pct,top10_overlap_surge_vs_cases
+621b4307-28a6-486e-9716-02435373d348,4,8,26,1.0,preferred,182,0,0,0.0,1.0,0.3626373626373626,0.3076923076923077,6

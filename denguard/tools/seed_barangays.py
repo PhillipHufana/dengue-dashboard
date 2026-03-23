@@ -53,7 +53,7 @@ def main():
             r = s.post(url, headers=headers(), params=params, json=chunk, timeout=20)
             r.raise_for_status()
             total += len(chunk)
-    print(f"✅ Seeded/updated {total} barangays")
+    print(f" Seeded/updated {total} barangays")
 
 if __name__ == "__main__":
     main()

@@ -201,7 +201,7 @@ export function LoginModal({
           </DialogTitle>
           <DialogDescription>
             {mode === "login"
-              ? "Sign in with Supabase Auth (email + password)."
+              ? "Sign in with email + password."
               : "Create an account to request admin access. An existing admin must approve you."}
           </DialogDescription>
         </DialogHeader>

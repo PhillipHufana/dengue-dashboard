@@ -81,7 +81,7 @@ def ensure_barangay_forecast_df(
     out = out[["Barangay_key", "ds", "yhat", "yhat_lower", "yhat_upper", "model_name", "horizon_type"]]
     out = out.sort_values(["Barangay_key", "model_name", "ds"]).reset_index(drop=True)
 
-    # ✅ IMPORTANT: uniqueness must include model_name + horizon_type for long format
+    # IMPORTANT: uniqueness must include model_name + horizon_type for long format
     if out.duplicated(subset=["Barangay_key", "ds", "model_name", "horizon_type"]).any():
         raise ValueError("Barangay forecast has duplicate (Barangay_key, ds, model_name, horizon_type).")
 
@@ -109,7 +109,7 @@ def ensure_barangay_forecast_long_df(df: pd.DataFrame) -> pd.DataFrame:
     out["ds"] = _to_dt_monday(out["ds"], "barangay_forecast_long.ds")
     out = _ensure_interval_cols(out)
 
-    # ✅ Sort the WHOLE frame once so extras stay aligned
+    # Sort the WHOLE frame once so extras stay aligned
     sort_cols = ["Barangay_key", "model_name", "horizon_type", "ds"]
     out = out.sort_values(sort_cols).reset_index(drop=True)
 

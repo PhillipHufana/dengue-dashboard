@@ -14,14 +14,14 @@ def train_test_split_city(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
     print("\n== STEP 6: Train/Test split ==")
 
-    # Build city_prophet (model-ready)
-    city_prophet = (
+    # Build a common model-ready city series in ds/y format.
+    city_model_df = (
         city_weekly.rename(columns={"WeekStart": "ds", "CityCases": "y"})
         .sort_values("ds")
         .reset_index(drop=True)
     )
-    city_prophet["ds"] = pd.to_datetime(city_prophet["ds"], errors="raise")
-    city_prophet["y"] = pd.to_numeric(city_prophet["y"], errors="coerce").fillna(0.0)
+    city_model_df["ds"] = pd.to_datetime(city_model_df["ds"], errors="raise")
+    city_model_df["y"] = pd.to_numeric(city_model_df["y"], errors="coerce").fillna(0.0)
 
     # Determine train_end:
     # - Backtest: typically cfg.train_end_date (fixed cutoff)
@@ -32,15 +32,15 @@ def train_test_split_city(
         if getattr(cfg, "run_kind", "backtest") == "backtest":
             train_end = pd.to_datetime(getattr(cfg, "backtest_end_date"))
         else:
-            train_end = city_prophet["ds"].max()
+            train_end = city_model_df["ds"].max()
 
-    train_city = city_prophet[city_prophet["ds"] <= train_end][["ds", "y"]].copy()
-    test_city  = city_prophet[city_prophet["ds"] >  train_end][["ds", "y"]].copy()
+    train_city = city_model_df[city_model_df["ds"] <= train_end][["ds", "y"]].copy()
+    test_city  = city_model_df[city_model_df["ds"] >  train_end][["ds", "y"]].copy()
 
     if train_city.empty:
         raise ValueError(
             f"Train set is empty. train_end={train_end} "
-            f"data range={city_prophet['ds'].min()}..{city_prophet['ds'].max()}"
+            f"data range={city_model_df['ds'].min()}..{city_model_df['ds'].max()}"
         )
 
     if require_test and test_city.empty:
@@ -67,9 +67,9 @@ def train_test_split_city(
         assert test_city["ds"].min() > train_end
 
         recon = pd.concat([train_city, test_city]).sort_values("ds").reset_index(drop=True)
-        orig = city_prophet[["ds", "y"]].sort_values("ds").reset_index(drop=True)
+        orig = city_model_df[["ds", "y"]].sort_values("ds").reset_index(drop=True)
         assert len(recon) == len(orig)
         assert recon["ds"].equals(orig["ds"])
         assert np.allclose(recon["y"].to_numpy(), orig["y"].to_numpy())
 
-    return city_prophet, train_city, test_city, test_len
+    return city_model_df, train_city, test_city, test_len

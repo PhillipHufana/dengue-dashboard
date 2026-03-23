@@ -1,0 +1,2 @@
+model_name,model_scope,unit_key,order_label,order_p,order_d,order_q,seasonal,seasonal_period,seasonal_P,seasonal_D,seasonal_Q,run_id,run_kind
+arima,city,city,"(1, 0, 0)",1,0,0,False,1,0,0,0,621b4307-28a6-486e-9716-02435373d348,backtest

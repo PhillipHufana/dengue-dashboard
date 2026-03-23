@@ -279,6 +279,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                         Obs {formatCases(b.observed_cases_w ?? 0)} | P {formatCases(b.prophet_forecast_w ?? 0)} | A {formatCases(b.arima_forecast_w ?? 0)}
                       </div>
                     ) : null}
+                    {/*
                     <div
                       title={b.trend_message}
                       className={`flex items-center justify-end gap-1 text-[10px] ${
@@ -293,6 +294,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                       {b.trend < 0 && <ChevronDown className="h-3 w-3" />}
                       {Math.abs(b.trend)}%
                     </div>
+                    */}
                   </div>
                 </div>
               );

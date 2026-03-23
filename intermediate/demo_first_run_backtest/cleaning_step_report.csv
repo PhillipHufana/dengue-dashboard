@@ -1,0 +1,7 @@
+step,rows_before,rows_after,rows_dropped,drop_pct
+merge_strategy,42663,42663,0,0.0
+drop_blank_barangay,42663,42662,1,2.3439514333263016e-05
+drop_invalid_donset,42662,42660,2,4.688012751394684e-05
+drop_future_donset,42660,42660,0,0.0
+drop_implausibly_old_donset,42660,42657,3,7.032348804500703e-05
+fingerprint_dedupe,42657,39483,3174,0.0744074829453548

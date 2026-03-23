@@ -149,7 +149,7 @@ def get_choropleth(
     inc_values: List[float] = []
     surge_values: List[float] = []
 
-    # ✅ city-level aggregates (public-health correct)
+    # city-level aggregates (public-health correct)
     city_forecast_cases = 0.0
     city_baseline_expected_cases = 0.0
     city_population = 0
@@ -264,7 +264,7 @@ def get_choropleth(
 
             "population": pop,
 
-            # ✅ NEW: choropleth burden classification
+            # NEW: choropleth burden classification
             "burden_class": inc_class,  # very_low..very_high
 
             # Keep existing keys so frontend won’t break
@@ -307,7 +307,7 @@ def get_choropleth(
         "surge_epsilon": SURGE_EPSILON,
         "data_last_updated": data_last_updated,
 
-        # ✅ public-health KPIs (city-level)
+        # public-health KPIs (city-level)
         "city_forecast_cases": round(city_forecast_cases, 2),
         "city_population": city_population,
         "city_incidence_per_100k": round(city_incidence_per_100k, 2) if city_incidence_per_100k is not None else None,

@@ -314,7 +314,7 @@ def local_models_tierA(
 
         df_train = df_full[df_full["ds"] <= train_end].reset_index(drop=True)
 
-        # ✅ force weekly grid so local models train on consistent W-MON
+        #  force weekly grid so local models train on consistent W-MON
         df_train = (
             df_train.set_index("ds")
             .asfreq("W-MON")
@@ -587,7 +587,7 @@ def local_models_tierA(
                 "sMAPE_best_local_test": float(smape_best_local),
                 "delta_disagg_minus_local": _safe_float(delta),
                 "best_local_model": best_local_model,
-                "Chosen": chosen,  # ✅ now: local_prophet/local_arima/disagg
+                "Chosen": chosen,  #  now: local_prophet/local_arima/disagg
                 "decision_reason": decision_reason,
                 "status": status,
                 "err_prophet": err_prophet,

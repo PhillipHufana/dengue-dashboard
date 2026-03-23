@@ -13,7 +13,7 @@ def build_city_series(weekly_full: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         .rename(columns={"Cases": "CityCases"})
     )
 
-    # ✅ G0.4: tag every row with run_id
+    #  G0.4: tag every row with run_id
     city_weekly["run_id"] = cfg.run_id
 
     city_weekly["WeekStart"] = pd.to_datetime(city_weekly["WeekStart"], errors="raise")
@@ -22,7 +22,7 @@ def build_city_series(weekly_full: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     city_weekly = city_weekly[["run_id", "WeekStart", "CityCases"]]
 
     city_weekly.to_csv(cfg.out / "city_weekly.csv", index=False)
-    print("✅ Saved citywide weekly totals")
+    print(" Saved citywide weekly totals")
 
     plt.figure(figsize=(10, 4))
     plt.plot(city_weekly["WeekStart"], city_weekly["CityCases"])

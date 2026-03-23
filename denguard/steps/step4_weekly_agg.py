@@ -61,18 +61,18 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         .sort_values(["Barangay_key", "WeekStart"])
     )
 
-    # ✅ G0.4: tag every row with run_id
+    # G0.4: tag every row with run_id
     weekly_full["run_id"] = cfg.run_id
 
 
     # Ensure all barangays have same week count
     week_counts = weekly_full.groupby("Barangay_key")["WeekStart"].count()
-    assert week_counts.nunique() == 1, "❌ Inconsistent week counts per barangay!"
+    assert week_counts.nunique() == 1, " Inconsistent week counts per barangay!"
 
     ws = pd.to_datetime(weekly["WeekStart"]).sort_values()
     print("Weekly dayofweek unique:", ws.dt.dayofweek.unique())  # should be [0]
 
-    print(f"✅ All barangays have {week_counts.iloc[0]} weeks of data.")
+    print(f"All barangays have {week_counts.iloc[0]} weeks of data.")
 
     weekly_full = weekly_full[["run_id", "Barangay_key", "WeekStart", "Cases"]]
 
@@ -81,7 +81,7 @@ def weekly_aggregation(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         index=False,
         encoding="utf-8-sig"
     )
-    print(f"✅ Saved full weekly dataset ({len(weekly_full):,} rows)")
+    print(f"Saved full weekly dataset ({len(weekly_full):,} rows)")
 
     print("Weekly template start:", weeks.min(), "end:", weeks.max(), "n_weeks:", len(weeks))
     print("Canonical barangays:", len(barangays))

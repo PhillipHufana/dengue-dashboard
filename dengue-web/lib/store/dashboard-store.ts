@@ -60,7 +60,7 @@ export const useDashboardStore = create<DashboardState>()(
       runId: null,
       horizonType: "future",
 
-      // ✅ default period
+      //  default period
       period: "1m",
       setPeriod: (p) => set({ period: p }),
 

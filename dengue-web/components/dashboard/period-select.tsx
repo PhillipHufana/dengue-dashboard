@@ -13,7 +13,7 @@ const periodLabel: Record<TimePeriod, string> = {
   "1y": "1 Year",
 };
 
-const ALLOWED_PERIODS: TimePeriod[] = ["1w", "2w", "1m", "3m"]; // ✅ temporary limit
+const ALLOWED_PERIODS: TimePeriod[] = ["1w", "2w", "1m", "3m"]; //  temporary limit
 
 export function PeriodSelect({ compact = false }: { compact?: boolean }) {
   const period = useDashboardStore((s) => s.period);

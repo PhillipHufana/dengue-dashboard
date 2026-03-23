@@ -533,11 +533,11 @@ def get_forecast_summary(
         if inc is not None:
             inc_values.append(float(inc))
 
-    # ✅ compute Jenks breaks AFTER we have all values
+    #  compute Jenks breaks AFTER we have all values
     case_breaks = jenks_breaks_safe(case_values, n_classes=5)
     inc_breaks = jenks_breaks_safe(inc_values, n_classes=5)
 
-    # ✅ second pass: assign classes + build response rows
+    #  second pass: assign classes + build response rows
     for (nm, week_start, total_fc, display_total, observed_total, inc, observed_inc, prophet_fc, arima_fc, pop, history_len, yhat_lower, yhat_upper) in rows_tmp:
         cases_class = jenks_class(float(display_total), case_breaks) if display_total is not None else "unknown"
         burden_class = jenks_class(float(inc), inc_breaks) if inc is not None else "unknown"
@@ -559,11 +559,11 @@ def get_forecast_summary(
                 "prophet_forecast_w": float(prophet_fc),
                 "arima_forecast_w": float(arima_fc),
 
-                # ✅ Jenks classes
+                #  Jenks classes
                 "cases_class": cases_class,
                 "burden_class": burden_class,
 
-                # ✅ keep legacy keys (but now consistent with Jenks)
+                #  keep legacy keys (but now consistent with Jenks)
                 "risk_level": burden_class,              # burden everywhere
                 "risk_level_cases": cases_class,
                 "risk_level_incidence": burden_class,

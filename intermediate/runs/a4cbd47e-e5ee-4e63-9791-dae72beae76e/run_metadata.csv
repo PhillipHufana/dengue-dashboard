@@ -1,0 +1,2 @@
+run_id,run_kind,data_cutoff_date,train_start,train_end,test_start,test_end,test_length_weeks,forecast_horizon_weeks,disagg_weight_weeks,disagg_scheme,alpha_smooth,selected_primary_model,ranking_formula_version,surge_baseline_weeks,surge_epsilon,surge_min_forecast_cases,incoming_mode,backtest_end_date
+a4cbd47e-e5ee-4e63-9791-dae72beae76e,production,2025-07-07,2016-12-26,2025-07-07,,,0,12,52,static,1.0,prophet,v3_adaptive_baseline_8w_or_26w,8,1.0,2.0,full_refresh,2022-12-26

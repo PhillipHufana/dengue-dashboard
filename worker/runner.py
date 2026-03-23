@@ -274,7 +274,7 @@ def main():
             set_upload(sb, upload_id, "succeeded", None)
             log_run(sb, run_id, "info", "published", payload={"active_run_id": run_id})
 
-            print(f"✅ published run {run_id} from upload {upload_id}")
+            print(f" published run {run_id} from upload {upload_id}")
 
         except Exception as e:
             msg = f"{type(e).__name__}: {e}"

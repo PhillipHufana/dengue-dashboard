@@ -40,7 +40,7 @@ export function AdminUpload() {
   // keep last selected file so you can "rerun anyway" even after input clears
   const [lastFile, setLastFile] = useState<File | null>(null);
 
-  // ✅ separate "data" vs "visibility"
+  //  separate "data" vs "visibility"
   const [detailsData, setDetailsData] = useState<UploadResponse | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -205,7 +205,7 @@ export function AdminUpload() {
           </PopoverContent>
         </Popover>
 
-        {/* ✅ only appears when backend says "already_succeeded" */}
+        {/*  only appears when backend says "already_succeeded" */}
         {canRerun && (
           <Button
             type="button"

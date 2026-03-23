@@ -25,7 +25,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // ✅ logged in (role enforcement comes next via backend)
+      //  logged in (role enforcement comes next via backend)
       setStatus("authed");
       setMessage("");
     };
