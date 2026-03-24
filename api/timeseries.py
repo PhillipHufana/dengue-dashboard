@@ -85,6 +85,7 @@ def _resample_series(
 # Main endpoint
 # ------------------------------------------------------------
 
+@router.get("")
 @router.get("/")
 def get_timeseries(
     level: Literal["barangay", "city"] = Query("barangay"),

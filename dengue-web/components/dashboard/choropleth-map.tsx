@@ -350,10 +350,17 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
             </Badge>
           </div>
           {selectedBarangay ? (
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 min-w-0">
-              <span className="text-primary text-sm">Selected:</span>
-              <Badge className="max-w-[52vw] md:max-w-none truncate">{selectedBarangay.pretty}</Badge>
-              <Button size="sm" variant="ghost" className="ml-auto h-6" onClick={() => onBarangaySelect(null)}>
+            <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 min-w-0">
+              <span className="text-primary text-xs sm:text-sm shrink-0">Selected:</span>
+              <Badge className="max-w-full sm:max-w-[60vw] md:max-w-none truncate text-[10px] sm:text-xs min-w-0">
+                {selectedBarangay.pretty}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-full sm:ml-auto sm:w-auto"
+                onClick={() => onBarangaySelect(null)}
+              >
                 Clear
               </Button>
             </div>
@@ -417,7 +424,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
             <div className="text-red-500 p-4">Failed to load map.</div>
           )}
 
-          <div className="absolute top-2 right-2 max-w-[60vw] md:max-w-[320px] bg-white/85 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 p-2 rounded-lg backdrop-blur-sm z-50">
+          <div className="absolute top-2 right-2 max-w-[58vw] sm:max-w-[52vw] md:max-w-[320px] bg-white/85 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 p-2 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[10px] text-slate-700 dark:text-slate-200 font-medium">
               {effectiveMetric === "cases"
                 ? "VERY HIGH CASE BARANGAYS"
@@ -428,7 +435,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
             <div className="mt-1 flex flex-wrap gap-1">
               {highlightedNames.length ? (
                 highlightedNames.map((name) => (
-                  <Badge key={name} variant="secondary" className="text-[10px]">
+                  <Badge key={name} variant="secondary" className="max-w-full truncate text-[10px]">
                     {name}
                   </Badge>
                 ))
@@ -438,7 +445,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
             </div>
           </div>
 
-          <div className="absolute bottom-2 left-2 max-w-[56vw] md:max-w-[360px] bg-background/95 border p-1.5 md:p-3 rounded-lg backdrop-blur-sm z-50">
+          <div className="absolute bottom-2 left-2 max-w-[58vw] sm:max-w-[52vw] md:max-w-[360px] bg-background/95 border p-1.5 md:p-3 rounded-lg backdrop-blur-sm z-50">
             <div className="text-[9px] md:text-xs font-medium mb-1 md:mb-2 text-muted-foreground">
               {effectiveMetric === "incidence" ? "Incidence Levels" : effectiveMetric === "surge" ? "Surge Levels" : "Case Levels"}
             </div>

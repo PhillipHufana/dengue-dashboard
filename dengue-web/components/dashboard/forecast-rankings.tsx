@@ -242,13 +242,13 @@ export const ForecastRankings = React.memo(function ForecastRankings({
             />
           </div>
 
-          <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
+          <div className="flex flex-wrap gap-1 p-1 bg-secondary/50 rounded-lg">
             {["all", "very_high", "high", "medium", "low", "very_low"].map((r) => (
               <Button
                 key={r}
                 size="sm"
                 variant={riskFilter === r ? "default" : "ghost"}
-                className="text-[10px]"
+                className="min-w-0 flex-1 basis-[31%] text-[10px] sm:flex-none sm:basis-auto"
                 onClick={() => setRiskFilter(r as RiskFilter)}
               >
                 {r === "all" ? "ALL" : r.replace("_", " ").toUpperCase()}
@@ -289,7 +289,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                     rowRefs.current[b.name] = node;
                   }}
                   onClick={() => onBarangaySelect(isSelected ? null : { pretty: b.pretty_name, clean: b.name })}
-                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                  className={`flex items-start gap-2 sm:gap-3 p-2 rounded-lg cursor-pointer transition-all min-w-0 ${
                     isSelected
                       ? "bg-primary/20 border border-primary"
                       : "bg-secondary/30 hover:bg-secondary/50 border border-transparent"
@@ -316,8 +316,8 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <p className="font-bold text-sm">
+                  <div className="min-w-0 shrink-0 text-right max-w-[42%] sm:max-w-[46%]">
+                    <p className="font-bold text-sm break-words">
                       {effectiveMetric === "surge"
                         ? formatSurgeX(value)
                         : effectiveMetric === "cases"
@@ -325,15 +325,15 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                         : formatRate(value)}
                     </p>
                     {effectiveMetric === "surge" ? (
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[10px] text-muted-foreground break-words">
                         Forecast Window: {formatCases(b.forecast_w_cases ?? 0)} | Baseline: {formatCases(b.baseline_expected_w ?? 0)}
                       </div>
                     ) : effectiveMetric === "incidence" ? (
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[10px] text-muted-foreground break-words">
                         Cases per 100,000 people
                       </div>
                     ) : (
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[10px] text-muted-foreground break-words">
                         Total cases in selected window
                       </div>
                     )}
