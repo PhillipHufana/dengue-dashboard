@@ -16,6 +16,7 @@ from .auth import require_admin_user, require_user_id
 
 from pydantic import BaseModel
 
+from denguard.config import DEFAULT_CFG
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -227,7 +228,7 @@ def admin_upload(
             "mode": "production",
             "run_kind": "production",
             "status": "queued",
-            "horizon_weeks": 12,
+            "horizon_weeks": int(getattr(DEFAULT_CFG, "production_horizon_weeks", 52)),
             "started_at": _utc_now_iso(),
             "finished_at": None,
             "error_message": None,

@@ -1,4 +1,5 @@
 # api/main.py
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .supabase_client import get_supabase
@@ -20,12 +21,23 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+def _parse_csv_env(name: str) -> list[str]:
+    raw = os.getenv(name, "")
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+default_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+cors_origins = _parse_csv_env("CORS_ORIGINS") or default_cors_origins
+cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],  # IMPORTANT: allows Authorization header
