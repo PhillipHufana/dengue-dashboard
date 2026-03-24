@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from .supabase_client import get_supabase
 from typing import Optional, Dict, Any, List
 import json
+from cachetools import TTLCache
 from .run_helpers import resolve_run_id, resolve_model_name
 from .forecast import _load_population_map
 from .utils import normalize_name
@@ -12,6 +13,8 @@ from typing import Sequence, Tuple
 from .jenks import jenks_breaks_safe, jenks_class
 
 router = APIRouter(prefix="/geo", tags=["geo"])
+
+_choropleth_cache = TTLCache(maxsize=64, ttl=300)
 
 PERIOD_WEEKS = {
     "1w": 1,
@@ -75,6 +78,9 @@ def get_choropleth(
     mode = str(data_mode or "forecast").strip().lower()
     if mode not in {"forecast", "observed"}:
         mode = "forecast"
+    cache_key = (rid, model, period, mode)
+    if cache_key in _choropleth_cache:
+        return _choropleth_cache[cache_key]
 
     brg_rows = (
         sb.table("barangays")
@@ -353,7 +359,7 @@ def get_choropleth(
         else None
     )
 
-    return {
+    resp = {
         "type": "FeatureCollection",
         "run_id": rid,
         "model_name": model,
@@ -379,6 +385,8 @@ def get_choropleth(
 
         "features": features,
     }
+    _choropleth_cache[cache_key] = resp
+    return resp
 
 @router.get("/hotspots/top")
 def dengue_hotspots_top(

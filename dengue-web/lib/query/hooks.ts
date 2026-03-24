@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getSummary, getChoropleth, getTimeseries, getForecastRankings, getCityCompareSeries, getActionPriority } from "@/lib/api";
 
 import type { DataMode, Frequency, RiskMetric, TimePeriod } from "@/lib/store/dashboard-store";
@@ -21,6 +21,10 @@ export function useSummary(
         period: period ?? undefined,
         dataMode: dataMode ?? undefined,
       }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 export function useChoropleth(
@@ -38,6 +42,10 @@ export function useChoropleth(
         period: period ?? undefined,
         dataMode: dataMode ?? undefined,
       }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -60,6 +68,7 @@ export function useRankings(
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -82,6 +91,7 @@ export function useActionPriority(
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -103,6 +113,10 @@ export function useBarangaySeries(
         modelName,
         horizonType,
       }),
+    staleTime: 2 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -116,6 +130,10 @@ export function useCitySeries(freq: Frequency, runId: string | null, modelName: 
         modelName,
         horizonType,
       }),
+    staleTime: 2 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -127,5 +145,9 @@ export function useCityCompareSeries(runId: string | null, enabled = true) {
       getCityCompareSeries({
         runId: runId ?? undefined,
       }),
+    staleTime: 2 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }

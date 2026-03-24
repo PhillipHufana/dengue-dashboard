@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { KpiCards } from "./dashboard/kpi-cards"
 import { ForecastChart } from "./dashboard/forecast-chart"
 import { ForecastRankings } from "./dashboard/forecast-rankings"
@@ -36,10 +36,12 @@ export function DengueDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [disaggScheme, setDisaggScheme] = useState<string | null>(null)
   const setRunId = useDashboardStore((s) => s.setRunId)
+  const currentRunId = useDashboardStore((s) => s.runId)
   const dataMode = useDashboardStore((s) => s.dataMode)
   const riskMetric = useDashboardStore((s) => s.riskMetric)
   const period = useDashboardStore((s) => s.period)
   const setRiskMetric = useDashboardStore((s) => s.setRiskMetric)
+  const latestRunIdRef = useRef<string | null>(currentRunId)
 
   const periodWeeks: Record<string, number> = {
     "1w": 1,
@@ -98,24 +100,49 @@ export function DengueDashboard() {
   })();
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const info = await getDataInfo();
-        if (alive) {
-          setLastUpdated(info.last_historical_date);
-          setRunId(info.run_id ?? null);
-          setDisaggScheme(info.disagg_scheme ?? null);
-        }
-      } catch {
-        if (alive) {
-          setLastUpdated(null);
-          setDisaggScheme(null);
-        }
+    latestRunIdRef.current = currentRunId;
+  }, [currentRunId]);
+
+  const syncLatestRun = useCallback(async (alive = true) => {
+    try {
+      const info = await getDataInfo();
+      if (!alive) return;
+
+      const nextRunId = info.run_id ?? null;
+      const runChanged = nextRunId !== latestRunIdRef.current;
+
+      setLastUpdated(info.last_historical_date);
+      setDisaggScheme(info.disagg_scheme ?? null);
+
+      if (runChanged) {
+        latestRunIdRef.current = nextRunId;
+        setRunId(nextRunId);
+        setSelectedBarangay(null);
+        setMapFocusToken(0);
       }
-    })();
-    return () => { alive = false; };
+    } catch {
+      if (!alive) return;
+      setLastUpdated(null);
+      setDisaggScheme(null);
+    }
   }, [setRunId]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const initialTimeoutId = window.setTimeout(() => {
+      void syncLatestRun(alive);
+    }, 0);
+    const intervalId = window.setInterval(() => {
+      void syncLatestRun(alive);
+    }, 30_000);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(initialTimeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [syncLatestRun]);
 
   useEffect(() => {
     if (dataMode === "observed" && (riskMetric === "surge" || riskMetric === "action_priority")) {
@@ -141,6 +168,7 @@ export function DengueDashboard() {
         mode="public"
         lastUpdated={formatReadableDate(lastUpdated)}
         disaggScheme={disaggScheme}
+        onRefreshLatestRun={() => void syncLatestRun(true)}
       />
 
       <main className="relative z-0 p-3 md:p-6">

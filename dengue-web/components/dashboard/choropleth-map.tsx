@@ -108,11 +108,17 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
   const useAction = isForecastMode && riskMetric === "action_priority";
   const effectiveMetric = useAction ? "surge" : riskMetric;
 
-  const { data: geo, isLoading: loadingGeo } = useChoropleth(runId, modelName, period, dataMode);
-  const { data: rankingData } = useRankings(period, runId, modelName, effectiveMetric, dataMode);
+  const { data: geo, isLoading: loadingGeo, isFetching: fetchingGeo } = useChoropleth(runId, modelName, period, dataMode);
+  const rankingsQuery = useRankings(period, runId, modelName, effectiveMetric, dataMode);
+  const { data: rankingData } = rankingsQuery;
   const actionQuery = useActionPriority(period, runId, modelName, dataMode, useAction);
   const geoMeta = geo as ChoroplethMeta | undefined;
-  const mapLoading = loadingGeo || (useAction && actionQuery.isLoading);
+  const mapLoading =
+    loadingGeo ||
+    fetchingGeo ||
+    rankingsQuery.isLoading ||
+    rankingsQuery.isFetching ||
+    (useAction && (actionQuery.isLoading || actionQuery.isFetching));
   const [showMapLabels, setShowMapLabels] = useState(false);
 
   useEffect(() => {

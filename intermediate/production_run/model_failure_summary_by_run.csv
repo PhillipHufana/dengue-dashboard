@@ -35,3 +35,7 @@ city,prophet,1,1,0,0.0,91812205-3118-4b5c-ae06-2bd047b75f6d,production
 city,arima,1,1,0,0.0,91812205-3118-4b5c-ae06-2bd047b75f6d,production
 local,local_prophet,0,0,0,0.0,91812205-3118-4b5c-ae06-2bd047b75f6d,production
 local,local_arima,0,0,0,0.0,91812205-3118-4b5c-ae06-2bd047b75f6d,production
+city,prophet,1,1,0,0.0,3f4b4961-8091-4f2d-9317-f04e914e3769,production
+city,arima,1,1,0,0.0,3f4b4961-8091-4f2d-9317-f04e914e3769,production
+local,local_prophet,0,0,0,0.0,3f4b4961-8091-4f2d-9317-f04e914e3769,production
+local,local_arima,0,0,0,0.0,3f4b4961-8091-4f2d-9317-f04e914e3769,production

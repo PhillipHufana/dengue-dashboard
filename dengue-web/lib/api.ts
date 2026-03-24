@@ -123,7 +123,7 @@ export async function getDataInfo(): Promise<{
   run_id?: string;
   disagg_scheme?: string | null;
 }> {
-  const res = await fetch(`${API_BASE}/data/info`);
+  const res = await fetch(`${API_BASE}/data/info`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load data info");
   return res.json();
 }

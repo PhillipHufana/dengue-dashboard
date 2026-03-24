@@ -33,7 +33,7 @@ export function KpiCards() {
   const useAction = isForecastMode && riskMetric === "action_priority";
   const effectiveMetric = useAction ? "surge" : riskMetric;
 
-  const { data: geo, isLoading, error } = useChoropleth(runId, modelName, period, dataMode);
+  const { data: geo, isLoading, isFetching, error } = useChoropleth(runId, modelName, period, dataMode);
   const actionQuery = useActionPriority(period, runId, modelName, dataMode, useAction);
   const { data: cityCompare } = useCityCompareSeries(runId, dataMode === "forecast");
   const geoSafe = geo as (ChoroplethFC & {
@@ -117,7 +117,7 @@ export function KpiCards() {
     };
   }, [useAction, actionSummary, geoFeatures, effectiveMetric, dataMode]);
 
-  const cardsLoading = isLoading || (useAction && actionQuery.isLoading);
+  const cardsLoading = isLoading || isFetching || (useAction && (actionQuery.isLoading || actionQuery.isFetching));
 
   if (cardsLoading) {
     return (

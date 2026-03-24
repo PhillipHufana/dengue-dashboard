@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bug, Calendar, LogIn, Shield, UserCircle } from "lucide-react";
+import { Bug, Calendar, LogIn, RefreshCw, Shield, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
@@ -82,10 +82,12 @@ export function AppHeader({
   mode,
   lastUpdated,
   disaggScheme,
+  onRefreshLatestRun,
 }: {
   mode: HeaderMode;
   lastUpdated?: string | null;
   disaggScheme?: string | null;
+  onRefreshLatestRun?: () => void;
 }) {
   const router = useRouter();
   const dataMode = useDashboardStore((s) => s.dataMode);
@@ -188,6 +190,17 @@ export function AppHeader({
                 Disagg: {disaggScheme}
               </Badge>
             ) : null}
+            {mode === "public" && onRefreshLatestRun ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 bg-transparent"
+                onClick={onRefreshLatestRun}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh Latest Run
+              </Button>
+            ) : null}
           </div>
 
           {mode === "public" ? (
@@ -274,6 +287,17 @@ export function AppHeader({
           <Badge variant="secondary" className="text-[9px] uppercase tracking-wide ml-1">
             {disaggScheme}
           </Badge>
+        ) : null}
+        {mode === "public" && onRefreshLatestRun ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-7 gap-1 px-2 text-[10px] bg-transparent"
+            onClick={onRefreshLatestRun}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Refresh
+          </Button>
         ) : null}
       </div>
     </header>

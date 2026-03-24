@@ -48,7 +48,9 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const rankingsData = rankingsQuery.data;
   const actionData = actionQuery.data;
   const data = useAction ? actionData : rankingsData;
-  const isLoading = useAction ? actionQuery.isLoading : rankingsQuery.isLoading;
+  const isLoading = useAction
+    ? (actionQuery.isLoading || actionQuery.isFetching)
+    : (rankingsQuery.isLoading || rankingsQuery.isFetching);
   const rankingTitle =
     useAction
       ? "Forecasted Surge by Barangay"

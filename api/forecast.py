@@ -4,6 +4,7 @@ import statistics
 from fastapi import APIRouter, Query, HTTPException
 from typing import Dict, List, Optional, Literal
 from datetime import date
+from cachetools import TTLCache
 from .supabase_client import get_supabase
 from .utils import normalize_name
 from .run_helpers import (
@@ -17,6 +18,8 @@ from .risk import risk_from_baseline_percentiles
 from .risk import risk_from_baseline_percentiles_windowed
 from .jenks import jenks_breaks_safe, jenks_class
 router = APIRouter()
+
+_summary_cache = TTLCache(maxsize=64, ttl=300)
 
 # ================================================================
 # 🔧 HELPERS — LOAD WEEKLY HISTORY + COMPUTE THRESHOLDS
@@ -419,6 +422,9 @@ def get_forecast_summary(
     mode = str(data_mode or "forecast").strip().lower()
     if mode not in {"forecast", "observed"}:
         mode = "forecast"
+    cache_key = (rid, model, period, mode)
+    if cache_key in _summary_cache:
+        return _summary_cache[cache_key]
 
     city_rows = (
         sb.table("city_weekly_runs")
@@ -572,7 +578,7 @@ def get_forecast_summary(
                 "yhat_upper": yhat_upper,
             }
         )
-    return {
+    resp = {
         "run_id": rid,
         "model_name": model,
         "horizon_type": "future",
@@ -587,3 +593,5 @@ def get_forecast_summary(
         "jenks_breaks_incidence": inc_breaks,
         "jenks_breaks_cases": case_breaks,
     }
+    _summary_cache[cache_key] = resp
+    return resp

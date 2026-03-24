@@ -110,7 +110,9 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
   const cityCompareQuery = useCityCompareSeries(runId, !brgyName);
 
   const isCityView = !brgyName;
-  const isLoading = isCityView ? cityCompareQuery.isLoading : barangayQuery.isLoading;
+  const isLoading = isCityView
+    ? (cityCompareQuery.isLoading || cityCompareQuery.isFetching)
+    : (barangayQuery.isLoading || barangayQuery.isFetching);
   const isError = isCityView ? cityCompareQuery.isError : barangayQuery.isError;
   const series = useMemo(() => {
     if (isCityView) return cityCompareQuery.data?.series ?? [];
