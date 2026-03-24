@@ -10,6 +10,7 @@ dependencies = [
   "fastapi",
   "uvicorn[standard]",
   "python-dotenv",
+  "python-multipart",
   "pandas",
   "numpy",
   "matplotlib",
