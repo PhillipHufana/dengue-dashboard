@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapCont
 const TileLayer = dynamic(() => import("react-leaflet").then((m) => m.TileLayer), { ssr: false });
 const GeoJSON = dynamic(() => import("react-leaflet").then((m) => m.GeoJSON), { ssr: false });
 const Marker = dynamic(() => import("react-leaflet").then((m) => m.Marker), { ssr: false });
+const MapFocusController = dynamic(() => import("./map-focus-controller").then((m) => m.MapFocusController), { ssr: false });
 
 import "leaflet/dist/leaflet.css";
 import { divIcon } from "leaflet";
@@ -48,6 +49,7 @@ function formatRange(a: number, b: number, unit: string, metric: string) {
 interface ChoroplethMapProps {
   selectedBarangay: { pretty: string; clean: string } | null;
   onBarangaySelect: (value: { pretty: string; clean: string } | null) => void;
+  focusToken?: number;
 }
 
 type ChoroplethMeta = ChoroplethFC & {
@@ -96,16 +98,15 @@ function featureCentroid(feature: MapFeature): [number, number] | null {
   return [latSum / points.length, lngSum / points.length];
 }
 
-export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: ChoroplethMapProps) {
+export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken = 0 }: ChoroplethMapProps) {
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const dataMode = useDashboardStore((s) => s.dataMode);
   const period = useDashboardStore((s) => s.period);
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
-  const useAction = riskMetric === "action_priority";
-
-  const effectiveMetric =
-    useAction ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+  const isForecastMode = dataMode === "forecast";
+  const useAction = isForecastMode && riskMetric === "action_priority";
+  const effectiveMetric = useAction ? "surge" : riskMetric;
 
   const { data: geo, isLoading: loadingGeo } = useChoropleth(runId, modelName, period, dataMode);
   const { data: rankingData } = useRankings(period, runId, modelName, effectiveMetric, dataMode);
@@ -135,19 +136,49 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
       effectiveMetric === "incidence"
         ? geoMeta?.jenks_breaks_incidence
         : effectiveMetric === "surge"
-        ? geoMeta?.jenks_breaks_surge
+        ? (rankingData?.jenks_breaks_surge ?? geoMeta?.jenks_breaks_surge)
         : geoMeta?.jenks_breaks_cases;
     if (!Array.isArray(b) || b.length < 6) return null;
     const unit = effectiveMetric === "incidence" ? "/100k" : effectiveMetric === "surge" ? "x" : "cases";
     const labels = ["Very Low", "Low", "Medium", "High", "Very High"];
     const classes = ["very_low", "low", "medium", "high", "very_high"] as const;
     return classes.map((cls, i) => ({ cls, label: labels[i], range: formatRange(b[i], b[i + 1], unit, effectiveMetric) }));
-  }, [geoMeta, effectiveMetric]);
+  }, [effectiveMetric, geoMeta?.jenks_breaks_cases, geoMeta?.jenks_breaks_incidence, geoMeta?.jenks_breaks_surge, rankingData?.jenks_breaks_surge]);
 
   const periodLabel = useMemo(
     () => formatDateRange(geoMeta?.period_start_week, geoMeta?.period_end_week) ?? period.toUpperCase(),
     [geoMeta?.period_end_week, geoMeta?.period_start_week, period],
   );
+
+  const metricClassForFeature = useCallback((feature: { properties: Record<string, unknown> }, row?: RankingRow) => {
+    if (effectiveMetric === "surge") {
+      return String(useAction ? (row?.surge_class ?? "very_low") : (row?.surge_class ?? feature.properties.surge_class ?? "unknown"));
+    }
+    if (effectiveMetric === "incidence") {
+      return String(row?.burden_class ?? feature.properties.burden_class ?? "unknown");
+    }
+    return String(row?.cases_class ?? feature.properties.cases_class ?? "unknown");
+  }, [effectiveMetric, useAction]);
+
+  const metricValueForFeature = useCallback((feature: { properties: Record<string, unknown> }, row?: RankingRow) => {
+    if (effectiveMetric === "surge") {
+      return Number(useAction ? (row?.surge_score ?? 0) : (row?.surge_score ?? feature.properties.forecast_surge_ratio ?? 0));
+    }
+    if (effectiveMetric === "incidence") {
+      return Number(row?.total_forecast_incidence_per_100k ?? feature.properties.forecast_incidence_per_100k ?? 0);
+    }
+    return Number(
+      dataMode === "observed"
+        ? (row?.observed_cases_w ?? row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.latest_cases ?? 0)
+        : (row?.forecast_w_cases ?? row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.forecast_cases ?? feature.properties.latest_forecast ?? 0)
+    );
+  }, [dataMode, effectiveMetric, useAction]);
+
+  const selectedCenter = useMemo(() => {
+    if (!selectedBarangay?.clean || !geo?.features?.length) return null;
+    const feature = geo.features.find((f) => String(f.properties.name ?? "") === selectedBarangay.clean) as MapFeature | undefined;
+    return feature ? featureCentroid(feature) : null;
+  }, [geo, selectedBarangay]);
 
   const stats = useMemo(() => {
     if (!geo?.features?.length) {
@@ -163,22 +194,8 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     for (const f of geo.features as Array<{ properties: Record<string, unknown> }>) {
       const name = String(f.properties.name ?? "");
       const row = rankingByName.get(name);
-      const value =
-        effectiveMetric === "surge"
-          ? Number(row?.surge_score ?? f.properties.forecast_surge_ratio ?? 0)
-          : effectiveMetric === "incidence"
-          ? Number(row?.total_forecast_incidence_per_100k ?? f.properties.forecast_incidence_per_100k ?? 0)
-          : Number(
-              dataMode === "observed"
-                ? (row?.observed_cases_w ?? row?.total_forecast_cases ?? row?.total_forecast ?? f.properties.latest_cases ?? 0)
-                : (row?.forecast_w_cases ?? row?.total_forecast_cases ?? row?.total_forecast ?? f.properties.forecast_cases ?? f.properties.latest_forecast ?? 0)
-            );
-      const cls =
-        effectiveMetric === "surge"
-          ? String(row?.surge_class ?? f.properties.surge_class ?? "unknown")
-          : effectiveMetric === "incidence"
-          ? String(row?.burden_class ?? f.properties.burden_class ?? "unknown")
-          : String(row?.cases_class ?? f.properties.cases_class ?? "unknown");
+      const value = metricValueForFeature(f, row);
+      const cls = metricClassForFeature(f, row);
 
       total += value;
       if (cls === "very_high") very_high += 1;
@@ -189,7 +206,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     }
 
     return { total, very_high, high, medium, low, very_low };
-  }, [geo, rankingByName, effectiveMetric, dataMode]);
+  }, [geo, rankingByName, metricClassForFeature, metricValueForFeature]);
 
   const asOfDate = useMemo(() => {
     const raw = geoMeta?.data_last_updated ?? null;
@@ -205,17 +222,12 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
       .filter((f) => {
         const key = String(f.properties.name ?? "");
         const row = rankingByName.get(key);
-        const level =
-          effectiveMetric === "surge"
-            ? String(row?.surge_class ?? f.properties.surge_class ?? "unknown")
-            : effectiveMetric === "incidence"
-            ? String(row?.burden_class ?? f.properties.burden_class ?? "unknown")
-            : String(row?.cases_class ?? f.properties.cases_class ?? "unknown");
+        const level = metricClassForFeature(f, row);
         return level === "very_high";
       })
       .map((f) => humanizeName(String(f.properties.display_name ?? f.properties.name ?? "")))
       .sort((a, b) => a.localeCompare(b));
-  }, [geo, rankingByName, effectiveMetric]);
+  }, [geo, rankingByName, metricClassForFeature]);
 
   const mapLabels = useMemo(() => {
     if (!geo?.features?.length) return [];
@@ -223,12 +235,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
       .map((f) => {
         const key = String(f.properties.name ?? "");
         const row = rankingByName.get(key);
-        const level =
-          effectiveMetric === "surge"
-            ? String(row?.surge_class ?? f.properties.surge_class ?? "unknown")
-            : effectiveMetric === "incidence"
-            ? String(row?.burden_class ?? f.properties.burden_class ?? "unknown")
-            : String(row?.cases_class ?? f.properties.cases_class ?? "unknown");
+        const level = metricClassForFeature(f, row);
         if (level !== "very_high") return null;
         const center = featureCentroid(f as MapFeature);
         if (!center) return null;
@@ -240,7 +247,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
         };
       })
       .filter((item): item is { key: string; level: string; center: [number, number]; label: string } => item !== null);
-  }, [geo, rankingByName, effectiveMetric]);
+  }, [geo, rankingByName, metricClassForFeature]);
 
   const style = (feature?: MapFeature) => {
     if (!feature) {
@@ -253,12 +260,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     }
     const key = String(feature.properties.name ?? "");
     const row = rankingByName.get(key);
-    const level =
-      effectiveMetric === "surge"
-        ? String(row?.surge_class ?? feature.properties.surge_class ?? "unknown")
-        : effectiveMetric === "incidence"
-        ? String(row?.burden_class ?? feature.properties.burden_class ?? "unknown")
-        : String(row?.cases_class ?? feature.properties.cases_class ?? "unknown");
+    const level = metricClassForFeature(feature, row);
     const selected = selectedBarangay?.clean === key;
     return {
       fillColor: getColor(level),
@@ -272,22 +274,8 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
     const key = String(feature.properties.name ?? "");
     const row = rankingByName.get(key);
     const label = humanizeName(String(feature.properties.display_name ?? key));
-    const level =
-      effectiveMetric === "surge"
-        ? String(row?.surge_class ?? feature.properties.surge_class ?? "unknown")
-        : effectiveMetric === "incidence"
-        ? String(row?.burden_class ?? feature.properties.burden_class ?? "unknown")
-        : String(row?.cases_class ?? feature.properties.cases_class ?? "unknown");
-    const value =
-      effectiveMetric === "surge"
-        ? Number(row?.surge_score ?? feature.properties.forecast_surge_ratio ?? 0)
-        : effectiveMetric === "incidence"
-        ? Number(row?.total_forecast_incidence_per_100k ?? feature.properties.forecast_incidence_per_100k ?? 0)
-        : Number(
-            dataMode === "observed"
-              ? (row?.observed_cases_w ?? row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.latest_cases ?? 0)
-              : (row?.forecast_w_cases ?? row?.total_forecast_cases ?? row?.total_forecast ?? feature.properties.forecast_cases ?? feature.properties.latest_forecast ?? 0)
-          );
+    const level = metricClassForFeature(feature, row);
+    const value = metricValueForFeature(feature, row);
     const pop = feature.properties.population ? Number(feature.properties.population).toLocaleString() : "-";
     const labelValue = effectiveMetric === "cases" ? formatCases(value) : effectiveMetric === "surge" ? formatSurgeX(value) : formatRate(value);
     const mainLabel =
@@ -388,6 +376,7 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
           ) : geo ? (
             <MapContainer center={[7.1907, 125.4553]} zoom={11} scrollWheelZoom className="w-full h-full">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" opacity={0.35} />
+              <MapFocusController center={selectedCenter} focusToken={focusToken} zoom={13} />
               <GeoJSON
                 key={`${effectiveMetric}-${dataMode}-${period}-${geoMeta?.run_id ?? ""}-${geoMeta?.model_name ?? ""}`}
                 data={geo}
@@ -398,10 +387,19 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect }: Choropleth
                 <Marker
                   key={item.key}
                   position={item.center}
-                  interactive={false}
+                  interactive
+                  eventHandlers={{
+                    click: () => {
+                      if (selectedBarangay?.clean === item.key) {
+                        onBarangaySelect(null);
+                      } else {
+                        onBarangaySelect({ pretty: item.label, clean: item.key });
+                      }
+                    },
+                  }}
                   icon={divIcon({
                     className: "barangay-map-label",
-                    html: `<div style="display:flex;align-items:center;gap:6px;color:#5b2510;font-size:10px;font-weight:700;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:9999px;background:#F93716;display:inline-block;flex:0 0 auto;"></span><span style="background:rgba(255,255,255,0.76);padding:3px 6px;border-radius:8px;border:1px solid rgba(91,37,16,0.12);box-shadow:0 1px 4px rgba(0,0,0,0.14);">${item.label}</span></div>`,
+                    html: `<div style="display:flex;align-items:center;gap:6px;color:#5b2510;font-size:10px;font-weight:700;white-space:nowrap;cursor:pointer;"><span style="width:8px;height:8px;border-radius:9999px;background:#F93716;display:inline-block;flex:0 0 auto;"></span><span style="background:rgba(255,255,255,0.76);padding:3px 6px;border-radius:8px;border:1px solid rgba(91,37,16,0.12);box-shadow:0 1px 4px rgba(0,0,0,0.14);">${item.label}</span></div>`,
                   })}
                 />
               )) : null}

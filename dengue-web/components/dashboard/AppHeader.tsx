@@ -155,7 +155,10 @@ export function AppHeader({
   const subtitle = mode === "admin" ? "Uploads - Runs - Logs" : "Predictive outbreak monitoring - 182 Barangays";
 
   return (
-    <header className="sticky top-0 z-[900] overflow-visible border-b border-border bg-background px-3 py-2 md:px-6 md:py-4">
+    <header
+      className="sticky top-0 overflow-visible border-b border-border bg-background px-3 py-2 md:px-6 md:py-4"
+      style={{ zIndex: 1000 }}
+    >
       <LoginModal open={loginOpen} onOpenChange={setLoginOpen} showTrigger={false} redirectToAdminOnLogin />
 
       <div className="flex items-center justify-between gap-2">

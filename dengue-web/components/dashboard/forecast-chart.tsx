@@ -150,7 +150,7 @@ export function ForecastChart({ selectedBarangay }: ForecastChartProps) {
     : isCityView
     ? `Forecasted and observed city series${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "action_priority"
-    ? `Forecasted action priority context${rangeLabel ? `: ${rangeLabel}` : ""}`
+    ? `Forecasted surge context${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "cases"
     ? `Forecasted cases${rangeLabel ? `: ${rangeLabel}` : ""}`
     : riskMetric === "incidence"

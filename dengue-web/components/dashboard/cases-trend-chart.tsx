@@ -6,12 +6,38 @@ import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import { useCitySeries } from "@/lib/query/hooks";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 
-function CustomTooltip({ active, payload, label }: any) {
+type TrendPoint = {
+  date: string;
+  cases: number | null;
+  forecast: number | null;
+};
+
+type RawTrendPoint = {
+  date: string;
+  cases?: number | null;
+  forecast?: number | null;
+};
+
+type TrendTooltipEntry = {
+  color?: string;
+  dataKey?: string;
+  value?: number | string | null;
+};
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TrendTooltipEntry[];
+  label?: string;
+}) {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-lg border border-border bg-background p-3 shadow-md">
         <p className="mb-2 text-sm font-medium">{label}</p>
-        {payload.map((entry: any, index: number) => (
+        {payload.map((entry, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {entry.dataKey === "cases" ? "Actual" : "Forecast"}: {Number(entry.value ?? 0).toLocaleString()}
           </p>
@@ -31,8 +57,8 @@ export function CasesTrendChart() {
   const { data, isLoading } = useCitySeries(freq, runId, modelName, horizonType);
 
   const chartData = useMemo(() => {
-    const series = data?.series ?? [];
-    return series.map((d: any) => ({
+    const series = (data?.series ?? []) as RawTrendPoint[];
+    return series.map((d: RawTrendPoint): TrendPoint => ({
       date: d.date,
       cases: d.cases ?? null,
       forecast: d.forecast ?? null,
@@ -47,7 +73,7 @@ export function CasesTrendChart() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[320px] w-full">
+        <div className="h-80 w-full">
           {isLoading ? (
             <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
               Loading…

@@ -29,9 +29,9 @@ export function KpiCards() {
   const period = useDashboardStore((s) => s.period);
   const riskMetric = useDashboardStore((s) => s.riskMetric);
   const dataMode = useDashboardStore((s) => s.dataMode);
-  const useAction = riskMetric === "action_priority";
-  const effectiveMetric =
-    useAction ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
+  const isForecastMode = dataMode === "forecast";
+  const useAction = isForecastMode && riskMetric === "action_priority";
+  const effectiveMetric = useAction ? "surge" : riskMetric;
 
   const { data: geo, isLoading, error } = useChoropleth(runId, modelName, period, dataMode);
   const actionQuery = useActionPriority(period, runId, modelName, dataMode, useAction);
@@ -67,27 +67,22 @@ export function KpiCards() {
     const top = rows[0];
     return {
       cityTotalCases: Number(actionData?.summary?.city_total_cases ?? rows.reduce((a: number, r: RankingRow) => {
-        return a + Number(dataMode === "observed" ? (r.observed_cases_w ?? r.total_forecast_cases ?? r.total_forecast ?? 0) : (r.forecast_w_cases ?? 0));
+        return a + Number(r.forecast_w_cases ?? 0);
       }, 0)),
-      priorityCount: Number(actionData?.summary?.priority_count ?? (dataMode === "observed"
-        ? rows.filter((r: RankingRow) => Number(r.observed_cases_w ?? r.total_forecast_cases ?? 0) > 0).length
-        : rows.filter((r: RankingRow) => Boolean(r.priority_eligible)).length)),
-      veryHighCount: Number(actionData?.summary?.very_high_count ?? rows.filter((r: RankingRow) => (
-        dataMode === "observed"
-          ? String(r.cases_class ?? r.risk_level_cases ?? r.risk_level ?? "unknown")
-          : String(r.surge_class ?? "unknown")
-      ) === "very_high").length),
+      priorityCount: Number(actionData?.summary?.priority_count ?? rows.filter((r: RankingRow) => Boolean(r.priority_eligible)).length),
+      veryHighCount: Number(actionData?.summary?.very_high_count ?? rows.filter((r: RankingRow) => String(r.surge_class ?? "unknown") === "very_high").length),
       topName: String(actionData?.summary?.top_name ?? top?.pretty_name ?? top?.name ?? "-"),
-      topValue: Number(actionData?.summary?.top_value ?? (dataMode === "observed"
-        ? (top?.observed_cases_w ?? top?.total_forecast_cases ?? top?.total_forecast ?? 0)
-        : (top?.surge_score ?? 0))),
+      topValue: Number(actionData?.summary?.top_value ?? (top?.surge_score ?? 0)),
     };
-  }, [useAction, actionRows, actionData, dataMode]);
+  }, [useAction, actionRows, actionData]);
 
   const veryHighCount = useMemo(() => {
     if (useAction && actionSummary) return actionSummary.veryHighCount;
     const key: MetricClass = effectiveMetric === "cases" ? "cases_class" : effectiveMetric === "incidence" ? "burden_class" : "surge_class";
-    return geoFeatures.filter((f) => (f?.properties as Record<string, string | undefined>)?.[key] === "very_high").length;
+    return geoFeatures.filter((f) => {
+      const props = (f?.properties ?? {}) as unknown as Record<string, unknown>;
+      return String(props[key] ?? "unknown") === "very_high";
+    }).length;
   }, [useAction, actionSummary, geoFeatures, effectiveMetric]);
 
   const hotspot = useMemo(() => {
@@ -203,9 +198,7 @@ export function KpiCards() {
             </p>
             <p className="text-xs text-muted-foreground">
               {useAction
-                ? dataMode === "observed"
-                  ? "Observed action priority"
-                  : "Barangays prioritized"
+                ? "Eligible surge barangays"
                 : effectiveMetric === "surge"
                 ? "Forecasted surge vs baseline"
                 : dataMode === "observed"

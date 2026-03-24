@@ -25,7 +25,7 @@ class Config:
     backtest_end_date: str = "2022-12-26"  # replaces old fixed train_end_date conceptually
 
     # --- Production horizon ---
-    production_horizon_weeks: int = 12
+    production_horizon_weeks: int = 52
 
     # --- Production fallback model if no test exists ---
     production_city_model: Literal["prophet", "arima"] = "prophet"
@@ -71,7 +71,7 @@ class Config:
 DEFAULT_CFG = Config(
     run_kind="backtest",
     backtest_end_date="2022-12-26",
-    production_horizon_weeks=12,
+    production_horizon_weeks=52,
     production_city_model="prophet",
     disagg_weight_weeks=52,
     disagg_scheme_production="rolling",

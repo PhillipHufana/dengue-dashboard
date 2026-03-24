@@ -4,6 +4,7 @@ import { useState } from "react"
 import { KpiCards } from "./dashboard/kpi-cards"
 import { ForecastChart } from "./dashboard/forecast-chart"
 import { ForecastRankings } from "./dashboard/forecast-rankings"
+import { YearOverYearComparison } from "./dashboard/year-over-year-comparison"
 import dynamic from "next/dynamic";
 // import { DataUploadLogs } from "./dashboard/upload-logs"
 import { useDashboardStore } from "@/lib/store/dashboard-store"
@@ -31,6 +32,7 @@ export function DengueDashboard() {
     pretty: string;
     clean: string;
   } | null>(null);
+  const [mapFocusToken, setMapFocusToken] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [disaggScheme, setDisaggScheme] = useState<string | null>(null)
   const setRunId = useDashboardStore((s) => s.setRunId)
@@ -71,12 +73,6 @@ export function DengueDashboard() {
           body: "This view compares reported cases to population over the selected observed date range.",
         };
       }
-      if (riskMetric === "action_priority") {
-        return {
-          title: "Observed Action Priority",
-          body: "This view prioritizes barangays using recent reported burden in the selected observed date range.",
-        };
-      }
       return {
         title: "Observed Cases",
         body: "This view shows where the most reported cases were recorded in the selected observed date range.",
@@ -89,16 +85,10 @@ export function DengueDashboard() {
         body: "This view shows forecasted incidence for the selected future date range using projected cases and population.",
       };
     }
-    if (riskMetric === "surge") {
+    if (riskMetric === "action_priority" || riskMetric === "surge") {
       return {
         title: "Forecasted Surge",
-        body: "This view compares the selected forecast window against recent baseline activity to highlight the strongest expected increase.",
-      };
-    }
-    if (riskMetric === "action_priority") {
-      return {
-        title: "Forecasted Action Priority",
-        body: "This view prioritizes barangays with meaningful expected rise and projected burden in the selected forecast date range.",
+        body: "This view compares the selected forecast window against recent baseline activity and suppresses low-burden barangays that do not meet the minimum eligibility threshold.",
       };
     }
     return {
@@ -128,10 +118,21 @@ export function DengueDashboard() {
   }, [setRunId]);
 
   useEffect(() => {
-    if (dataMode === "observed" && riskMetric === "surge") {
+    if (dataMode === "observed" && (riskMetric === "surge" || riskMetric === "action_priority")) {
       setRiskMetric("cases");
     }
   }, [dataMode, riskMetric, setRiskMetric]);
+
+  const handleMapBarangaySelect = (value: { pretty: string; clean: string } | null) => {
+    setSelectedBarangay(value);
+  };
+
+  const handleRankingBarangaySelect = (value: { pretty: string; clean: string } | null) => {
+    setSelectedBarangay(value);
+    if (dataMode === "forecast" && value) {
+      setMapFocusToken((current) => current + 1);
+    }
+  };
 
 
   return (
@@ -142,7 +143,7 @@ export function DengueDashboard() {
         disaggScheme={disaggScheme}
       />
 
-      <main className="p-3 md:p-6">
+      <main className="relative z-0 p-3 md:p-6">
         <div className="space-y-4 md:space-y-6">
           <section className={`rounded-lg border p-3 md:p-4 ${
             dataMode === "observed"
@@ -167,17 +168,20 @@ export function DengueDashboard() {
 
           <KpiCards />
 
+          <YearOverYearComparison selectedBarangay={selectedBarangay} />
+
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6 items-stretch">
             <div className="xl:col-span-8 h-full">
               <ChoroplethMap
                 selectedBarangay={selectedBarangay}
-                onBarangaySelect={setSelectedBarangay}
+                onBarangaySelect={handleMapBarangaySelect}
+                focusToken={mapFocusToken}
               />
             </div>
             <div className="xl:col-span-4 h-full">
               <ForecastRankings
                 selectedBarangay={selectedBarangay}
-                onBarangaySelect={setSelectedBarangay}
+                onBarangaySelect={handleRankingBarangaySelect}
               />
             </div>
           </div>

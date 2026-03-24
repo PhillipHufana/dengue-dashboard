@@ -22,7 +22,10 @@ PERIOD_WEEKS = {
     "1y": 52,
 }
 SURGE_HISTORY_WEEKS = 8
+SURGE_FALLBACK_BASELINE_WEEKS = 26
+SURGE_MIN_NONZERO_FOR_SHORT_BASELINE = 4
 SURGE_EPSILON = 1.0
+SURGE_MIN_FORECAST_CASES = 2.0
 
 def fetch_all(q, page_size: int = 1000):
     out = []
@@ -104,7 +107,7 @@ def get_choropleth(
         .select("week_start")
         .eq("run_id", rid)
         .order("week_start", desc=True)
-        .limit(max(SURGE_HISTORY_WEEKS, weeks_to_sum))
+        .limit(max(SURGE_HISTORY_WEEKS, SURGE_FALLBACK_BASELINE_WEEKS, weeks_to_sum))
         .execute()
         .data
     ) or []
@@ -113,14 +116,15 @@ def get_choropleth(
             sb.table("city_weekly")
             .select("week_start")
             .order("week_start", desc=True)
-            .limit(max(SURGE_HISTORY_WEEKS, weeks_to_sum))
+            .limit(max(SURGE_HISTORY_WEEKS, SURGE_FALLBACK_BASELINE_WEEKS, weeks_to_sum))
             .execute()
             .data
         ) or []
     data_last_updated = city_weeks[0]["week_start"] if city_weeks else None
-    weeks_for_surge = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
+    weeks_for_surge_short = [x.get("week_start") for x in city_weeks[:SURGE_HISTORY_WEEKS] if x.get("week_start") is not None]
+    weeks_for_surge_long = [x.get("week_start") for x in city_weeks[:SURGE_FALLBACK_BASELINE_WEEKS] if x.get("week_start") is not None]
     weeks_for_observed = [x.get("week_start") for x in city_weeks[:weeks_to_sum] if x.get("week_start") is not None]
-    weeks_for_needed = list(dict.fromkeys(weeks_for_surge + weeks_for_observed))
+    weeks_for_needed = list(dict.fromkeys(weeks_for_surge_long + weeks_for_observed))
     future_week_starts = sorted({str(r.get("week_start")) for r in frows if r.get("week_start") is not None})
     forecast_window = future_week_starts[:weeks_to_sum]
     observed_window = sorted([str(x) for x in weeks_for_observed])
@@ -179,10 +183,22 @@ def get_choropleth(
         if pop and pop > 0:
             city_population += int(pop)
 
-        recent = [float(series.get(str(ws), 0.0)) for ws in weeks_for_surge] if weeks_for_surge else []
-        past_8w_avg = (sum(recent) / float(SURGE_HISTORY_WEEKS)) if recent else 0.0
+        short_vals = [float(series.get(str(ws), 0.0)) for ws in weeks_for_surge_short] if weeks_for_surge_short else []
+        long_vals = [float(series.get(str(ws), 0.0)) for ws in weeks_for_surge_long] if weeks_for_surge_long else []
+        nonzero_8w = int(sum(1 for v in short_vals if v > 0.0))
+        if nonzero_8w >= int(SURGE_MIN_NONZERO_FOR_SHORT_BASELINE):
+            baseline_window_vals = short_vals
+            baseline_weeks_used = int(SURGE_HISTORY_WEEKS)
+        else:
+            baseline_window_vals = long_vals
+            baseline_weeks_used = int(SURGE_FALLBACK_BASELINE_WEEKS)
+        denom = float(len(baseline_window_vals)) if len(baseline_window_vals) else 1.0
+        past_8w_avg = float(sum(baseline_window_vals)) / denom
         baseline_expected_w = float(past_8w_avg) * float(weeks_to_sum)
         surge_ratio = float(forecast_total) / float(baseline_expected_w + SURGE_EPSILON)
+        surge_eligible = float(forecast_total) >= float(SURGE_MIN_FORECAST_CASES)
+        baseline_eligible = float(baseline_expected_w) >= 1.0
+        priority_eligible = bool(surge_eligible and baseline_eligible)
 
         inc = None
         if pop and pop > 0:
@@ -212,6 +228,11 @@ def get_choropleth(
                 observed_total,
                 forecast_inc,
                 observed_inc,
+                surge_eligible,
+                baseline_eligible,
+                priority_eligible,
+                baseline_weeks_used,
+                nonzero_8w,
             )
         )
 
@@ -220,7 +241,31 @@ def get_choropleth(
 
     breaks = jenks_breaks_safe(inc_values, n_classes=5)
     case_breaks = jenks_breaks_safe(case_values, n_classes=5)
-    surge_breaks = jenks_breaks_safe(surge_values, n_classes=5)
+    eligible_surge_values = [
+        float(surge_ratio)
+        for (
+            _b,
+            _nm,
+            _geom,
+            _total_fc,
+            _inc,
+            surge_ratio,
+            _baseline_expected_w,
+            _wk0,
+            _pop,
+            _forecast_total,
+            _observed_total,
+            _forecast_inc,
+            _observed_inc,
+            _surge_eligible,
+            _baseline_eligible,
+            priority_eligible,
+            _baseline_weeks_used,
+            _nonzero_8w,
+        ) in rows_for_features
+        if bool(priority_eligible)
+    ]
+    surge_breaks = jenks_breaks_safe(eligible_surge_values or [0.0], n_classes=5)
 
     # ---- 2nd pass: build GeoJSON features with Jenks class labels
     features = []
@@ -238,11 +283,16 @@ def get_choropleth(
         observed_total,
         forecast_inc,
         observed_inc,
+        surge_eligible,
+        baseline_eligible,
+        priority_eligible,
+        baseline_weeks_used,
+        nonzero_8w,
     ) in rows_for_features:
         inc_class = jenks_class(inc, breaks)
         
         cases_class = jenks_class(total_fc, case_breaks) if total_fc is not None else "unknown"
-        surge_class = jenks_class(surge_ratio, surge_breaks) if surge_ratio is not None else "unknown"
+        surge_class = jenks_class(surge_ratio, surge_breaks) if priority_eligible and surge_ratio is not None else "very_low"
 
         properties = {
             "name": nm,
@@ -262,6 +312,12 @@ def get_choropleth(
             "forecast_surge_ratio": surge_ratio,
             "baseline_expected_w": baseline_expected_w,
             "surge_class": surge_class,
+            "surge_class_raw": jenks_class(surge_ratio, surge_breaks) if surge_ratio is not None else "unknown",
+            "surge_eligible": bool(surge_eligible),
+            "baseline_eligible": bool(baseline_eligible),
+            "priority_eligible": bool(priority_eligible),
+            "baseline_weeks_used": int(baseline_weeks_used),
+            "nonzero_weeks_8w": int(nonzero_8w),
             "observed_cases": observed_total,
             "observed_incidence_per_100k": observed_inc,
             "prophet_forecast_cases": None,

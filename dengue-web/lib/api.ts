@@ -259,6 +259,9 @@ export interface RankingResponse {
   period_start_week?: string | null;
   period_end_week?: string | null;
   rankings: RankingRow[];
+  jenks_breaks_incidence?: number[];
+  jenks_breaks_cases?: number[];
+  jenks_breaks_surge?: number[];
   run_id: string;
   model_name: string;
   horizon_type: "future";

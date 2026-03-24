@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,24 +32,26 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const runId = useDashboardStore((s) => s.runId);
   const modelName = useDashboardStore((s) => s.modelName);
   const pathname = usePathname();
   const isAdminView = pathname?.startsWith("/admin") ?? false;
 
-  const useAction = riskMetric === "action_priority";
+  const useAction = dataMode === "forecast" && riskMetric === "action_priority";
   const effectiveMetric =
     riskMetric === "action_priority" ? (dataMode === "observed" ? "cases" : "surge") : riskMetric;
   const rankingsQuery = useRankings(timePeriod, runId, modelName, effectiveMetric, dataMode);
   const actionQuery = useActionPriority(timePeriod, runId, modelName, dataMode, useAction);
-  const data = useAction ? actionQuery.data : rankingsQuery.data;
+  const rankingsData = rankingsQuery.data;
+  const actionData = actionQuery.data;
+  const data = useAction ? actionData : rankingsData;
   const isLoading = useAction ? actionQuery.isLoading : rankingsQuery.isLoading;
   const rankingTitle =
     useAction
-      ? dataMode === "observed"
-        ? "Observed Action Priority"
-        : "Forecasted Action Priority"
+      ? "Forecasted Surge by Barangay"
       : dataMode === "observed"
       ? riskMetric === "cases"
         ? "Observed Cases by Barangay"
@@ -60,12 +62,12 @@ export const ForecastRankings = React.memo(function ForecastRankings({
       ? "Forecasted Incidence by Barangay"
       : "Forecasted Surge by Barangay";
   const barangays: RankingRow[] = useMemo(() => {
-    const baseRows = useAction ? (actionQuery.data?.rows ?? []) : (data?.rankings ?? []);
+    const baseRows: RankingRow[] = useAction ? (actionData?.rows ?? []) : (rankingsData?.rankings ?? []);
     const list = baseRows.slice();
 
     if (useAction) return list;
 
-    list.sort((a, b) => {
+    list.sort((a: RankingRow, b: RankingRow) => {
       if (riskMetric === "surge") {
         const av = Number(a.surge_score ?? 0);
         const bv = Number(b.surge_score ?? 0);
@@ -82,7 +84,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     });
 
     return list;
-  }, [useAction, actionQuery.data?.rows, data, riskMetric]);
+  }, [useAction, actionData?.rows, rankingsData?.rankings, riskMetric]);
   const lastUpdated = data?.model_current_date;
 
   const filtered = useMemo(() => {
@@ -105,7 +107,35 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     );
   }, [barangays, searchQuery, riskFilter, effectiveMetric]);
 
-  const displayed = showAll ? filtered : filtered.slice(0, 10);
+  const displayed = useMemo(() => {
+    const base = showAll ? filtered : filtered.slice(0, 10);
+    const selected = selectedBarangay?.clean;
+    if (!selected || base.some((b) => b.name === selected)) {
+      return base;
+    }
+
+    const selectedRow = barangays.find((b) => b.name === selected);
+    return selectedRow ? [...base, selectedRow] : base;
+  }, [barangays, filtered, selectedBarangay?.clean, showAll]);
+
+  const rankLookup = useMemo(() => {
+    return new Map(barangays.map((b, index) => [b.name, index + 1]));
+  }, [barangays]);
+
+  useEffect(() => {
+    const selected = selectedBarangay?.clean;
+    if (!selected) return;
+
+    const row = rowRefs.current[selected];
+    const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']") as HTMLDivElement | null;
+    if (!row || !viewport) return;
+
+    window.setTimeout(() => {
+      const rowTop = row.offsetTop;
+      const targetTop = Math.max(0, rowTop - viewport.clientHeight / 2 + row.clientHeight / 2);
+      viewport.scrollTo({ top: targetTop, behavior: "smooth" });
+    }, 120);
+  }, [displayed, selectedBarangay?.clean]);
 
   const getRiskColor = (lvl: string) => {
     switch (lvl) {
@@ -161,9 +191,11 @@ export const ForecastRankings = React.memo(function ForecastRankings({
   }
 
   return (
-    <Card className={`h-full xl:h-[780px] flex flex-col ${
+    <Card
+      className={`h-full xl:h-[780px] flex flex-col ${
       dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"
-    }`}>
+    }`}
+    >
       <CardHeader className="p-3 pb-2 md:p-6 md:pb-3">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -210,10 +242,11 @@ export const ForecastRankings = React.memo(function ForecastRankings({
       </CardHeader>
 
       <CardContent className="p-3 pt-0 md:p-6 md:pt-0 flex-1 min-h-0">
+        <div ref={scrollAreaRef} className="h-full">
         <ScrollArea className="h-full">
           <div className="space-y-2">
             {displayed.map((b, index) => {
-              const rank = index + 1;
+              const rank = rankLookup.get(b.name) ?? index + 1;
               const isSelected = selectedBarangay?.clean === b.name;
 
               const cls =
@@ -235,6 +268,9 @@ export const ForecastRankings = React.memo(function ForecastRankings({
               return (
                 <div
                   key={b.name}
+                  ref={(node) => {
+                    rowRefs.current[b.name] = node;
+                  }}
                   onClick={() => onBarangaySelect(isSelected ? null : { pretty: b.pretty_name, clean: b.name })}
                   className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
                     isSelected
@@ -303,6 +339,7 @@ export const ForecastRankings = React.memo(function ForecastRankings({
             })}
           </div>
         </ScrollArea>
+        </div>
 
         {filtered.length > 10 && (
           <Button

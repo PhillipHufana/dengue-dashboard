@@ -16,7 +16,7 @@ export function DataModeToggle({ compact = false }: { compact?: boolean }) {
         variant={dataMode === "observed" ? "default" : "outline"}
         onClick={() => {
           setDataMode("observed");
-          setRiskMetric("action_priority");
+          setRiskMetric("cases");
         }}
         className={compact ? "h-8 px-2 text-xs font-medium flex-1 min-w-0 rounded-r-none" : "h-9 px-4 text-sm font-medium rounded-r-none"}
         title="Observed data from the selected past date range."

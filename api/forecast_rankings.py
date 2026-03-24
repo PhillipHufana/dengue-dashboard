@@ -135,6 +135,12 @@ def _recommended_value(row: dict[str, Any], mode: str) -> float:
     return float(row.get("surge_score") or 0.0)
 
 
+def _surge_display_class(surge_score: float, priority_eligible: bool, surge_breaks: list[float]) -> str:
+    if not priority_eligible:
+        return "very_low"
+    return jenks_class(float(surge_score), surge_breaks) if surge_score is not None else "unknown"
+
+
 @router.get("/action-priority")
 def get_action_priority(
     period: str = Query("1m"),
@@ -426,7 +432,36 @@ def get_forecast_rankings(
 
     case_breaks = jenks_breaks_safe(case_values, n_classes=5)
     inc_breaks = jenks_breaks_safe(inc_values, n_classes=5)
-    surge_breaks = jenks_breaks_safe(surge_values, n_classes=5)
+    eligible_surge_values = [
+        float(score)
+        for (
+            _name,
+            _total_forecast,
+            _inc,
+            _observed_w_cases,
+            _observed_w_incidence,
+            _prophet_forecast_w,
+            _arima_forecast_w,
+            _display_cases,
+            _display_incidence,
+            _trend,
+            _last_week,
+            _this_week,
+            _trend_source,
+            _trend_message,
+            _forecast_w_cases,
+            _past_8w_avg_cases,
+            _baseline_expected_w,
+            score,
+            _surge_eligible,
+            _baseline_eligible,
+            priority_eligible,
+            _baseline_weeks_used,
+            _nonzero_8w,
+        ) in rows_tmp
+        if bool(priority_eligible)
+    ]
+    surge_breaks = jenks_breaks_safe(eligible_surge_values or [0.0], n_classes=5)
 
     results = []
     for (
@@ -456,7 +491,7 @@ def get_forecast_rankings(
     ) in rows_tmp:
         cases_class = jenks_class(float(display_cases), case_breaks) if display_cases is not None else "unknown"
         burden_class = jenks_class(float(display_incidence), inc_breaks) if display_incidence is not None else "unknown"
-        surge_class = jenks_class(float(surge_score), surge_breaks) if surge_score is not None else "unknown"
+        surge_class = _surge_display_class(float(surge_score), bool(priority_eligible), surge_breaks)
 
         results.append(
             {
@@ -480,6 +515,7 @@ def get_forecast_rankings(
                 "baseline_expected_w": round(float(baseline_expected_w), 4),
                 "surge_score": round(float(surge_score), 6),
                 "surge_class": surge_class,
+                "surge_class_raw": jenks_class(float(surge_score), surge_breaks) if surge_score is not None else "unknown",
                 "surge_eligible": bool(surge_eligible),
                 "baseline_eligible": bool(baseline_eligible),
                 "priority_eligible": bool(priority_eligible),
