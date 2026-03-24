@@ -506,7 +506,13 @@ function SidebarMenuButton({
 }: React.ComponentProps<'button'> & {
   asChild?: boolean
   isActive?: boolean
-  tooltip?: string | React.ComponentProps<typeof TooltipContent>
+  tooltip?: string | {
+    children?: React.ReactNode
+    side?: 'top' | 'right' | 'bottom' | 'left'
+    align?: 'start' | 'center' | 'end'
+    sideOffset?: number
+    className?: string
+  }
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const Comp = asChild ? Slot : 'button'
   const { isMobile, state } = useSidebar()
@@ -606,10 +612,11 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<'div'> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
+  const reactId = React.useId()
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+    const numericSeed = Array.from(reactId).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return `${50 + (numericSeed % 40)}%`
+  }, [reactId])
 
   return (
     <div
