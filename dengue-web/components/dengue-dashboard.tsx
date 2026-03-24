@@ -217,7 +217,27 @@ export function DengueDashboard() {
           <ForecastChart selectedBarangay={selectedBarangay} />
 
           {/* <DataUploadLogs /> */}
-
+          <section className="rounded-xl border border-[#67B99A]/40 bg-[#E9F9F0] px-4 py-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-[#1F5F46]">Help Improve This Dashboard</p>
+                <p className="text-sm text-[#2D6A4F]">
+                  Please answer the short user evaluation survey after testing the dashboard.
+                </p>
+              </div>
+              <a
+                href="https://docs.google.com/forms/d/1SqhUB4BB3iiQpQ3Ff48Y7HazwXO46IsE5gOjm5u0CnE/edit"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-lg bg-[#1F5F46] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#174936]"
+              >
+                Open User Evaluation Survey
+              </a>
+            </div>
+            <div className="mt-4 border-t border-[#67B99A]/30 pt-3 text-xs text-[#2D6A4F]">
+              © Phillip Hufana 2026
+            </div>
+          </section>
 
         </div>
       </main>
