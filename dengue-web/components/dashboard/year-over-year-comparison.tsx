@@ -17,7 +17,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  type LabelProps,
 } from "recharts";
 
 interface YearOverYearComparisonProps {
@@ -84,37 +83,6 @@ function ComparisonTooltip({
         </div>
       ))}
     </div>
-  );
-}
-
-function EndLabel({
-  x,
-  y,
-  value,
-  index,
-  chartLength,
-  color,
-}: {
-  x?: number;
-  y?: number;
-  value?: string | number;
-  index?: number;
-  chartLength: number;
-  color: string;
-}) {
-  if (index !== chartLength - 1 || x == null || y == null || value == null) return null;
-
-  return (
-    <text
-      x={x + 8}
-      y={y}
-      fill={color}
-      fontSize={10}
-      fontWeight={700}
-      dominantBaseline="central"
-    >
-      {String(value)}
-    </text>
   );
 }
 
@@ -316,16 +284,6 @@ export function YearOverYearComparison({ selectedBarangay }: YearOverYearCompari
                   strokeWidth={index === 0 ? 2.75 : 2}
                   strokeDasharray={index >= 3 ? "4 4" : undefined}
                   dot={false}
-                  label={(props: LabelProps) => (
-                    <EndLabel
-                      x={typeof props.x === "number" ? props.x : undefined}
-                      y={typeof props.y === "number" ? props.y : undefined}
-                      value={year}
-                      index={typeof props.index === "number" ? props.index : undefined}
-                      chartLength={comparison.chartData.length}
-                      color={YEAR_COLORS[colorIndex % YEAR_COLORS.length]}
-                    />
-                  )}
                 />
               )})}
             </LineChart>

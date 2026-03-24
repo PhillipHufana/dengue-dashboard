@@ -116,11 +116,14 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
   const [showMapLabels, setShowMapLabels] = useState(false);
 
   useEffect(() => {
-    const update = () => setShowMapLabels(window.innerWidth >= 1280);
+    const update = () => {
+      const width = window.innerWidth;
+      setShowMapLabels(width >= 1280 || (dataMode === "observed" && width < 768));
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [dataMode]);
 
   const rankingByName = useMemo(() => {
     const out = new Map<string, RankingRow>();
@@ -290,13 +293,13 @@ export function ChoroplethMap({ selectedBarangay, onBarangaySelect, focusToken =
         : "";
 
     layer.bindTooltip(
-      `<strong>${label}</strong><br/>
+      `<div style="font-size:11px;line-height:1.3;"><strong>${label}</strong><br/>
       View: <strong>${dataMode === "observed" ? "Observed" : "Forecasted"}</strong><br/>
       Date range: <strong>${periodLabel}</strong><br/>
       Population: <strong>${pop}</strong><br/>
       Class: <strong>${humanizeClass(level)}</strong><br/>
       ${mainLabel}: <strong>${labelValue}</strong>${surgeDetail}
-      <div style="font-size:11px;color:#aaa;margin-top:4px">Click to view trend</div>`,
+      <div style="font-size:10px;color:#888;margin-top:4px">Click to view trend</div></div>`,
       { sticky: true }
     );
 

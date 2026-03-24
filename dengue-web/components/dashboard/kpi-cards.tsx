@@ -147,12 +147,12 @@ export function KpiCards() {
   return (
     <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
       <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
-        <CardContent className="p-3 md:p-6">
+        <CardContent className="p-2.5 md:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-              <Activity className="h-4 w-4 text-primary" />
+            <div className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg bg-secondary">
+              <Activity className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
             </div>
-            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
+            <span className={`text-[10px] md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
             <p className="text-2xl md:text-3xl font-bold">
@@ -177,12 +177,12 @@ export function KpiCards() {
       </Card>
 
       <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
-        <CardContent className="p-3 md:p-6">
+        <CardContent className="p-2.5 md:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-              <BarChart3 className="h-4 w-4 text-primary" />
+            <div className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg bg-secondary">
+              <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
             </div>
-            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
+            <span className={`text-[10px] md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
             <p className="text-2xl md:text-3xl font-bold">
@@ -210,12 +210,12 @@ export function KpiCards() {
       </Card>
 
       <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
-        <CardContent className="p-3 md:p-6">
+        <CardContent className="p-2.5 md:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+            <div className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg bg-secondary">
+              <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4 text-destructive" />
             </div>
-            <span className="text-xs md:text-sm text-destructive font-medium">{periodLabel}</span>
+            <span className="text-[10px] md:text-sm text-destructive font-medium">{periodLabel}</span>
           </div>
           <div className="mt-4">
             <p className="text-2xl md:text-3xl font-bold">{veryHighCount}</p>
@@ -227,12 +227,12 @@ export function KpiCards() {
       </Card>
 
       <Card className={dataMode === "observed" ? "bg-card border-[#67B99A]" : "bg-card border-blue-300"}>
-        <CardContent className="p-3 md:p-6">
+        <CardContent className="p-2.5 md:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-              <MapPin className="h-4 w-4 text-primary" />
+            <div className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg bg-secondary">
+              <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
             </div>
-            <span className={`text-xs md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
+            <span className={`text-[10px] md:text-sm font-medium ${dataMode === "observed" ? "text-[#2F7D5E] dark:text-[#88D4AB]" : "text-blue-700 dark:text-blue-300"}`}>{periodLabel}</span>
           </div>
           <div className="mt-4">
             <p className="text-2xl md:text-3xl font-bold">

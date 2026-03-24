@@ -122,6 +122,13 @@ export const ForecastRankings = React.memo(function ForecastRankings({
     return new Map(barangays.map((b, index) => [b.name, index + 1]));
   }, [barangays]);
 
+  const interpretationText =
+    effectiveMetric === "surge"
+      ? "Interpretation: 2.5x means the forecast is about 2.5 times the recent baseline."
+      : effectiveMetric === "incidence"
+      ? "Interpretation: values are cases per 100,000 people for the selected window."
+      : "Interpretation: values are total cases in the selected time window.";
+
   useEffect(() => {
     const selected = selectedBarangay?.clean;
     if (!selected) return;
@@ -214,6 +221,14 @@ export const ForecastRankings = React.memo(function ForecastRankings({
               <p>Data updated through: {data.model_current_date}</p>
             </div>
           ) : null}
+
+          <div className={`rounded-md border px-2 py-1 text-[10px] font-medium leading-tight ${
+            dataMode === "observed"
+              ? "border-[#67B99A]/50 bg-[#88D4AB]/15 text-[#1F5F46] dark:text-[#BFEFD0]"
+              : "border-blue-300 bg-blue-50/80 text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"
+          }`}>
+            {interpretationText}
+          </div>
 
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -311,7 +326,15 @@ export const ForecastRankings = React.memo(function ForecastRankings({
                       <div className="text-[10px] text-muted-foreground">
                         Forecast Window: {formatCases(b.forecast_w_cases ?? 0)} | Baseline: {formatCases(b.baseline_expected_w ?? 0)}
                       </div>
-                    ) : null}
+                    ) : effectiveMetric === "incidence" ? (
+                      <div className="text-[10px] text-muted-foreground">
+                        Cases per 100,000 people
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-muted-foreground">
+                        Total cases in selected window
+                      </div>
+                    )}
                     {isAdminView && dataMode === "forecast" ? (
                       <div className="text-[10px] text-muted-foreground">
                         Obs {formatCases(b.observed_cases_w ?? 0)} | P {formatCases(b.prophet_forecast_w ?? 0)} | A {formatCases(b.arima_forecast_w ?? 0)}

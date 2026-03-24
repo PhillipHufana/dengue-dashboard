@@ -51,7 +51,7 @@ export function RiskMetricToggle({ compact = false }: { compact?: boolean }) {
         }
         title={dataMode === "observed" ? "Observed incidence based on reported cases." : "Forecasted incidence based on projected cases."}
       >
-        {compact ? "Incid." : "Incidence"}
+        {compact ? "Incidence" : "Incidence"}
       </Button>
     </ButtonGroup>
   );

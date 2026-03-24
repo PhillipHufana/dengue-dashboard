@@ -70,30 +70,30 @@ export function DengueDashboard() {
       if (riskMetric === "incidence") {
         return {
           title: "Observed Incidence",
-          body: "This view compares reported cases to population over the selected observed date range.",
+          body: "Cases adjusted for population. 25 means 25/100,000.",
         };
       }
       return {
         title: "Observed Cases",
-        body: "This view shows where the most reported cases were recorded in the selected observed date range.",
+        body: "Reported cases in the selected date range.",
       };
     }
 
     if (riskMetric === "incidence") {
       return {
         title: "Forecasted Incidence",
-        body: "This view shows forecasted incidence for the selected future date range using projected cases and population.",
+        body: "Projected cases adjusted for population size.",
       };
     }
     if (riskMetric === "action_priority" || riskMetric === "surge") {
       return {
         title: "Forecasted Surge",
-        body: "This view compares the selected forecast window against recent baseline activity and suppresses low-burden barangays that do not meet the minimum eligibility threshold.",
+        body: "Projected rise versus recent baseline activity.",
       };
     }
     return {
       title: "Forecasted Cases",
-      body: "This view shows projected cases for the selected future date range.",
+      body: "Projected cases in the selected future window.",
     };
   })();
 
